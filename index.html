@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tide Monitor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        
+        .current-value {
+            text-align: center;
+            font-size: 2em;
+            margin: 20px 0;
+            color: #2196F3;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 10px;
+        }
+        
+        .readings {
+            margin: 20px 0;
+        }
+        
+        .reading {
+            padding: 10px;
+            margin: 5px 0;
+            background: #f9f9f9;
+            border-left: 4px solid #2196F3;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌊 Water Level Monitor</h1>
+        
+        <div class="current-value">
+            Current: <span id="currentValue">Loading...</span>
+        </div>
+        
+        <div id="status" class="loading">Loading data...</div>
+        
+        <div class="readings">
+            <h3>Recent Readings:</h3>
+            <div id="readingsList"></div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseUrl = 'https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/.json';
+        
+        // Get data from Firebase
+        async function getData() {
+            try {
+                console.log('Fetching data from:', firebaseUrl);
+                
+                const response = await fetch(firebaseUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Raw data:', data);
+                
+                if (!data) {
+                    throw new Error('No data received');
+                }
+                
+                // Convert to array
+                const readings = [];
+                for (let key in data) {
+                    const reading = data[key];
+                    readings.push({
+                        key: key,
+                        time: reading.t,
+                        waterLevel: parseFloat(reading.w),
+                        flow: parseFloat(reading.f),
+                        measurement: parseFloat(reading.m)
+                    });
+                }
+                
+                // Sort by time (newest first)
+                readings.sort((a, b) => new Date(b.time) - new Date(a.time));
+                
+                // Take last 10 readings
+                const recent = readings.slice(0, 10);
+                
+                console.log('Processed readings:', recent);
+                return recent;
+                
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                document.getElementById('status').innerHTML = `❌ Error: ${error.message}`;
+                return [];
+            }
+        }
+        
+        // Display the data
+        function displayData(readings) {
+            if (readings.length === 0) {
+                document.getElementById('currentValue').textContent = 'No data';
+                document.getElementById('readingsList').innerHTML = '<p>No readings available</p>';
+                return;
+            }
+            
+            // Show current (latest) value
+            const latest = readings[0];
+            document.getElementById('currentValue').textContent = latest.waterLevel;
+            
+            // Show list of readings
+            let html = '';
+            readings.forEach((reading, index) => {
+                const timeStr = new Date(reading.time).toLocaleString();
+                html += `
+                    <div class="reading">
+                        <strong>${timeStr}</strong><br>
+                        Water Level: ${reading.waterLevel} | 
+                        Flow: ${reading.flow} | 
+                        Measurement: ${reading.measurement}
+                    </div>
+                `;
+            });
+            
+            document.getElementById('readingsList').innerHTML = html;
+            document.getElementById('status').innerHTML = '✅ Data loaded successfully';
+        }
+        
+        // Main function
+        async function refresh() {
+            console.log('Refreshing data...');
+            const readings = await getData();
+            displayData(readings);
+        }
+        
+        // Start
+        refresh();
+        
+        // Refresh every 2 minutes
+        setInterval(refresh, 120000);
+    </script>
+</body>
+</html>
