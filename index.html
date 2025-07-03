@@ -51,7 +51,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🌊 Water Level Monitor</h1>
+        <h1>🌊 Water Level Monitor (ft)</h1>
         
         <div class="current-value">
             Current: <span id="currentValue">Loading...</span>
@@ -93,7 +93,7 @@
                     readings.push({
                         key: key,
                         time: reading.t,
-                        waterLevel: parseFloat(reading.w),
+                        waterLevel: parseFloat(reading.w) / 304.8, // Convert mm to feet
                         frequency: parseFloat(reading.f),
                         magnitude: parseFloat(reading.m)
                     });
@@ -132,7 +132,7 @@
             
             // Show current (latest) value
             const latest = readings[0];
-            document.getElementById('currentValue').textContent = latest.waterLevel;
+            document.getElementById('currentValue').textContent = `${latest.waterLevel.toFixed(2)} ft`;
             
             // Show list of readings
             let html = '';
@@ -141,7 +141,7 @@
                 html += `
                     <div class="reading">
                         <strong>${timeStr}</strong><br>
-                        Water Level: ${reading.waterLevel} | 
+                        Water Level: ${reading.waterLevel.toFixed(2)} ft | 
                         Frequency: ${reading.frequency} | 
                         Magnitude: ${reading.magnitude}
                     </div>
