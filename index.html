@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Tide Monitor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -32,6 +33,15 @@
             border-radius: 10px;
         }
         
+        .chart-container {
+            height: 400px;
+            margin: 30px 0;
+            padding: 20px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+        }
+        
         .readings {
             margin: 20px 0;
         }
@@ -59,6 +69,11 @@
         
         <div id="status" class="loading">Loading data...</div>
         
+        <div class="chart-container">
+            <h3>Water Level - Last 24 Hours</h3>
+            <canvas id="waterLevelChart"></canvas>
+        </div>
+        
         <div class="readings">
             <h3>Recent Readings:</h3>
             <div id="readingsList"></div>
@@ -67,6 +82,53 @@
 
     <script>
         const firebaseUrl = 'https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/.json?orderBy="$key"&limitToLast=1440';
+        let waterLevelChart;
+        
+        // Initialize the chart
+        function initChart() {
+            const ctx = document.getElementById('waterLevelChart').getContext('2d');
+            waterLevelChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Water Level (ft)',
+                        data: [],
+                        borderColor: '#2196F3',
+                        backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                        fill: true,
+                        tension: 0.1,
+                        pointRadius: 1,
+                        pointHoverRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            min: -10,
+                            max: 10,
+                            title: {
+                                display: true,
+                                text: 'Water Level (feet)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
         
         // Get data from Firebase
         async function getData() {
@@ -134,9 +196,13 @@
             const latest = readings[0];
             document.getElementById('currentValue').textContent = `${latest.waterLevel.toFixed(2)} ft`;
             
-            // Show list of readings
+            // Update chart with all 24-hour data
+            updateChart(readings);
+            
+            // Show list of last 10 readings only
+            const last10 = readings.slice(0, 10);
             let html = '';
-            readings.forEach((reading, index) => {
+            last10.forEach((reading, index) => {
                 const timeStr = new Date(reading.time).toLocaleString();
                 html += `
                     <div class="reading">
@@ -152,6 +218,31 @@
             document.getElementById('status').innerHTML = '✅ Data loaded successfully';
         }
         
+        // Update the chart
+        function updateChart(readings) {
+            if (!waterLevelChart || readings.length === 0) return;
+            
+            // Sort by time (oldest first for chart)
+            const sortedReadings = [...readings].sort((a, b) => new Date(a.time) - new Date(b.time));
+            
+            // Create labels and data
+            const labels = sortedReadings.map(reading => {
+                const time = new Date(reading.time);
+                return time.toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: false 
+                });
+            });
+            
+            const waterLevelData = sortedReadings.map(reading => reading.waterLevel);
+            
+            // Update chart
+            waterLevelChart.data.labels = labels;
+            waterLevelChart.data.datasets[0].data = waterLevelData;
+            waterLevelChart.update('none');
+        }
+        
         // Main function
         async function refresh() {
             console.log('Refreshing data...');
@@ -160,6 +251,7 @@
         }
         
         // Start
+        initChart();
         refresh();
         
         // Refresh every 2 minutes
