@@ -94,8 +94,8 @@
                         key: key,
                         time: reading.t,
                         waterLevel: parseFloat(reading.w),
-                        flow: parseFloat(reading.f),
-                        measurement: parseFloat(reading.m)
+                        frequency: parseFloat(reading.f),
+                        magnitude: parseFloat(reading.m)
                     });
                 }
                 
@@ -135,8 +135,8 @@
                     <div class="reading">
                         <strong>${timeStr}</strong><br>
                         Water Level: ${reading.waterLevel} | 
-                        Flow: ${reading.flow} | 
-                        Measurement: ${reading.measurement}
+                        Frequency: ${reading.frequency} | 
+                        Magnitude: ${reading.magnitude}
                     </div>
                 `;
             });
