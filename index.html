@@ -2,7 +2,7 @@
 <html>
 <head>
     <title>Tide Monitor</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -86,7 +86,15 @@
         
         // Initialize the chart
         function initChart() {
+            // Check if Chart is available
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js not loaded');
+                document.getElementById('status').innerHTML = '❌ Chart library failed to load';
+                return;
+            }
+            
             const ctx = document.getElementById('waterLevelChart').getContext('2d');
+            waterLevelChart = new Chart(ctx, {
             waterLevelChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -251,8 +259,11 @@
         }
         
         // Start
-        initChart();
-        refresh();
+        // Wait a moment for Chart.js to load, then initialize
+        setTimeout(() => {
+            initChart();
+            refresh();
+        }, 500);
         
         // Refresh every 2 minutes
         setInterval(refresh, 120000);
