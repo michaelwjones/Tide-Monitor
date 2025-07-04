@@ -97,11 +97,12 @@
         function createChart(readings) {
             const ctx = document.getElementById('waterLevelChart').getContext('2d');
             
-            // Filter out any invalid timestamps and get min/max times
+            // Filter out any invalid timestamps
             const validReadings = readings.filter(r => r.rawTimestamp.getTime() > 0);
-            const timestamps = validReadings.map(r => r.rawTimestamp);
-            const minTime = new Date(Math.min(...timestamps));
-            const maxTime = new Date(Math.max(...timestamps));
+            
+            // Set time range to exactly 24 hours ago to now
+            const now = new Date();
+            const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
             
             new Chart(ctx, {
                 type: 'line',
@@ -118,11 +119,12 @@
                     }]
                 },
                 options: {
+                    animation: false,
                     responsive: true,
                     scales: {
                         y: {
-                            min: -10,
-                            max: 10,
+                            min: -8,
+                            max: 8,
                             title: {
                                 display: true,
                                 text: 'Water Level (feet)'
@@ -130,23 +132,24 @@
                         },
                         x: {
                             type: 'time',
-                            min: minTime,
-                            max: maxTime,
+                            min: twentyFourHoursAgo,
+                            max: now,
                             time: {
                                 displayFormats: {
                                     hour: 'MMM dd HH:mm'
                                 }
                             },
                             title: {
-                                display: true,
-                                text: 'Time'
+                                display: false
                             }
                         }
                     },
                     plugins: {
+                        legend: {
+                            display: false
+                        },
                         title: {
-                            display: true,
-                            text: 'Water Level Over Last 24 Hours'
+                            display: false
                         }
                     }
                 }
