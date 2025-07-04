@@ -17,7 +17,7 @@
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.umd.js"></script>
 </head>
 <body>
     <h1>Tide Monitor</h1>
@@ -49,6 +49,17 @@
 
     <script>
         window.addEventListener('load', function() {
+            // Check what annotation plugins are available
+            console.log('Chart object:', Chart);
+            console.log('Window annotation keys:', Object.keys(window).filter(k => k.toLowerCase().includes('annotation')));
+            
+            // Try different ways to register the annotation plugin
+            if (typeof ChartAnnotation !== 'undefined') {
+                Chart.register(ChartAnnotation);
+            } else if (window.ChartAnnotation) {
+                Chart.register(window.ChartAnnotation);
+            }
+            
             fetchTideData();
         });
 
@@ -163,8 +174,7 @@
                             }
                         }
                     }
-                },
-                plugins: [window.chartjs.annotation.default]
+                }
             });
         }
     </script>
