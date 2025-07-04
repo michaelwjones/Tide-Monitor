@@ -17,7 +17,6 @@
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.umd.js"></script>
 </head>
 <body>
     <h1>Tide Monitor</h1>
@@ -49,17 +48,6 @@
 
     <script>
         window.addEventListener('load', function() {
-            // Check what annotation plugins are available
-            console.log('Chart object:', Chart);
-            console.log('Window annotation keys:', Object.keys(window).filter(k => k.toLowerCase().includes('annotation')));
-            
-            // Try different ways to register the annotation plugin
-            if (typeof ChartAnnotation !== 'undefined') {
-                Chart.register(ChartAnnotation);
-            } else if (window.ChartAnnotation) {
-                Chart.register(window.ChartAnnotation);
-            }
-            
             fetchTideData();
         });
 
@@ -115,18 +103,33 @@
             const now = new Date();
             const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
             
+            // Create horizontal line data points
+            const horizontalLineData = [
+                {x: twentyFourHoursAgo, y: 1.15},
+                {x: now, y: 1.15}
+            ];
+            
             new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: validReadings.map(r => r.rawTimestamp),
                     datasets: [{
                         label: 'Water Level (ft)',
-                        data: validReadings.map(r => parseFloat(r.waterLevel)),
+                        data: validReadings.map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevel)})),
                         borderColor: 'blue',
                         backgroundColor: 'rgba(0, 0, 255, 0.1)',
                         borderWidth: 2,
                         pointRadius: 0,
-                        pointHoverRadius: 0
+                        pointHoverRadius: 0,
+                        order: 1
+                    }, {
+                        label: 'Reference Line',
+                        data: horizontalLineData,
+                        borderColor: 'green',
+                        borderWidth: 3,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        fill: false,
+                        order: 0
                     }]
                 },
                 options: {
@@ -161,17 +164,6 @@
                         },
                         title: {
                             display: false
-                        },
-                        annotation: {
-                            annotations: {
-                                line1: {
-                                    type: 'line',
-                                    yMin: 1.15,
-                                    yMax: 1.15,
-                                    borderColor: 'red',
-                                    borderWidth: 3,
-                                }
-                            }
                         }
                     }
                 }
