@@ -1,118 +1,106 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Tide Monitor</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tide Monitor - Recent Readings</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background: #f0f0f0;
+        table, th, td {
+            border: 1px solid black;
         }
-        
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-        }
-        
-        h1 {
-            text-align: center;
-            color: #333;
-        }
-        
-        .current-value {
-            text-align: center;
-            font-size: 2em;
-            margin: 20px 0;
-            color: #2196F3;
-            padding: 20px;
-            background: #f5f5f5;
-            border-radius: 10px;
-        }
-        
-        .chart-container {
-            height: 400px;
-            margin: 30px 0;
-            padding: 20px;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 10px;
-        }
-        
-        .readings {
-            margin: 20px 0;
-        }
-        
-        .reading {
-            padding: 10px;
-            margin: 5px 0;
-            background: #f9f9f9;
-            border-left: 4px solid #2196F3;
-        }
-        
-        .loading {
-            text-align: center;
-            color: #666;
+        table {
+            border-collapse: collapse;
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 </head>
 <body>
-    <div class="container">
-        <h1>🌊 Water Level Monitor (ft)</h1>
-        
-        <div class="current-value">
-            Current: <span id="currentValue">Loading...</span>
-        </div>
-        
-        <div id="status" class="loading">Loading data...</div>
-        
-        <div class="chart-container">
-            <h3>Water Level - Last 24 Hours</h3>
-            <canvas id="waterLevelChart"></canvas>
-        </div>
-        
-        <div class="readings">
-            <h3>Recent Readings:</h3>
-            <div id="readingsList"></div>
-        </div>
+    <h1>Tide Monitor - Last 24 Hours</h1>
+    
+    <h2>Water Level Chart</h2>
+    <canvas id="waterLevelChart" width="800" height="400"></canvas>
+    
+    <h2>Recent Readings</h2>
+    <div id="readings">
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Water Level (ft)</th>
+                    <th>Frequency (Hz)</th>
+                    <th>Magnitude</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <tr>
+                    <td colspan="4">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
     <script>
-        const firebaseUrl = 'https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/.json?orderBy="$key"&limitToLast=1440';
-        let waterLevelChart;
-        
-        // Initialize the chart
-        function initChart() {
-            // Check if Chart is available
-            if (typeof Chart === 'undefined') {
-                console.error('Chart.js not loaded');
-                document.getElementById('status').innerHTML = '❌ Chart library failed to load';
-                return;
-            }
+        window.addEventListener('load', function() {
+            fetchTideData();
+        });
+
+        async function fetchTideData() {
+            const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/.json?orderBy="$key"&limitToLast=1440');
+            const data = await response.json();
             
+            const readings = Object.entries(data).map(([key, value]) => ({
+                id: key,
+                timestamp: new Date(value.t).toLocaleString('en-US', { 
+                    timeZone: 'America/New_York',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                }),
+                rawTimestamp: new Date(value.t),
+                frequency: value.f,
+                magnitude: value.m,
+                waterLevel: (value.w / 304.8).toFixed(2)
+            }));
+            
+            // Create chart with all data
+            createChart(readings);
+            
+            // Get only the last 10 readings and reverse to show most recent first
+            const last10 = readings.slice(-10).reverse();
+            
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = last10.map(reading => `
+                <tr>
+                    <td>${reading.timestamp}</td>
+                    <td>${reading.waterLevel}</td>
+                    <td>${reading.frequency}</td>
+                    <td>${reading.magnitude}</td>
+                </tr>
+            `).join('');
+        }
+
+        function createChart(readings) {
             const ctx = document.getElementById('waterLevelChart').getContext('2d');
-            waterLevelChart = new Chart(ctx, {
-            waterLevelChart = new Chart(ctx, {
+            
+            new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: [],
+                    labels: readings.map(r => r.rawTimestamp),
                     datasets: [{
                         label: 'Water Level (ft)',
-                        data: [],
-                        borderColor: '#2196F3',
-                        backgroundColor: 'rgba(33, 150, 243, 0.1)',
-                        fill: true,
-                        tension: 0.1,
-                        pointRadius: 1,
-                        pointHoverRadius: 4
+                        data: readings.map(r => parseFloat(r.waterLevel)),
+                        borderColor: 'blue',
+                        backgroundColor: 'rgba(0, 0, 255, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 1
                     }]
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: false,
                     scales: {
                         y: {
                             min: -10,
@@ -123,6 +111,12 @@
                             }
                         },
                         x: {
+                            type: 'time',
+                            time: {
+                                displayFormats: {
+                                    hour: 'MMM DD HH:mm'
+                                }
+                            },
                             title: {
                                 display: true,
                                 text: 'Time'
@@ -130,143 +124,14 @@
                         }
                     },
                     plugins: {
-                        legend: {
-                            display: false
+                        title: {
+                            display: true,
+                            text: 'Water Level Over Last 24 Hours'
                         }
                     }
                 }
             });
         }
-        
-        // Get data from Firebase
-        async function getData() {
-            try {
-                console.log('Fetching data from:', firebaseUrl);
-                
-                const response = await fetch(firebaseUrl);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const data = await response.json();
-                console.log('Raw data:', data);
-                
-                if (!data) {
-                    throw new Error('No data received');
-                }
-                
-                // Convert to array
-                const readings = [];
-                for (let key in data) {
-                    const reading = data[key];
-                    readings.push({
-                        key: key,
-                        time: reading.t,
-                        waterLevel: parseFloat(reading.w) / 304.8, // Convert mm to feet
-                        frequency: parseFloat(reading.f),
-                        magnitude: parseFloat(reading.m)
-                    });
-                }
-                
-                // Sort by time (newest first)
-                readings.sort((a, b) => new Date(b.time) - new Date(a.time));
-                
-                // Filter to last 24 hours
-                const now = new Date();
-                const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-                const recentReadings = readings.filter(reading => new Date(reading.time) >= twentyFourHoursAgo);
-                
-                // Take last 10 for display
-                const recent = recentReadings.slice(0, 10);
-                
-                console.log('Total readings from Firebase:', readings.length);
-                console.log('Readings in last 24 hours:', recentReadings.length);
-                console.log('Showing most recent:', recent.length);
-                return recent;
-                
-            } catch (error) {
-                console.error('Error fetching data:', error);
-                document.getElementById('status').innerHTML = `❌ Error: ${error.message}`;
-                return [];
-            }
-        }
-        
-        // Display the data
-        function displayData(readings) {
-            if (readings.length === 0) {
-                document.getElementById('currentValue').textContent = 'No data';
-                document.getElementById('readingsList').innerHTML = '<p>No readings available</p>';
-                return;
-            }
-            
-            // Show current (latest) value
-            const latest = readings[0];
-            document.getElementById('currentValue').textContent = `${latest.waterLevel.toFixed(2)} ft`;
-            
-            // Update chart with all 24-hour data
-            updateChart(readings);
-            
-            // Show list of last 10 readings only
-            const last10 = readings.slice(0, 10);
-            let html = '';
-            last10.forEach((reading, index) => {
-                const timeStr = new Date(reading.time).toLocaleString();
-                html += `
-                    <div class="reading">
-                        <strong>${timeStr}</strong><br>
-                        Water Level: ${reading.waterLevel.toFixed(2)} ft | 
-                        Frequency: ${reading.frequency} | 
-                        Magnitude: ${reading.magnitude}
-                    </div>
-                `;
-            });
-            
-            document.getElementById('readingsList').innerHTML = html;
-            document.getElementById('status').innerHTML = '✅ Data loaded successfully';
-        }
-        
-        // Update the chart
-        function updateChart(readings) {
-            if (!waterLevelChart || readings.length === 0) return;
-            
-            // Sort by time (oldest first for chart)
-            const sortedReadings = [...readings].sort((a, b) => new Date(a.time) - new Date(b.time));
-            
-            // Create labels and data
-            const labels = sortedReadings.map(reading => {
-                const time = new Date(reading.time);
-                return time.toLocaleTimeString('en-US', { 
-                    hour: '2-digit', 
-                    minute: '2-digit',
-                    hour12: false 
-                });
-            });
-            
-            const waterLevelData = sortedReadings.map(reading => reading.waterLevel);
-            
-            // Update chart
-            waterLevelChart.data.labels = labels;
-            waterLevelChart.data.datasets[0].data = waterLevelData;
-            waterLevelChart.update('none');
-        }
-        
-        // Main function
-        async function refresh() {
-            console.log('Refreshing data...');
-            const readings = await getData();
-            displayData(readings);
-        }
-        
-        // Start
-        // Wait a moment for Chart.js to load, then initialize
-        setTimeout(() => {
-            initChart();
-            refresh();
-        }, 500);
-        
-        // Refresh every 2 minutes
-        setInterval(refresh, 120000);
     </script>
 </body>
 </html>
