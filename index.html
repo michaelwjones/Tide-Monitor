@@ -11,33 +11,40 @@
         table {
             border-collapse: collapse;
         }
+        .hidden {
+            display: none;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 </head>
 <body>
-    <h1>Tide Monitor - Last 24 Hours</h1>
+    <h1>Tide Monitor</h1>
     
-    <h2>Water Level Chart</h2>
-    <canvas id="waterLevelChart" width="800" height="400"></canvas>
+    <div id="loading">Loading...</div>
     
-    <h2>Recent Readings</h2>
-    <div id="readings">
-        <table>
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Water Level (ft)</th>
-                    <th>Frequency (Hz)</th>
-                    <th>Magnitude</th>
-                </tr>
-            </thead>
-            <tbody id="tableBody">
-                <tr>
-                    <td colspan="4">Loading...</td>
-                </tr>
-            </tbody>
-        </table>
+    <div id="content" class="hidden">
+        <h2>Water Level Chart</h2>
+        <canvas id="waterLevelChart" width="800" height="400"></canvas>
+        
+        <h2>Recent Readings</h2>
+        <div id="readings">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Water Level (ft)</th>
+                        <th>Frequency (Hz)</th>
+                        <th>Magnitude</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr>
+                        <td colspan="4">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <script>
@@ -81,6 +88,10 @@
                     <td>${reading.magnitude}</td>
                 </tr>
             `).join('');
+            
+            // Hide loading and show content
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('content').classList.remove('hidden');
         }
 
         function createChart(readings) {
@@ -102,7 +113,8 @@
                         borderColor: 'blue',
                         backgroundColor: 'rgba(0, 0, 255, 0.1)',
                         borderWidth: 2,
-                        pointRadius: 1
+                        pointRadius: 0,
+                        pointHoverRadius: 0
                     }]
                 },
                 options: {
@@ -122,7 +134,7 @@
                             max: maxTime,
                             time: {
                                 displayFormats: {
-                                    hour: 'MMM DD HH:mm'
+                                    hour: 'MMM dd HH:mm'
                                 }
                             },
                             title: {
