@@ -86,13 +86,19 @@
         function createChart(readings) {
             const ctx = document.getElementById('waterLevelChart').getContext('2d');
             
+            // Filter out any invalid timestamps and get min/max times
+            const validReadings = readings.filter(r => r.rawTimestamp.getTime() > 0);
+            const timestamps = validReadings.map(r => r.rawTimestamp);
+            const minTime = new Date(Math.min(...timestamps));
+            const maxTime = new Date(Math.max(...timestamps));
+            
             new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: readings.map(r => r.rawTimestamp),
+                    labels: validReadings.map(r => r.rawTimestamp),
                     datasets: [{
                         label: 'Water Level (ft)',
-                        data: readings.map(r => parseFloat(r.waterLevel)),
+                        data: validReadings.map(r => parseFloat(r.waterLevel)),
                         borderColor: 'blue',
                         backgroundColor: 'rgba(0, 0, 255, 0.1)',
                         borderWidth: 2,
@@ -112,6 +118,8 @@
                         },
                         x: {
                             type: 'time',
+                            min: minTime,
+                            max: maxTime,
                             time: {
                                 displayFormats: {
                                     hour: 'MMM DD HH:mm'
