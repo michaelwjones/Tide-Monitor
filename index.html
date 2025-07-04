@@ -17,6 +17,7 @@
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 </head>
 <body>
     <h1>Tide Monitor</h1>
@@ -149,9 +150,21 @@
                         },
                         title: {
                             display: false
+                        },
+                        annotation: {
+                            annotations: {
+                                line1: {
+                                    type: 'line',
+                                    yMin: 1.15,
+                                    yMax: 1.15,
+                                    borderColor: 'red',
+                                    borderWidth: 3,
+                                }
+                            }
                         }
                     }
-                }
+                },
+                plugins: [window.chartjs.annotation.default]
             });
         }
     </script>
