@@ -33,13 +33,14 @@
                     <tr>
                         <th>Time</th>
                         <th>Water Level (ft)</th>
-                        <th>Frequency (Hz)</th>
-                        <th>Magnitude</th>
+                        <th>Height (Percentile)</th>
+                        <th>Height (Envelope)</th>
+                        <th>Height (Binning)</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
                     <tr>
-                        <td colspan="4">Loading...</td>
+                        <td colspan="5">Loading...</td>
                     </tr>
                 </tbody>
             </table>
@@ -72,8 +73,9 @@
                     second: '2-digit'
                 }),
                 rawTimestamp: new Date(value.t),
-                frequency: value.f,
-                magnitude: value.m,
+                heightPercentile: value.hp ?? '--',
+                heightEnvelope: value.he ?? '--',
+                heightBinning: value.hb ?? '--',
                 waterLevel: (value.w / 304.8).toFixed(2)
             }));
             
@@ -88,8 +90,9 @@
                 <tr>
                     <td>${reading.timestamp}</td>
                     <td>${reading.waterLevel}</td>
-                    <td>${reading.frequency}</td>
-                    <td>${reading.magnitude}</td>
+                    <td>${reading.heightPercentile}</td>
+                    <td>${reading.heightEnvelope}</td>
+                    <td>${reading.heightBinning}</td>
                 </tr>
             `).join('');
             
