@@ -33,9 +33,9 @@
                     <tr>
                         <th>Time</th>
                         <th>Water Level (ft)</th>
-                        <th>Height (Percentile)</th>
-                        <th>Height (Envelope)</th>
-                        <th>Height (Binning)</th>
+                        <th>Waves (Percentile)</th>
+                        <th>Waves (Envelope)</th>
+                        <th>Waves (Binning)</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
@@ -73,9 +73,9 @@
                     second: '2-digit'
                 }),
                 rawTimestamp: new Date(value.t),
-                heightPercentile: (value.hp !== undefined && value.hp !== null) ? (value.hp / 304.8).toFixed(2) : '--',
-                heightEnvelope: (value.he !== undefined && value.he !== null) ? (value.he / 304.8).toFixed(2) : '--',
-                heightBinning: (value.hb !== undefined && value.hb !== null) ? (value.hb / 304.8).toFixed(2) : '--',
+                wavesPercentile: (value.hp !== undefined && value.hp !== null) ? (value.hp / 304.8).toFixed(2) : '--',
+                wavesEnvelope: (value.he !== undefined && value.he !== null) ? (value.he / 304.8).toFixed(2) : '--',
+                wavesBinning: (value.hb !== undefined && value.hb !== null) ? (value.hb / 304.8).toFixed(2) : '--',
                 waterLevel: (value.w / 304.8).toFixed(2)
             }));
             
@@ -90,9 +90,9 @@
                 <tr>
                     <td>${reading.timestamp}</td>
                     <td>${reading.waterLevel}</td>
-                    <td>${reading.heightPercentile}</td>
-                    <td>${reading.heightEnvelope}</td>
-                    <td>${reading.heightBinning}</td>
+                    <td>${reading.wavesPercentile}</td>
+                    <td>${reading.wavesEnvelope}</td>
+                    <td>${reading.wavesBinning}</td>
                 </tr>
             `).join('');
             
@@ -135,6 +135,33 @@
                         pointHoverRadius: 0,
                         order: 1
                     }, {
+                        label: 'Waves (Percentile)',
+                        data: validReadings.filter(r => r.wavesPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesPercentile)})),
+                        borderColor: 'red',
+                        backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        order: 2
+                    }, {
+                        label: 'Waves (Envelope)',
+                        data: validReadings.filter(r => r.wavesEnvelope !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesEnvelope)})),
+                        borderColor: 'orange',
+                        backgroundColor: 'rgba(255, 165, 0, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        order: 3
+                    }, {
+                        label: 'Waves (Binning)',
+                        data: validReadings.filter(r => r.wavesBinning !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesBinning)})),
+                        borderColor: 'purple',
+                        backgroundColor: 'rgba(128, 0, 128, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        order: 4
+                    }, {
                         label: 'Reference Line',
                         data: horizontalLineData,
                         borderColor: 'green',
@@ -173,7 +200,8 @@
                     },
                     plugins: {
                         legend: {
-                            display: false
+                            display: true,
+                            position: 'top'
                         },
                         title: {
                             display: false
