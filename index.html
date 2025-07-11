@@ -73,9 +73,9 @@
                     second: '2-digit'
                 }),
                 rawTimestamp: new Date(value.t),
-                heightPercentile: value.hp ?? '--',
-                heightEnvelope: value.he ?? '--',
-                heightBinning: value.hb ?? '--',
+                heightPercentile: (value.hp !== undefined && value.hp !== null) ? (value.hp / 304.8).toFixed(2) : '--',
+                heightEnvelope: (value.he !== undefined && value.he !== null) ? (value.he / 304.8).toFixed(2) : '--',
+                heightBinning: (value.hb !== undefined && value.hb !== null) ? (value.hb / 304.8).toFixed(2) : '--',
                 waterLevel: (value.w / 304.8).toFixed(2)
             }));
             
