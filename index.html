@@ -140,7 +140,7 @@
                         data: validReadings.filter(r => r.wavesPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesPercentile)})),
                         borderColor: 'red',
                         backgroundColor: 'rgba(255, 0, 0, 0.1)',
-                        borderWidth: 2,
+                        borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 0,
                         order: 2
@@ -149,7 +149,7 @@
                         data: validReadings.filter(r => r.wavesEnvelope !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesEnvelope)})),
                         borderColor: 'orange',
                         backgroundColor: 'rgba(255, 165, 0, 0.1)',
-                        borderWidth: 2,
+                        borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 0,
                         order: 3
@@ -158,7 +158,7 @@
                         data: validReadings.filter(r => r.wavesBinning !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesBinning)})),
                         borderColor: 'purple',
                         backgroundColor: 'rgba(128, 0, 128, 0.1)',
-                        borderWidth: 2,
+                        borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 0,
                         order: 4
@@ -166,7 +166,7 @@
                         label: 'Reference Line',
                         data: horizontalLineData,
                         borderColor: 'green',
-                        borderWidth: 3,
+                        borderWidth: 2,
                         pointRadius: 0,
                         pointHoverRadius: 0,
                         fill: false,
