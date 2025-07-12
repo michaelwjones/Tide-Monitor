@@ -11,32 +11,34 @@
             background-color: #f5f5f5;
         }
         .container {
-            max-width: 1200px;
-            margin: 0 auto;
+            margin: 0;
             background: white;
             padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         h1 {
             color: #333;
             border-bottom: 2px solid #007bff;
             padding-bottom: 10px;
         }
-        .nav {
-            margin-bottom: 20px;
+        .main-link {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            transition: background-color 0.2s;
+            z-index: 1000;
         }
-        .nav a {
-            display: inline-block;
-            padding: 8px 16px;
-            margin-right: 10px;
-            background: #007bff;
+        .main-link:hover {
+            background: #218838;
             color: white;
             text-decoration: none;
-            border-radius: 4px;
-        }
-        .nav a:hover {
-            background: #0056b3;
         }
         .section {
             margin-bottom: 30px;
@@ -71,12 +73,7 @@
     <div class="container">
         <h1>Tide Monitor - Debug Dashboard</h1>
         
-        <div class="nav">
-            <a href="../index.html">← Back to Main Dashboard</a>
-            <a href="#chart">Debug Chart</a>
-            <a href="#system-status">System Status</a>
-            <a href="#diagnostics">Diagnostics</a>
-        </div>
+        <a href="../index.html" class="main-link">← Main Dashboard</a>
 
         <div id="loading">Loading debug data...</div>
         
@@ -88,19 +85,6 @@
             </div>
         </div>
 
-        <div class="section" id="system-status">
-            <h2>System Status</h2>
-            <div class="placeholder">
-                Particle device status, connectivity, and sensor health monitoring will be displayed here.
-            </div>
-        </div>
-
-        <div class="section" id="diagnostics">
-            <h2>Diagnostics</h2>
-            <div class="placeholder">
-                Debugging tools, data validation, and troubleshooting information will be displayed here.
-            </div>
-        </div>
     </div>
 
     <script>
@@ -167,11 +151,6 @@
             const now = new Date();
             const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
             
-            // Create horizontal line data points
-            const horizontalLineData = [
-                {x: twentyFourHoursAgo, y: 2.5},
-                {x: now, y: 2.5}
-            ];
             
             debugChartInstance = new Chart(ctx, {
                 type: 'line',
@@ -181,37 +160,34 @@
                         data: validReadings.map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevel)})),
                         borderColor: 'blue',
                         backgroundColor: 'rgba(0, 0, 255, 0.1)',
-                        borderWidth: 3,
+                        borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 0,
                         order: 1
                     }, {
                         label: 'Water Level (Percentile)',
                         data: validReadings.filter(r => r.waterLevelPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelPercentile)})),
-                        borderColor: 'darkblue',
-                        backgroundColor: 'rgba(0, 0, 139, 0.1)',
-                        borderWidth: 2,
-                        borderDash: [10, 5],
+                        borderColor: 'cyan',
+                        backgroundColor: 'rgba(0, 255, 255, 0.1)',
+                        borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 0,
                         order: 2
                     }, {
                         label: 'Water Level (Envelope)',
                         data: validReadings.filter(r => r.waterLevelEnvelope !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelEnvelope)})),
-                        borderColor: 'navy',
-                        backgroundColor: 'rgba(0, 0, 128, 0.1)',
-                        borderWidth: 2,
-                        borderDash: [5, 5],
+                        borderColor: 'magenta',
+                        backgroundColor: 'rgba(255, 0, 255, 0.1)',
+                        borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 0,
                         order: 3
                     }, {
                         label: 'Water Level (Binning)',
                         data: validReadings.filter(r => r.waterLevelBinning !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelBinning)})),
-                        borderColor: 'mediumblue',
-                        backgroundColor: 'rgba(0, 0, 205, 0.1)',
-                        borderWidth: 2,
-                        borderDash: [3, 3],
+                        borderColor: 'lime',
+                        backgroundColor: 'rgba(0, 255, 0, 0.1),
+                        borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 0,
                         order: 4
@@ -242,15 +218,6 @@
                         pointRadius: 0,
                         pointHoverRadius: 0,
                         order: 7
-                    }, {
-                        label: 'Reference Line',
-                        data: horizontalLineData,
-                        borderColor: 'green',
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        pointHoverRadius: 0,
-                        fill: false,
-                        order: 0
                     }]
                 },
                 options: {
@@ -295,18 +262,17 @@
             if (legendContainer) {
                 const legendItems = [
                     { label: 'Water Level (Average)', color: 'blue', bold: true },
-                    { label: 'Water Level (Percentile)', color: 'darkblue', dashed: true },
-                    { label: 'Water Level (Envelope)', color: 'navy', dashed: true },
-                    { label: 'Water Level (Binning)', color: 'mediumblue', dashed: true },
+                    { label: 'Water Level (Percentile)', color: 'cyan' },
+                    { label: 'Water Level (Envelope)', color: 'magenta' },
+                    { label: 'Water Level (Binning)', color: 'lime' },
                     { label: 'Wave Height (Percentile)', color: 'red' },
                     { label: 'Wave Height (Envelope)', color: 'orange' },
-                    { label: 'Wave Height (Binning)', color: 'purple' },
-                    { label: 'Reference Line', color: 'green' }
+                    { label: 'Wave Height (Binning)', color: 'purple' }
                 ];
                 
                 legendContainer.innerHTML = legendItems.map(item => `
                     <span style="display: flex; align-items: center; gap: 5px; ${item.bold ? 'font-weight: bold;' : ''}">
-                        <span style="width: 16px; height: 3px; background-color: ${item.color}; display: inline-block; ${item.dashed ? 'border-top: 2px dashed ' + item.color + '; background: none;' : ''}"></span>
+                        <span style="width: 16px; height: 3px; background-color: ${item.color}; display: inline-block;"></span>
                         <span>${item.label}</span>
                     </span>
                 `).join('');
