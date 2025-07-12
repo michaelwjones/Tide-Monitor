@@ -18,7 +18,7 @@ const int SAMPLE_DELAY_MS = 50;              // Delay between samples
 const int MAX_PUBLISH_SIZE = 1024;           // Maximum bytes per Particle publish
 
 // Offline storage configuration
-const int MAX_STORED_READINGS = 1000;        // Maximum readings to store offline (~16 hours)
+const int MAX_STORED_READINGS = 400;         // Maximum readings to store offline (~6.7 hours)
 const int MAX_JSON_LENGTH = 120;             // Maximum length of JSON string per reading
 
 // Variables for data storage and publication
