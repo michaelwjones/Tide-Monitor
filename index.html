@@ -209,6 +209,25 @@
                     }
                 }
             });
+            
+            // Generate custom legend
+            const legendContainer = document.getElementById('chartLegend');
+            if (legendContainer) {
+                const legendItems = [
+                    { label: 'Water Level (ft)', color: 'blue' },
+                    { label: 'Waves (Percentile)', color: 'red' },
+                    { label: 'Waves (Envelope)', color: 'orange' },
+                    { label: 'Waves (Binning)', color: 'purple' },
+                    { label: 'Reference Line', color: 'green' }
+                ];
+                
+                legendContainer.innerHTML = legendItems.map(item => `
+                    <span style="display: flex; align-items: center; gap: 5px;">
+                        <span style="width: 16px; height: 3px; background-color: ${item.color}; display: inline-block;"></span>
+                        <span>${item.label}</span>
+                    </span>
+                `).join('');
+            }
         }
     </script>
 </body>
