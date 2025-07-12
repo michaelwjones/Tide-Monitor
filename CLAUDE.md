@@ -59,6 +59,7 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Web Das
 This project does not use traditional build tools. Development involves:
 
 1. **Firmware development**: Use Particle Workbench or Web IDE for the Arduino code
+   - **Flash to device**: Run `flash.bat` in `backend/boron404x/` directory to deploy firmware to Particle Boron
 2. **Web dashboard**: Open `index.html` directly in browser or serve with local HTTP server
 3. **Testing**: Manual testing with live sensor data or Firebase data inspection
 

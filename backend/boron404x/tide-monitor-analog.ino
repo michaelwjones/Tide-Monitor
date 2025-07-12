@@ -106,7 +106,7 @@ void takeMeasurement() {
     
     for (int i = 0; i < NUM_SAMPLES; i++) {
         int distanceMm = adcToDepthMm(samples[i]);
-        if (distanceMm >= 300 && distanceMm <= 5000) {
+        if (distanceMm >= 300 && distanceMm <= 4000) {
             validDistances[validSampleCount] = distanceMm;  // Store converted distance
             validSampleCount++;
         }
