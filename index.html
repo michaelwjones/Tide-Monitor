@@ -14,11 +14,33 @@
         .hidden {
             display: none;
         }
+        .debug-link {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 10px 16px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            transition: background-color 0.2s;
+            z-index: 1000;
+        }
+        .debug-link:hover {
+            background: #218838;
+            color: white;
+            text-decoration: none;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 </head>
 <body>
+    <a href="debug/" class="debug-link">Debug Dashboard →</a>
+    
     <h1>Tide Monitor</h1>
     
     <div id="loading">Loading...</div>
@@ -26,26 +48,6 @@
     <div id="content" class="hidden">
         <canvas id="waterLevelChart" width="800" height="500"></canvas>
         <div id="chartLegend" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-top: 10px; font-size: 14px;"></div>
-        
-        <h2>Recent Readings</h2>
-        <div id="readings">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Time</th>
-                        <th>Water Level (ft)</th>
-                        <th>Waves (Percentile)</th>
-                        <th>Waves (Envelope)</th>
-                        <th>Waves (Binning)</th>
-                    </tr>
-                </thead>
-                <tbody id="tableBody">
-                    <tr>
-                        <td colspan="5">Loading...</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
     </div>
 
     <script>
@@ -82,20 +84,6 @@
             
             // Create chart with all data
             createChart(readings);
-            
-            // Get only the last 10 readings and reverse to show most recent first
-            const last10 = readings.slice(-10).reverse();
-            
-            const tableBody = document.getElementById('tableBody');
-            tableBody.innerHTML = last10.map(reading => `
-                <tr>
-                    <td>${reading.timestamp}</td>
-                    <td>${reading.waterLevel}</td>
-                    <td>${reading.wavesPercentile}</td>
-                    <td>${reading.wavesEnvelope}</td>
-                    <td>${reading.wavesBinning}</td>
-                </tr>
-            `).join('');
             
             // Hide loading and show content
             document.getElementById('loading').classList.add('hidden');
@@ -134,6 +122,7 @@
                         borderWidth: 2,
                         pointRadius: 0,
                         pointHoverRadius: 0,
+                        tension: 0.4,
                         order: 1
                     }, {
                         label: 'Waves (Percentile)',
@@ -143,6 +132,7 @@
                         borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 0,
+                        tension: 0.3,
                         order: 2
                     }, {
                         label: 'Waves (Envelope)',
@@ -152,6 +142,7 @@
                         borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 0,
+                        tension: 0.3,
                         order: 3
                     }, {
                         label: 'Waves (Binning)',
@@ -161,6 +152,7 @@
                         borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 0,
+                        tension: 0.3,
                         order: 4
                     }, {
                         label: 'Reference Line',
@@ -170,6 +162,7 @@
                         pointRadius: 0,
                         pointHoverRadius: 0,
                         fill: false,
+                        tension: 0,
                         order: 0
                     }]
                 },

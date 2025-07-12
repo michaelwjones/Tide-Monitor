@@ -9,15 +9,20 @@ This is a **Tide Monitor** project that measures water levels and wave heights u
 1. **Embedded firmware** (`backend/boron404x/tide-monitor-analog.ino`) - Arduino-style C++ code for the Particle Boron that:
    - Reads analog voltage from HRXL-MaxSonar MB7360 ultrasonic sensor
    - Takes 512 samples every minute for noise reduction
-   - Calculates water level and three different wave height measurements (percentile, envelope, binning)
+   - Calculates water level (average) and three different wave height measurements (percentile, envelope, binning)
+   - Also calculates water level using each of the three wave analysis methods
    - Stores readings offline in RAM when connectivity is lost
    - Publishes data to Particle cloud, which forwards to Firebase
 
 2. **Web dashboard** (`index.html`) - Single-page HTML application that:
    - Fetches data from Firebase Realtime Database
    - Displays real-time chart of last 24 hours using Chart.js
-   - Shows table of 10 most recent readings
    - Auto-refreshes every 2 minutes
+
+3. **Debug dashboard** (`debug/index.html`) - Additional interface for:
+   - Raw data inspection and debugging
+   - System status monitoring
+   - Diagnostic tools and troubleshooting
 
 ## Data Flow Architecture
 
@@ -27,7 +32,7 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Web Das
 
 - **Sensor data**: Distance measurements converted to water level (mm)
 - **Firebase endpoint**: `https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/`
-- **Data format**: JSON with timestamp (t), water level (w), and three wave height calculations (hp, he, hb)
+- **Data format**: JSON with timestamp (t), water level (w), wave height calculations (hp, he, hb), and method-specific water levels (wp, we, wb)
 - **Integration config**: `backend/particle.io/firebase integration.txt` contains Particle webhook configuration
 
 ## Key Technical Details
@@ -39,6 +44,8 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Web Das
 - **Offline storage**: Up to 1000 readings in RAM (~16 hours)
 - **Data validation**: Filters invalid sensor readings (300-5000mm range)
 - **Wave calculations**: Three different algorithms for wave height measurement
+- **Water level calculations**: Four different water level measurements (overall average + three method-specific levels)
+- **JSON length**: Increased to 120 characters to accommodate additional data fields
 
 ### Web Dashboard (`index.html`)
 - **Chart library**: Chart.js v4.5.0 with date-fns adapter
@@ -59,7 +66,9 @@ This project does not use traditional build tools. Development involves:
 
 ```
 Tide-Monitor/
-├── index.html                           # Web dashboard
+├── index.html                           # Main web dashboard (GitHub Pages root)
+├── debug/
+│   └── index.html                       # Debug dashboard (/debug URL path)
 └── backend/
     ├── boron404x/
     │   └── tide-monitor-analog.ino      # Particle Boron firmware
@@ -71,8 +80,11 @@ Tide-Monitor/
 
 Readings are stored with auto-generated keys containing:
 - `t`: ISO8601 timestamp
-- `w`: Water level in mm  
+- `w`: Water level in mm (average of all valid samples)
 - `hp`: Wave height (percentile method) in mm
 - `he`: Wave height (envelope method) in mm
 - `hb`: Wave height (binning method) in mm
+- `wp`: Water level (percentile method) in mm
+- `we`: Water level (envelope method) in mm
+- `wb`: Water level (binning method) in mm
 - `vs`: Valid sample count
