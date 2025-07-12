@@ -11,7 +11,8 @@
       "Bash(flash.bat)",
       "Bash(cmd:*)",
       "Bash(git pull:*)",
-      "Bash(git rebase:*)"
+      "Bash(git rebase:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }
