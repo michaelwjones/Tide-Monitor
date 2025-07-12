@@ -165,6 +165,7 @@
                         borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 0,
+                        yAxisID: 'y',
                         order: 1
                     }, {
                         label: 'Water Level (Percentile)',
@@ -174,6 +175,7 @@
                         borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 0,
+                        yAxisID: 'y',
                         order: 2
                     }, {
                         label: 'Water Level (Envelope)',
@@ -183,6 +185,7 @@
                         borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 0,
+                        yAxisID: 'y',
                         order: 3
                     }, {
                         label: 'Water Level (Binning)',
@@ -192,6 +195,7 @@
                         borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 0,
+                        yAxisID: 'y',
                         order: 4
                     }, {
                         label: 'Wave Height (Percentile)',
@@ -201,6 +205,7 @@
                         borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 0,
+                        yAxisID: 'y1',
                         order: 5
                     }, {
                         label: 'Wave Height (Envelope)',
@@ -210,6 +215,7 @@
                         borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 0,
+                        yAxisID: 'y1',
                         order: 6
                     }, {
                         label: 'Wave Height (Binning)',
@@ -219,6 +225,7 @@
                         borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 0,
+                        yAxisID: 'y1',
                         order: 7
                     }]
                 },
@@ -227,11 +234,26 @@
                     responsive: true,
                     scales: {
                         y: {
+                            type: 'linear',
+                            position: 'left',
                             min: 0,
                             max: 6,
                             title: {
                                 display: true,
-                                text: 'Water Level & Wave Height (feet)'
+                                text: 'Water Level (feet)'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            min: 0,
+                            max: 2,
+                            title: {
+                                display: true,
+                                text: 'Wave Height (feet)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
                             }
                         },
                         x: {
