@@ -1,0 +1,16 @@
+Name: Firebase tide monitor
+Event name: tideMonitor/reading
+url: https://tide-monitor-boron-default-rtdb.firebaseio.com/readings.json?auth=ZUR6pgDRJswT3TSME43rlUquCafEZYUxc0ybywWt
+Request type: POST
+Request format: JSON
+JSON data format:
+{
+  "event": "{{{PARTICLE_EVENT_NAME}}}",
+  "coreid": "{{{PARTICLE_DEVICE_ID}}}",
+  "published_at": "{{{PARTICLE_PUBLISHED_AT}}}",
+  "t": "{{{t}}}",
+  "w": "{{{w}}}",
+  "he": "{{{he}}}",
+  "hp": "{{{hp}}}",
+  "hb": "{{{hb}}}"
+}
