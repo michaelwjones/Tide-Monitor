@@ -20,9 +20,9 @@ This is a **Tide Monitor** project that measures water levels and wave heights u
    - Auto-refreshes every 2 minutes
 
 3. **Debug dashboard** (`debug/index.html`) - Additional interface for:
-   - Raw data inspection and debugging
-   - System status monitoring
-   - Diagnostic tools and troubleshooting
+   - Raw data inspection and debugging with all 8 data fields
+   - Multi-axis chart visualization (water levels, wave heights, valid samples)
+   - Same clean layout as main dashboard for consistency
 
 ## Data Flow Architecture
 
@@ -53,6 +53,17 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Web Das
 - **Chart features**: Time-series plot with water level and wave measurements
 - **Auto-refresh**: Updates every 2 minutes
 - **Timezone**: Eastern Time (America/New_York)
+- **Navigation**: Link to debug dashboard in top-right corner
+
+### Debug Dashboard (`debug/index.html`)
+- **Chart library**: Chart.js v4.5.0 with date-fns adapter (same as main)
+- **Data visualization**: All 8 data fields on multi-axis chart
+- **Layout**: Clean design matching main dashboard (no containers/borders)
+- **Navigation**: Link back to main dashboard in top-right corner
+- **Chart axes**: 
+  - Left Y-axis: Water level measurements (0-6 feet)
+  - Right Y-axis: Wave height measurements (0-2 feet)
+  - Hidden Y-axis: Valid sample count (0-512)
 
 ## Development Commands
 
@@ -70,9 +81,12 @@ Tide-Monitor/
 ├── index.html                           # Main web dashboard (GitHub Pages root)
 ├── debug/
 │   └── index.html                       # Debug dashboard (/debug URL path)
+├── _headers                             # Netlify security headers config
+├── CLAUDE.md                            # Project documentation for Claude Code
 └── backend/
     ├── boron404x/
-    │   └── tide-monitor-analog.ino      # Particle Boron firmware
+    │   ├── tide-monitor-analog.ino      # Particle Boron firmware
+    │   └── flash.bat                    # Firmware deployment script
     └── particle.io/
         └── firebase integration.txt     # Webhook configuration
 ```
@@ -89,3 +103,29 @@ Readings are stored with auto-generated keys containing:
 - `we`: Water level (envelope method) in mm
 - `wb`: Water level (binning method) in mm
 - `vs`: Valid sample count
+
+## Dashboard Features
+
+### Main Dashboard Features
+- **Chart visualization**: Water level (blue) and three wave height methods (red, orange, purple)
+- **Reference line**: Green horizontal line at 2.5 feet
+- **Custom legend**: Color-coded legend below chart
+- **Responsive design**: Works on desktop and mobile devices
+- **Auto-refresh**: Updates every 2 minutes
+- **Security**: CSP headers and content-type protection
+
+### Debug Dashboard Features  
+- **Comprehensive data**: Shows all 8 data fields from Firebase
+- **Multi-axis visualization**: 
+  - Water level measurements: Average (blue), Percentile (cyan), Envelope (magenta), Binning (lime)
+  - Wave height measurements: Percentile (red), Envelope (orange), Binning (purple)  
+  - Valid samples: Gray line (hidden axis for scale)
+- **Clean layout**: Same styling as main dashboard for consistency
+- **Navigation**: Easy switching between main and debug views
+
+## Technical Notes
+
+- **Deployment**: Hosted on GitHub Pages with Netlify-style headers
+- **Security**: Content Security Policy prevents XSS attacks
+- **Error handling**: Graceful degradation when data is unavailable
+- **Performance**: Optimized chart rendering with disabled animations
