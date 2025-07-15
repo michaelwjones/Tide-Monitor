@@ -13,7 +13,7 @@ This system continuously monitors water levels and wave activity using an ultras
 
 ### Key Measurements
 - **Water Level**: Distance from sensor to water surface (converted to feet)
-- **Wave Heights**: Three different calculation methods for wave analysis
+- **Wave Heights**: Two different calculation methods for wave analysis
 - **Data Quality**: Valid sample count for each reading
 
 ## 🛠️ System Architecture
@@ -38,7 +38,7 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Web Das
 
 ### Main Dashboard
 - **24-hour water level trend** with smooth line charts
-- **Wave height visualization** using three different analysis methods
+- **Wave height visualization** using two different analysis methods
 - **Reference line** at 2.5 feet for context
 - **Auto-refresh** every 2 minutes
 - **Mobile responsive** design
@@ -75,18 +75,16 @@ The system collects readings every minute with the following data points:
   "w": 2438,
   "hp": 152,
   "he": 178,
-  "hb": 145,
   "wp": 2445,
   "we": 2431,
-  "wb": 2440,
   "vs": 487
 }
 ```
 
 - `t`: Timestamp (ISO8601)
 - `w`: Water level in mm (average method)
-- `hp/he/hb`: Wave heights using percentile/envelope/binning methods
-- `wp/we/wb`: Water levels using percentile/envelope/binning methods  
+- `hp/he`: Wave heights using percentile/envelope methods
+- `wp/we`: Water levels using percentile/envelope methods  
 - `vs`: Valid sample count (out of 512)
 
 ## 🔧 Technical Details
@@ -94,7 +92,12 @@ The system collects readings every minute with the following data points:
 ### Wave Analysis Methods
 1. **Percentile Method**: Uses statistical percentiles to calculate wave heights
 2. **Envelope Method**: Analyzes the envelope of the wave signal
-3. **Binning Method**: Groups readings into bins for wave analysis
+
+### Failed Analysis Methods
+**Binning Method** (Removed): This method grouped readings into bins for wave analysis but was removed due to:
+- **Higher Erratic Behavior**: Produced more inconsistent results compared to percentile and envelope methods
+- **Lower Resolution**: Provided less precise measurements due to the binning approach
+- **Poor Signal Quality**: The discrete nature of binning introduced artifacts that degraded wave height calculations
 
 ### Data Processing
 - **Noise Reduction**: 512 samples averaged per reading

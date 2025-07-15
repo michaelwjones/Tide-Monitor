@@ -12,7 +12,13 @@
       "Bash(cmd:*)",
       "Bash(git pull:*)",
       "Bash(git rebase:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(git branch:*)",
+      "Bash(find:*)",
+      "Bash(mkdir:*)",
+      "Bash(ls:*)",
+      "Bash(npm:*)",
+      "Bash(particle flash:*)"
     ],
     "deny": []
   }

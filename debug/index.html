@@ -76,10 +76,8 @@
                     waterLevel: (value.w / 304.8).toFixed(2),
                     wavesPercentile: (value.hp !== undefined && value.hp !== null) ? (value.hp / 304.8).toFixed(2) : '--',
                     wavesEnvelope: (value.he !== undefined && value.he !== null) ? (value.he / 304.8).toFixed(2) : '--',
-                    wavesBinning: (value.hb !== undefined && value.hb !== null) ? (value.hb / 304.8).toFixed(2) : '--',
                     waterLevelPercentile: (value.wp !== undefined && value.wp !== null) ? (value.wp / 304.8).toFixed(2) : '--',
                     waterLevelEnvelope: (value.we !== undefined && value.we !== null) ? (value.we / 304.8).toFixed(2) : '--',
-                    waterLevelBinning: (value.wb !== undefined && value.wb !== null) ? (value.wb / 304.8).toFixed(2) : '--',
                     validSamples: value.vs || '--',
                     validSamplesRaw: value.vs || 0,
                     // NOAA data from Duke Marine Lab
@@ -153,16 +151,6 @@
                         yAxisID: 'y',
                         order: 3
                     }, {
-                        label: 'Water Level (Binning)',
-                        data: validReadings.filter(r => r.waterLevelBinning !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelBinning)})),
-                        borderColor: 'lime',
-                        backgroundColor: 'rgba(0, 255, 0, 0.1)',
-                        borderWidth: 1,
-                        pointRadius: 0,
-                        pointHoverRadius: 0,
-                        yAxisID: 'y',
-                        order: 4
-                    }, {
                         label: 'Wave Height (Percentile)',
                         data: validReadings.filter(r => r.wavesPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesPercentile)})),
                         borderColor: 'red',
@@ -182,16 +170,6 @@
                         pointHoverRadius: 0,
                         yAxisID: 'y1',
                         order: 6
-                    }, {
-                        label: 'Wave Height (Binning)',
-                        data: validReadings.filter(r => r.wavesBinning !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesBinning)})),
-                        borderColor: 'purple',
-                        backgroundColor: 'rgba(128, 0, 128, 0.1)',
-                        borderWidth: 1,
-                        pointRadius: 0,
-                        pointHoverRadius: 0,
-                        yAxisID: 'y1',
-                        order: 7
                     }, {
                         label: 'Valid Samples',
                         data: validReadings.map(r => ({x: r.rawTimestamp, y: r.validSamplesRaw})),
@@ -319,10 +297,8 @@
                     { label: 'Duke Marine Lab Water Level', color: 'darkblue', dash: true },
                     { label: 'Water Level (Percentile)', color: 'cyan' },
                     { label: 'Water Level (Envelope)', color: 'magenta' },
-                    { label: 'Water Level (Binning)', color: 'lime' },
                     { label: 'Wave Height (Percentile)', color: 'red' },
                     { label: 'Wave Height (Envelope)', color: 'orange' },
-                    { label: 'Wave Height (Binning)', color: 'purple' },
                     { label: 'Wind Speed', color: 'green' },
                     { label: 'Gust Speed', color: 'darkgreen', dash: true },
                     { label: 'Valid Samples', color: 'gray' }

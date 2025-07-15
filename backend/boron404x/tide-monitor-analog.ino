@@ -26,10 +26,8 @@ int depthInMm = 0;
 int waterLevelAverage = 0;
 int waveHeightPercentile = 0;
 int waveHeightEnvelope = 0;
-int waveHeightBinning = 0;
 int waterLevelPercentile = 0;
 int waterLevelEnvelope = 0;
-int waterLevelBinning = 0;
 
 // Variables for timing
 unsigned long lastReadingTime = 0;
@@ -48,7 +46,6 @@ void storeReading(String jsonString);
 int calculateAverage(int samples[], int numSamples);
 int calculateWaveHeightPercentile(int samples[], int numSamples, int* waterLevel);
 int calculateWaveHeightEnvelope(int samples[], int numSamples, int* waterLevel);
-int calculateWaveHeightBinning(int samples[], int numSamples, int* waterLevel);
 int adcToDepthMm(int adcReading);
 
 void setup() {
@@ -123,8 +120,6 @@ void takeMeasurement() {
     // Calculate wave height using envelope analysis
     waveHeightEnvelope = calculateWaveHeightEnvelope(validDistances, validSampleCount, &waterLevelEnvelope);
     
-    // Calculate wave height using binning analysis
-    waveHeightBinning = calculateWaveHeightBinning(validDistances, validSampleCount, &waterLevelBinning);
     
     // Use the average distance directly (already converted)
     depthInMm = averageDistance;
@@ -141,19 +136,17 @@ void takeMeasurement() {
     jsonData += "\"w\":" + String(waterLevelAverage) + ",";
     jsonData += "\"hp\":" + String(waveHeightPercentile) + ",";
     jsonData += "\"he\":" + String(waveHeightEnvelope) + ",";
-    jsonData += "\"hb\":" + String(waveHeightBinning) + ",";
     jsonData += "\"wp\":" + String(waterLevelPercentile) + ",";
     jsonData += "\"we\":" + String(waterLevelEnvelope) + ",";
-    jsonData += "\"wb\":" + String(waterLevelBinning) + ",";
     jsonData += "\"vs\":" + String(validSampleCount) + "}";  // Include valid sample count
     
     // Store this reading
     storeReading(jsonData);
     
     // Debug information
-    Serial.printlnf("Reading #%d: Depth: %dmm, Water Level: %dmm, Wave Height (P/E/B): %d/%d/%dmm, Method Levels (P/E/B): %d/%d/%dmm (Valid: %d/%d, Stored: %d)", 
-                   consecutiveReadings, depthInMm, waterLevelAverage, waveHeightPercentile, waveHeightEnvelope, waveHeightBinning, 
-                   waterLevelPercentile, waterLevelEnvelope, waterLevelBinning, validSampleCount, NUM_SAMPLES, storedReadingCount);
+    Serial.printlnf("Reading #%d: Depth: %dmm, Water Level: %dmm, Wave Height (P/E): %d/%dmm, Method Levels (P/E): %d/%dmm (Valid: %d/%d, Stored: %d)", 
+                   consecutiveReadings, depthInMm, waterLevelAverage, waveHeightPercentile, waveHeightEnvelope, 
+                   waterLevelPercentile, waterLevelEnvelope, validSampleCount, NUM_SAMPLES, storedReadingCount);
 }
 
 void publishAllReadings() {
@@ -434,78 +427,3 @@ int calculateWaveHeightEnvelope(int samples[], int numSamples, int* waterLevel) 
     return height;
 }
 
-int calculateWaveHeightBinning(int samples[], int numSamples, int* waterLevel) {
-    // Wave height calculation using binning analysis
-    // This method bins distance readings and finds wave height as the difference between
-    // minimum and maximum bins that contain at least a threshold number of samples
-    // Input: samples[] contains distance values in mm (already converted)
-    
-    const int BIN_SIZE = 25;             // mm per bin (25mm = ~1 inch resolution)
-    const int MIN_SAMPLES_PER_BIN = 8;   // Minimum samples required for a bin to be considered significant
-    
-    // Find the range of distance values
-    int minDistance = samples[0];
-    int maxDistance = samples[0];
-    for (int i = 1; i < numSamples; i++) {
-        if (samples[i] < minDistance) minDistance = samples[i];
-        if (samples[i] > maxDistance) maxDistance = samples[i];
-    }
-    
-    // Calculate number of bins needed
-    int numBins = ((maxDistance - minDistance) / BIN_SIZE) + 1;
-    
-    // Create and initialize bin array - use heap allocation
-    int* binCounts = (int*)malloc(numBins * sizeof(int));
-    if (binCounts == NULL) {
-        Serial.println("Error: Failed to allocate memory for binning calculation");
-        *waterLevel = 0;
-        return 0;
-    }
-    
-    for (int i = 0; i < numBins; i++) {
-        binCounts[i] = 0;
-    }
-    
-    // Count samples in each bin
-    for (int i = 0; i < numSamples; i++) {
-        int binIndex = (samples[i] - minDistance) / BIN_SIZE;
-        if (binIndex >= 0 && binIndex < numBins) {
-            binCounts[binIndex]++;
-        }
-    }
-    
-    // Find the minimum and maximum bin indices that meet the threshold
-    int minValidBin = -1;
-    int maxValidBin = -1;
-    
-    for (int i = 0; i < numBins; i++) {
-        if (binCounts[i] >= MIN_SAMPLES_PER_BIN) {
-            if (minValidBin == -1) {
-                minValidBin = i;
-            }
-            maxValidBin = i;
-        }
-    }
-    
-    // Return 0 if binning analysis failed to find sufficient bins
-    if (minValidBin == -1 || maxValidBin == -1 || minValidBin == maxValidBin) {
-        free(binCounts);
-        *waterLevel = 0;
-        return 0;
-    }
-    
-    // Calculate distance values for the center of the min and max valid bins
-    int minBinCenterDistance = minDistance + (minValidBin * BIN_SIZE) + (BIN_SIZE / 2);  // Shorter distances = crests
-    int maxBinCenterDistance = minDistance + (maxValidBin * BIN_SIZE) + (BIN_SIZE / 2);  // Longer distances = troughs
-    
-    // Calculate trough water level (longer distance = lower water level)
-    *waterLevel = MOUNT_HEIGHT - maxBinCenterDistance;
-    
-    // Wave height = trough distance - crest distance (should be positive if logic is correct)
-    int height = maxBinCenterDistance - minBinCenterDistance;
-    
-    // Clean up allocated memory
-    free(binCounts);
-    
-    return height;
-}

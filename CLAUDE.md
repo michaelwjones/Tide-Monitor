@@ -9,8 +9,8 @@ This is a **Tide Monitor** project that measures water levels and wave heights u
 1. **Embedded firmware** (`backend/boron404x/tide-monitor-analog.ino`) - Arduino-style C++ code for the Particle Boron that:
    - Reads analog voltage from HRXL-MaxSonar MB7360 ultrasonic sensor
    - Takes 512 samples every minute for noise reduction
-   - Calculates water level (average) and three different wave height measurements (percentile, envelope, binning)
-   - Also calculates water level using each of the three wave analysis methods
+   - Calculates water level (average) and two different wave height measurements (percentile, envelope)
+   - Also calculates water level using each of the two wave analysis methods
    - Stores readings offline in RAM when connectivity is lost
    - Publishes data to Particle cloud, which forwards to Firebase
 
@@ -53,8 +53,8 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Cloud F
 - **Sampling**: 512 samples per reading with 50ms delays
 - **Offline storage**: Up to 1000 readings in RAM (~16 hours)
 - **Data validation**: Filters invalid sensor readings (300-5000mm range)
-- **Wave calculations**: Three different algorithms for wave height measurement
-- **Water level calculations**: Four different water level measurements (overall average + three method-specific levels)
+- **Wave calculations**: Two different algorithms for wave height measurement
+- **Water level calculations**: Three different water level measurements (overall average + two method-specific levels)
 - **JSON length**: Increased to 120 characters to accommodate additional data fields
 
 ### Web Dashboard (`index.html`)
@@ -67,7 +67,7 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Cloud F
 
 ### Debug Dashboard (`debug/index.html`)
 - **Chart library**: Chart.js v4.5.0 with date-fns adapter (same as main)
-- **Data visualization**: All 8 data fields on multi-axis chart
+- **Data visualization**: All 6 data fields on multi-axis chart
 - **Layout**: Clean design matching main dashboard (no containers/borders)
 - **Navigation**: Link back to main dashboard in top-right corner
 - **Chart axes**: 
@@ -131,10 +131,8 @@ Readings are stored with auto-generated keys containing:
 - `w`: Water level in mm (average of all valid samples)
 - `hp`: Wave height (percentile method) in mm
 - `he`: Wave height (envelope method) in mm
-- `hb`: Wave height (binning method) in mm
 - `wp`: Water level (percentile method) in mm
 - `we`: Water level (envelope method) in mm
-- `wb`: Water level (binning method) in mm
 - `vs`: Valid sample count
 - `coreid`: Particle device ID
 - `event`: Event name
@@ -151,7 +149,7 @@ Readings are stored with auto-generated keys containing:
 ## Dashboard Features
 
 ### Main Dashboard Features
-- **Chart visualization**: Water level (blue) and three wave height methods (red, orange, purple)
+- **Chart visualization**: Water level (blue) and two wave height methods (red, orange)
 - **Reference line**: Green horizontal line at 2.5 feet
 - **Custom legend**: Color-coded legend below chart
 - **Responsive design**: Works on desktop and mobile devices
@@ -159,10 +157,10 @@ Readings are stored with auto-generated keys containing:
 - **Security**: CSP headers and content-type protection
 
 ### Debug Dashboard Features  
-- **Comprehensive data**: Shows all 8 data fields from Firebase
+- **Comprehensive data**: Shows all 6 data fields from Firebase
 - **Multi-axis visualization**: 
-  - Water level measurements: Average (blue), Percentile (cyan), Envelope (magenta), Binning (lime)
-  - Wave height measurements: Percentile (red), Envelope (orange), Binning (purple)  
+  - Water level measurements: Average (blue), Percentile (cyan), Envelope (magenta)
+  - Wave height measurements: Percentile (red), Envelope (orange)  
   - Valid samples: Gray line (hidden axis for scale)
 - **Clean layout**: Same styling as main dashboard for consistency
 - **Navigation**: Easy switching between main and debug views
@@ -173,3 +171,16 @@ Readings are stored with auto-generated keys containing:
 - **Security**: Content Security Policy prevents XSS attacks
 - **Error handling**: Graceful degradation when data is unavailable
 - **Performance**: Optimized chart rendering with disabled animations
+
+## Development History
+
+### Removed Components
+
+**Binning Analysis Method**: Previously implemented as a third wave height calculation method, the binning approach was removed from the system due to performance issues:
+
+- **Analysis Problem**: The method grouped sensor readings into discrete bins to calculate wave heights, but this approach produced erratic results
+- **Resolution Issues**: The binning approach provided lower resolution than percentile and envelope methods  
+- **Data Quality**: Introduced measurement artifacts that degraded the quality of wave height calculations
+- **Removal Scope**: All binning code was removed from firmware (`hb`/`wb` fields), web dashboards, JSON configurations, and documentation
+
+This removal simplified the system to focus on the two reliable wave analysis methods (percentile and envelope) that provide consistent, high-resolution measurements.
