@@ -19,10 +19,8 @@ The `enrichTideData` function automatically triggers when new readings are writt
 - **w**: Water level in mm (sensor average)
 - **hp**: Wave height percentile method (mm)
 - **he**: Wave height envelope method (mm) 
-- **hb**: Wave height binning method (mm)
 - **wp**: Water level percentile method (mm)
 - **we**: Water level envelope method (mm)
-- **wb**: Water level binning method (mm)
 - **vs**: Valid sample count
 - **coreid**: Particle device ID
 - **event**: Event name
@@ -52,14 +50,12 @@ These -999 values indicate API failures, not actual measurements.
   "coreid": "e00fce683c5052a113e58edd",
   "event": "tideMonitor/reading",
   "gs": "12.3",
-  "hb": "84",
   "he": "50", 
   "hp": "46",
   "published_at": "2025-07-14T21:44:51.441Z",
   "t": "2025-07-14T21:44:49Z",
   "vs": "512",
   "w": "619",
-  "wb": "575",
   "wd": "180",
   "we": "594",
   "wm": "2.5",

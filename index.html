@@ -80,7 +80,6 @@
                 rawTimestamp: new Date(value.t),
                 wavesPercentile: (value.hp !== undefined && value.hp !== null) ? (value.hp / 304.8).toFixed(2) : '--',
                 wavesEnvelope: (value.he !== undefined && value.he !== null) ? (value.he / 304.8).toFixed(2) : '--',
-                wavesBinning: (value.hb !== undefined && value.hb !== null) ? (value.hb / 304.8).toFixed(2) : '--',
                 waterLevel: (value.w / 304.8).toFixed(2)
             }));
             
@@ -147,16 +146,6 @@
                         tension: 0.5,
                         order: 3
                     }, {
-                        label: 'Waves (Binning)',
-                        data: validReadings.filter(r => r.wavesBinning !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesBinning)})),
-                        borderColor: 'purple',
-                        backgroundColor: 'rgba(128, 0, 128, 0.1)',
-                        borderWidth: 1,
-                        pointRadius: 0,
-                        pointHoverRadius: 0,
-                        tension: 0.5,
-                        order: 4
-                    }, {
                         label: 'Reference Line',
                         data: horizontalLineData,
                         borderColor: 'green',
@@ -212,7 +201,6 @@
                     { label: 'Water Level (ft)', color: 'blue' },
                     { label: 'Waves (Percentile)', color: 'red' },
                     { label: 'Waves (Envelope)', color: 'orange' },
-                    { label: 'Waves (Binning)', color: 'purple' },
                     { label: 'Reference Line', color: 'green' }
                 ];
                 
