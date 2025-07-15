@@ -23,7 +23,7 @@ This is a **Tide Monitor** project that measures water levels and wave heights u
    - Raw data inspection and debugging with all measurement methods
    - NOAA environmental data visualization (wind, water level)
    - System status monitoring
-   - Diagnostic tools and troubleshooting
+   - Same clean layout as main dashboard for consistency
 
 4. **Firebase Cloud Functions** (`backend/firebase-functions/`) - Serverless functions that:
    - Automatically trigger when new readings arrive
@@ -63,6 +63,17 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Cloud F
 - **Chart features**: Time-series plot with water level and wave measurements
 - **Auto-refresh**: Updates every 2 minutes
 - **Timezone**: Eastern Time (America/New_York)
+- **Navigation**: Link to debug dashboard in top-right corner
+
+### Debug Dashboard (`debug/index.html`)
+- **Chart library**: Chart.js v4.5.0 with date-fns adapter (same as main)
+- **Data visualization**: All 8 data fields on multi-axis chart
+- **Layout**: Clean design matching main dashboard (no containers/borders)
+- **Navigation**: Link back to main dashboard in top-right corner
+- **Chart axes**: 
+  - Left Y-axis: Water level measurements (0-6 feet)
+  - Right Y-axis: Wave height measurements (0-2 feet)
+  - Hidden Y-axis: Valid sample count (0-512)
 
 ### Debug Dashboard (`debug/index.html`)
 - **Multi-axis charts**: Displays all measurement methods and NOAA data
@@ -136,3 +147,29 @@ Readings are stored with auto-generated keys containing:
 - `wm`: Water level in feet (MLLW datum) from Duke Marine Lab
 
 **Note**: NOAA fields show -999 when APIs are unavailable
+
+## Dashboard Features
+
+### Main Dashboard Features
+- **Chart visualization**: Water level (blue) and three wave height methods (red, orange, purple)
+- **Reference line**: Green horizontal line at 2.5 feet
+- **Custom legend**: Color-coded legend below chart
+- **Responsive design**: Works on desktop and mobile devices
+- **Auto-refresh**: Updates every 2 minutes
+- **Security**: CSP headers and content-type protection
+
+### Debug Dashboard Features  
+- **Comprehensive data**: Shows all 8 data fields from Firebase
+- **Multi-axis visualization**: 
+  - Water level measurements: Average (blue), Percentile (cyan), Envelope (magenta), Binning (lime)
+  - Wave height measurements: Percentile (red), Envelope (orange), Binning (purple)  
+  - Valid samples: Gray line (hidden axis for scale)
+- **Clean layout**: Same styling as main dashboard for consistency
+- **Navigation**: Easy switching between main and debug views
+
+## Technical Notes
+
+- **Deployment**: Hosted on GitHub Pages with Netlify-style headers
+- **Security**: Content Security Policy prevents XSS attacks
+- **Error handling**: Graceful degradation when data is unavailable
+- **Performance**: Optimized chart rendering with disabled animations
