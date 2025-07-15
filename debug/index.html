@@ -81,7 +81,14 @@
                     waterLevelEnvelope: (value.we !== undefined && value.we !== null) ? (value.we / 304.8).toFixed(2) : '--',
                     waterLevelBinning: (value.wb !== undefined && value.wb !== null) ? (value.wb / 304.8).toFixed(2) : '--',
                     validSamples: value.vs || '--',
-                    validSamplesRaw: value.vs || 0
+                    validSamplesRaw: value.vs || 0,
+                    // NOAA data from Duke Marine Lab
+                    dukeWaterLevel: (value.wm !== undefined && value.wm !== null && value.wm !== "-999") ? parseFloat(value.wm).toFixed(2) : '--',
+                    dukeWaterLevelRaw: (value.wm !== undefined && value.wm !== null && value.wm !== "-999") ? parseFloat(value.wm) : null,
+                    windSpeed: (value.ws !== undefined && value.ws !== null && value.ws !== "-999") ? (parseFloat(value.ws) * 1.944).toFixed(1) : '--', // Convert m/s to knots
+                    windSpeedRaw: (value.ws !== undefined && value.ws !== null && value.ws !== "-999") ? (parseFloat(value.ws) * 1.944) : null,
+                    gustSpeed: (value.gs !== undefined && value.gs !== null && value.gs !== "-999") ? (parseFloat(value.gs) * 1.944).toFixed(1) : '--', // Convert m/s to knots
+                    gustSpeedRaw: (value.gs !== undefined && value.gs !== null && value.gs !== "-999") ? (parseFloat(value.gs) * 1.944) : null
                 }));
                 
                 // Create debug chart with all data
@@ -195,6 +202,37 @@
                         pointHoverRadius: 0,
                         yAxisID: 'y2',
                         order: 8
+                    }, {
+                        label: 'Duke Water Level (NOAA)',
+                        data: validReadings.filter(r => r.dukeWaterLevelRaw !== null).map(r => ({x: r.rawTimestamp, y: r.dukeWaterLevelRaw})),
+                        borderColor: 'darkblue',
+                        backgroundColor: 'rgba(0, 0, 139, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        yAxisID: 'y',
+                        order: 0,
+                        borderDash: [5, 5]
+                    }, {
+                        label: 'Wind Speed',
+                        data: validReadings.filter(r => r.windSpeedRaw !== null).map(r => ({x: r.rawTimestamp, y: r.windSpeedRaw})),
+                        borderColor: 'green',
+                        backgroundColor: 'rgba(0, 128, 0, 0.1)',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        yAxisID: 'y3',
+                        order: 9
+                    }, {
+                        label: 'Gust Speed',
+                        data: validReadings.filter(r => r.gustSpeedRaw !== null).map(r => ({x: r.rawTimestamp, y: r.gustSpeedRaw})),
+                        borderColor: 'darkgreen',
+                        backgroundColor: 'rgba(0, 100, 0, 0.1)',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        yAxisID: 'y3',
+                        order: 10
                     }]
                 },
                 options: {
@@ -234,6 +272,19 @@
                                 drawOnChartArea: false
                             }
                         },
+                        y3: {
+                            type: 'linear',
+                            position: 'right',
+                            min: 0,
+                            max: 30,
+                            title: {
+                                display: true,
+                                text: 'Wind Speed (knots)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        },
                         x: {
                             type: 'time',
                             min: twentyFourHoursAgo,
@@ -264,18 +315,21 @@
             if (legendContainer) {
                 const legendItems = [
                     { label: 'Water Level (Average)', color: 'blue', bold: true },
+                    { label: 'Duke Water Level (NOAA)', color: 'darkblue', bold: true, dash: true },
                     { label: 'Water Level (Percentile)', color: 'cyan' },
                     { label: 'Water Level (Envelope)', color: 'magenta' },
                     { label: 'Water Level (Binning)', color: 'lime' },
                     { label: 'Wave Height (Percentile)', color: 'red' },
                     { label: 'Wave Height (Envelope)', color: 'orange' },
                     { label: 'Wave Height (Binning)', color: 'purple' },
+                    { label: 'Wind Speed', color: 'green' },
+                    { label: 'Gust Speed', color: 'darkgreen' },
                     { label: 'Valid Samples', color: 'gray' }
                 ];
                 
                 legendContainer.innerHTML = legendItems.map(item => `
                     <span style="display: flex; align-items: center; gap: 5px; ${item.bold ? 'font-weight: bold;' : ''}">
-                        <span style="width: 16px; height: 3px; background-color: ${item.color}; display: inline-block;"></span>
+                        <span style="width: 16px; height: 3px; background-color: ${item.color}; display: inline-block; ${item.dash ? 'background-image: repeating-linear-gradient(to right, ' + item.color + ' 0px, ' + item.color + ' 2px, transparent 2px, transparent 4px);' : ''}"></span>
                         <span>${item.label}</span>
                     </span>
                 `).join('');

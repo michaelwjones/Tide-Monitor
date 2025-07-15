@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **Tide Monitor** project that measures water levels and wave heights using an ultrasonic sensor connected to a Particle Boron 404X microcontroller. The system consists of two main components:
+This is a **Tide Monitor** project that measures water levels and wave heights using an ultrasonic sensor connected to a Particle Boron 404X microcontroller. The system automatically enriches readings with real-time environmental data from NOAA. The system consists of three main components:
 
 1. **Embedded firmware** (`backend/boron404x/tide-monitor-analog.ino`) - Arduino-style C++ code for the Particle Boron that:
    - Reads analog voltage from HRXL-MaxSonar MB7360 ultrasonic sensor
@@ -20,19 +20,29 @@ This is a **Tide Monitor** project that measures water levels and wave heights u
    - Auto-refreshes every 2 minutes
 
 3. **Debug dashboard** (`debug/index.html`) - Additional interface for:
-   - Raw data inspection and debugging with all 8 data fields
-   - Multi-axis chart visualization (water levels, wave heights, valid samples)
+   - Raw data inspection and debugging with all measurement methods
+   - NOAA environmental data visualization (wind, water level)
+   - System status monitoring
    - Same clean layout as main dashboard for consistency
+
+4. **Firebase Cloud Functions** (`backend/firebase-functions/`) - Serverless functions that:
+   - Automatically trigger when new readings arrive
+   - Fetch real-time wind and water level data from NOAA station 8656483 (Duke Marine Lab)
+   - Enrich each reading with environmental conditions
+   - Handle API failures gracefully with error codes
 
 ## Data Flow Architecture
 
 ```
-Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Web Dashboard
+Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Cloud Functions → Enriched Data → Web Dashboard
+                                                                      ↓
+                                                              NOAA APIs (Duke Marine Lab)
 ```
 
 - **Sensor data**: Distance measurements converted to water level (mm)
 - **Firebase endpoint**: `https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/`
-- **Data format**: JSON with timestamp (t), water level (w), wave height calculations (hp, he, hb), and method-specific water levels (wp, we, wb)
+- **Data enrichment**: Cloud Functions automatically add NOAA environmental data
+- **Data format**: JSON with sensor data + NOAA wind/water level data
 - **Integration config**: `backend/particle.io/firebase integration.txt` contains Particle webhook configuration
 
 ## Key Technical Details
@@ -65,14 +75,32 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Web Das
   - Right Y-axis: Wave height measurements (0-2 feet)
   - Hidden Y-axis: Valid sample count (0-512)
 
+### Debug Dashboard (`debug/index.html`)
+- **Multi-axis charts**: Displays all measurement methods and NOAA data
+- **Y-axes**: Water level (0-6 ft), Wave height (0-2 ft), Wind speed (0-30 knots)
+- **NOAA integration**: Real-time wind and water level from Duke Marine Lab
+- **Error handling**: Filters out -999 API failure values
+- **Units**: Automatic conversion from m/s to knots for wind data
+
+### Firebase Cloud Functions (`backend/firebase-functions/`)
+- **Trigger**: `onValueCreated` for new readings in `/readings/` path
+- **APIs**: NOAA station 8656483 (Duke Marine Lab, Beaufort, NC)
+- **Data added**: Wind speed (ws), direction (wd), gust (gs), water level (wm)
+- **Error handling**: Sets -999 values when NOAA APIs fail
+- **Framework**: Firebase Functions v6 with Node.js 22
+
 ## Development Commands
 
-This project does not use traditional build tools. Development involves:
+This project uses minimal build tools. Development involves:
 
 1. **Firmware development**: Use Particle Workbench or Web IDE for the Arduino code
    - **Flash to device**: Run `flash.bat` in `backend/boron404x/` directory to deploy firmware to Particle Boron
 2. **Web dashboard**: Open `index.html` directly in browser or serve with local HTTP server
-3. **Testing**: Manual testing with live sensor data or Firebase data inspection
+3. **Firebase Functions**: Deploy Cloud Functions for data enrichment
+   - **Deploy**: `cd backend/firebase-functions && firebase deploy --only functions`
+   - **Logs**: `firebase functions:log`
+   - **Test locally**: `firebase emulators:start --only functions`
+4. **Testing**: Manual testing with live sensor data or Firebase data inspection
 
 ## Project Structure
 
@@ -80,13 +108,16 @@ This project does not use traditional build tools. Development involves:
 Tide-Monitor/
 ├── index.html                           # Main web dashboard (GitHub Pages root)
 ├── debug/
-│   └── index.html                       # Debug dashboard (/debug URL path)
-├── _headers                             # Netlify security headers config
-├── CLAUDE.md                            # Project documentation for Claude Code
+│   └── index.html                       # Debug dashboard with NOAA data visualization
 └── backend/
     ├── boron404x/
-    │   ├── tide-monitor-analog.ino      # Particle Boron firmware
-    │   └── flash.bat                    # Firmware deployment script
+    │   └── tide-monitor-analog.ino      # Particle Boron firmware
+    ├── firebase-functions/
+    │   ├── README.md                    # Cloud Functions documentation
+    │   ├── firebase.json                # Firebase configuration
+    │   └── tide-monitor/
+    │       ├── index.js                 # NOAA data enrichment function
+    │       └── package.json             # Node.js dependencies
     └── particle.io/
         └── firebase integration.txt     # Webhook configuration
 ```
@@ -94,6 +125,8 @@ Tide-Monitor/
 ## Firebase Data Schema
 
 Readings are stored with auto-generated keys containing:
+
+### Original Sensor Data (from Particle Boron)
 - `t`: ISO8601 timestamp
 - `w`: Water level in mm (average of all valid samples)
 - `hp`: Wave height (percentile method) in mm
@@ -103,6 +136,17 @@ Readings are stored with auto-generated keys containing:
 - `we`: Water level (envelope method) in mm
 - `wb`: Water level (binning method) in mm
 - `vs`: Valid sample count
+- `coreid`: Particle device ID
+- `event`: Event name
+- `published_at`: Particle cloud timestamp
+
+### NOAA Environmental Data (added by Cloud Functions)
+- `ws`: Wind speed in m/s from Duke Marine Lab
+- `wd`: Wind direction in degrees from Duke Marine Lab
+- `gs`: Gust speed in m/s from Duke Marine Lab
+- `wm`: Water level in feet (MLLW datum) from Duke Marine Lab
+
+**Note**: NOAA fields show -999 when APIs are unavailable
 
 ## Dashboard Features
 
