@@ -300,13 +300,13 @@
                     { label: 'Wave Height (Percentile)', color: 'red' },
                     { label: 'Wave Height (Envelope)', color: 'orange' },
                     { label: 'Wind Speed', color: 'green' },
-                    { label: 'Gust Speed', color: 'darkgreen', dash: true },
+                    { label: 'Gust Speed', color: 'darkgreen', dot: true },
                     { label: 'Valid Samples', color: 'gray' }
                 ];
                 
                 legendContainer.innerHTML = legendItems.map(item => `
                     <span style="display: flex; align-items: center; gap: 5px;">
-                        <span style="width: 16px; height: 3px; background-color: ${item.color}; display: inline-block; ${item.dash ? 'background-image: repeating-linear-gradient(to right, ' + item.color + ' 0px, ' + item.color + ' 2px, transparent 2px, transparent 4px);' : ''}"></span>
+                        <span style="width: 16px; height: 3px; background-color: ${item.color}; display: inline-block; ${item.dash ? 'background-image: repeating-linear-gradient(to right, ' + item.color + ' 0px, ' + item.color + ' 2px, transparent 2px, transparent 4px);' : item.dot ? 'background-image: repeating-linear-gradient(to right, ' + item.color + ' 0px, ' + item.color + ' 1px, transparent 1px, transparent 3px);' : ''}"></span>
                         <span>${item.label}</span>
                     </span>
                 `).join('');
