@@ -246,7 +246,7 @@
                         yAxisID: 'y2',
                         order: 8
                     }, {
-                        label: 'Duke Water Level (NOAA)',
+                        label: 'Duke Marine Lab Water Level',
                         data: validReadings.filter(r => r.dukeWaterLevelRaw !== null).map(r => ({x: r.rawTimestamp, y: r.dukeWaterLevelRaw})),
                         borderColor: 'darkblue',
                         backgroundColor: 'rgba(0, 0, 139, 0.1)',
@@ -275,7 +275,8 @@
                         pointRadius: 0,
                         pointHoverRadius: 0,
                         yAxisID: 'y3',
-                        order: 10
+                        order: 10,
+                        borderDash: [3, 3]
                     }]
                 },
                 options: {
@@ -357,8 +358,8 @@
             const legendContainer = document.getElementById('chartLegend');
             if (legendContainer) {
                 const legendItems = [
-                    { label: 'Water Level (Average)', color: 'blue', bold: true },
-                    { label: 'Duke Water Level (NOAA)', color: 'darkblue', bold: true, dash: true },
+                    { label: 'Water Level (Average)', color: 'blue' },
+                    { label: 'Duke Marine Lab Water Level', color: 'darkblue', dash: true },
                     { label: 'Water Level (Percentile)', color: 'cyan' },
                     { label: 'Water Level (Envelope)', color: 'magenta' },
                     { label: 'Water Level (Binning)', color: 'lime' },
@@ -366,12 +367,12 @@
                     { label: 'Wave Height (Envelope)', color: 'orange' },
                     { label: 'Wave Height (Binning)', color: 'purple' },
                     { label: 'Wind Speed', color: 'green' },
-                    { label: 'Gust Speed', color: 'darkgreen' },
+                    { label: 'Gust Speed', color: 'darkgreen', dash: true },
                     { label: 'Valid Samples', color: 'gray' }
                 ];
                 
                 legendContainer.innerHTML = legendItems.map(item => `
-                    <span style="display: flex; align-items: center; gap: 5px; ${item.bold ? 'font-weight: bold;' : ''}">
+                    <span style="display: flex; align-items: center; gap: 5px;">
                         <span style="width: 16px; height: 3px; background-color: ${item.color}; display: inline-block; ${item.dash ? 'background-image: repeating-linear-gradient(to right, ' + item.color + ' 0px, ' + item.color + ' 2px, transparent 2px, transparent 4px);' : ''}"></span>
                         <span>${item.label}</span>
                     </span>
