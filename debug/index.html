@@ -191,7 +191,7 @@
                     datasets: [{
                         label: 'Water Level (Average)',
                         data: validReadings.map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevel)})),
-                        borderColor: 'blue',
+                        borderColor: 'rgba(0, 0, 255, 1)',
                         backgroundColor: 'rgba(0, 0, 255, 0.1)',
                         borderWidth: 1,
                         pointRadius: 0,
@@ -201,7 +201,7 @@
                     }, {
                         label: 'Water Level (Percentile)',
                         data: validReadings.filter(r => r.waterLevelPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelPercentile)})),
-                        borderColor: 'cyan',
+                        borderColor: 'rgba(0, 255, 255, 1)',
                         backgroundColor: 'rgba(0, 255, 255, 0.1)',
                         borderWidth: 1,
                         pointRadius: 0,
@@ -211,7 +211,7 @@
                     }, {
                         label: 'Water Level (Envelope)',
                         data: validReadings.filter(r => r.waterLevelEnvelope !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelEnvelope)})),
-                        borderColor: 'magenta',
+                        borderColor: 'rgba(255, 0, 255, 1)',
                         backgroundColor: 'rgba(255, 0, 255, 0.1)',
                         borderWidth: 1,
                         pointRadius: 0,
@@ -221,7 +221,7 @@
                     }, {
                         label: 'Wave Height (Percentile)',
                         data: validReadings.filter(r => r.wavesPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesPercentile)})),
-                        borderColor: 'red',
+                        borderColor: 'rgba(255, 0, 0, 1)',
                         backgroundColor: 'rgba(255, 0, 0, 0.1)',
                         borderWidth: 1,
                         pointRadius: 0,
@@ -231,7 +231,7 @@
                     }, {
                         label: 'Wave Height (Envelope)',
                         data: validReadings.filter(r => r.wavesEnvelope !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesEnvelope)})),
-                        borderColor: 'orange',
+                        borderColor: 'rgba(255, 165, 0, 1)',
                         backgroundColor: 'rgba(255, 165, 0, 0.1)',
                         borderWidth: 1,
                         pointRadius: 0,
@@ -241,7 +241,7 @@
                     }, {
                         label: 'Valid Samples',
                         data: validReadings.map(r => ({x: r.rawTimestamp, y: r.validSamplesRaw})),
-                        borderColor: 'gray',
+                        borderColor: 'rgba(128, 128, 128, 1)',
                         backgroundColor: 'rgba(128, 128, 128, 0.1)',
                         borderWidth: 1,
                         pointRadius: 0,
@@ -251,7 +251,7 @@
                     }, {
                         label: 'Duke Marine Lab Water Level',
                         data: validReadings.filter(r => r.dukeWaterLevelRaw !== null).map(r => ({x: r.rawTimestamp, y: r.dukeWaterLevelRaw + 1.2})),
-                        borderColor: 'darkblue',
+                        borderColor: 'rgba(0, 0, 139, 1)',
                         backgroundColor: 'rgba(0, 0, 139, 0.1)',
                         borderWidth: 2,
                         pointRadius: 0,
@@ -262,7 +262,7 @@
                     }, {
                         label: 'Wind Speed',
                         data: validReadings.filter(r => r.windSpeedRaw !== null).map(r => ({x: r.rawTimestamp, y: r.windSpeedRaw})),
-                        borderColor: 'green',
+                        borderColor: 'rgba(0, 128, 0, 1)',
                         backgroundColor: 'rgba(0, 128, 0, 0.1)',
                         borderWidth: 1,
                         pointRadius: 0,
@@ -272,7 +272,7 @@
                     }, {
                         label: 'Gust Speed',
                         data: validReadings.filter(r => r.gustSpeedRaw !== null).map(r => ({x: r.rawTimestamp, y: r.gustSpeedRaw})),
-                        borderColor: 'darkgreen',
+                        borderColor: 'rgba(0, 100, 0, 1)',
                         backgroundColor: 'rgba(0, 100, 0, 0.1)',
                         borderWidth: 1,
                         pointRadius: 0,
@@ -395,13 +395,11 @@
             // Reduce opacity of original datasets (all except Valid Samples)
             debugChartInstance.data.datasets.forEach((dataset, index) => {
                 if (index !== 5) { // Skip Valid Samples (index 5)
-                    dataset.borderColor = dataset.borderColor.replace(/rgba\(([^)]+)\)/, (match, rgbValues) => {
-                        const values = rgbValues.split(',');
-                        return `rgba(${values[0]}, ${values[1]}, ${values[2]}, 0.25)`;
+                    dataset.borderColor = dataset.borderColor.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*[^)]+\)/, (match, r, g, b) => {
+                        return `rgba(${r}, ${g}, ${b}, 0.3)`;
                     });
-                    dataset.backgroundColor = dataset.backgroundColor.replace(/rgba\(([^)]+)\)/, (match, rgbValues) => {
-                        const values = rgbValues.split(',');
-                        return `rgba(${values[0]}, ${values[1]}, ${values[2]}, 0.1)`;
+                    dataset.backgroundColor = dataset.backgroundColor.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*[^)]+\)/, (match, r, g, b) => {
+                        return `rgba(${r}, ${g}, ${b}, 0.05)`;
                     });
                 }
             });
@@ -506,28 +504,28 @@
                 if (index !== 5) { // Skip Valid Samples (index 5)
                     // Restore original colors based on dataset type
                     if (dataset.label === 'Water Level (Average)') {
-                        dataset.borderColor = 'blue';
+                        dataset.borderColor = 'rgba(0, 0, 255, 1)';
                         dataset.backgroundColor = 'rgba(0, 0, 255, 0.1)';
                     } else if (dataset.label === 'Water Level (Percentile)') {
-                        dataset.borderColor = 'cyan';
+                        dataset.borderColor = 'rgba(0, 255, 255, 1)';
                         dataset.backgroundColor = 'rgba(0, 255, 255, 0.1)';
                     } else if (dataset.label === 'Water Level (Envelope)') {
-                        dataset.borderColor = 'magenta';
+                        dataset.borderColor = 'rgba(255, 0, 255, 1)';
                         dataset.backgroundColor = 'rgba(255, 0, 255, 0.1)';
                     } else if (dataset.label === 'Wave Height (Percentile)') {
-                        dataset.borderColor = 'red';
+                        dataset.borderColor = 'rgba(255, 0, 0, 1)';
                         dataset.backgroundColor = 'rgba(255, 0, 0, 0.1)';
                     } else if (dataset.label === 'Wave Height (Envelope)') {
-                        dataset.borderColor = 'orange';
+                        dataset.borderColor = 'rgba(255, 165, 0, 1)';
                         dataset.backgroundColor = 'rgba(255, 165, 0, 0.1)';
                     } else if (dataset.label === 'Duke Marine Lab Water Level') {
-                        dataset.borderColor = 'darkblue';
+                        dataset.borderColor = 'rgba(0, 0, 139, 1)';
                         dataset.backgroundColor = 'rgba(0, 0, 139, 0.1)';
                     } else if (dataset.label === 'Wind Speed') {
-                        dataset.borderColor = 'green';
+                        dataset.borderColor = 'rgba(0, 128, 0, 1)';
                         dataset.backgroundColor = 'rgba(0, 128, 0, 0.1)';
                     } else if (dataset.label === 'Gust Speed') {
-                        dataset.borderColor = 'darkgreen';
+                        dataset.borderColor = 'rgba(0, 100, 0, 1)';
                         dataset.backgroundColor = 'rgba(0, 100, 0, 0.1)';
                     }
                 }
