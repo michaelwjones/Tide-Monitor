@@ -62,8 +62,27 @@ exports.enrichTideData = onValueCreated("/readings/{readingId}", async (event) =
       
       if (waterData.data && waterData.data.length > 0) {
         const latest = waterData.data[0];
-        enrichedData.wm = latest.v || "-999";
+        const waterLevel = latest.v || "-999";
+        
+        // Enhanced validation and logging
+        console.log(`NOAA water level data: ${waterLevel} at ${latest.t}, flags: ${latest.f}, quality: ${latest.q}`);
+        
+        // Check for unusual values (outside expected range 0-8 feet)
+        if (waterLevel !== "-999" && (parseFloat(waterLevel) < 0 || parseFloat(waterLevel) > 8)) {
+          console.warn(`Unusual NOAA water level detected: ${waterLevel} feet - outside expected range`);
+        }
+        
+        // Check data age (warn if older than 10 minutes)
+        const dataTime = new Date(latest.t);
+        const now = new Date();
+        const ageMinutes = (now - dataTime) / (1000 * 60);
+        if (ageMinutes > 10) {
+          console.warn(`NOAA water level data is ${ageMinutes.toFixed(1)} minutes old`);
+        }
+        
+        enrichedData.wm = waterLevel;
       } else {
+        console.warn('No water level data available from NOAA API');
         enrichedData.wm = "-999";
       }
     } catch (error) {
