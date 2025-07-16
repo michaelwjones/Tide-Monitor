@@ -82,14 +82,15 @@
         let trendLinesVisible = false;
         let currentReadings = [];
 
-        // Natural cubic spline interpolation for smooth trends without edge effects
-        function calculateCubicSpline(data, smoothing = 0.8) {
+        // Prepare data for cubic spline interpolation - tight fit with no smoothing
+        function prepareSplineData(data) {
             const n = data.length;
             if (n < 4) return null;
             
             // Sort data by x value and remove duplicates
             const sortedData = [...data].sort((a, b) => a.x.getTime() - b.x.getTime());
             const uniqueData = [];
+            
             for (let i = 0; i < sortedData.length; i++) {
                 if (i === 0 || sortedData[i].x.getTime() !== sortedData[i-1].x.getTime()) {
                     uniqueData.push(sortedData[i]);
@@ -98,29 +99,8 @@
             
             if (uniqueData.length < 4) return null;
             
-            // Apply smoothing by averaging nearby points
-            const smoothedData = [];
-            const windowSize = Math.max(1, Math.floor(uniqueData.length * (1 - smoothing)));
-            
-            for (let i = 0; i < uniqueData.length; i++) {
-                const start = Math.max(0, i - windowSize);
-                const end = Math.min(uniqueData.length - 1, i + windowSize);
-                
-                let sum = 0;
-                let count = 0;
-                for (let j = start; j <= end; j++) {
-                    sum += uniqueData[j].y;
-                    count++;
-                }
-                
-                smoothedData.push({
-                    x: uniqueData[i].x,
-                    y: sum / count
-                });
-            }
-            
             return {
-                data: smoothedData,
+                data: uniqueData,
                 type: 'cubic_spline'
             };
         }
@@ -221,21 +201,21 @@
             return points;
         }
 
-        // Generate smooth trend line data points using cubic splines
-        function generateTrendLine(data, smoothResult) {
-            if (!smoothResult || !smoothResult.data || smoothResult.data.length < 4) return [];
+        // Generate tight-fitting trend line data points using cubic splines
+        function generateTrendLine(data, splineData) {
+            if (!splineData || !splineData.data || splineData.data.length < 4) return [];
             
-            // Compute natural cubic spline
-            const spline = computeNaturalCubicSpline(smoothResult.data);
+            // Compute natural cubic spline directly from the data
+            const spline = computeNaturalCubicSpline(splineData.data);
             if (!spline) return [];
             
             // Generate evaluation points for smooth curve
-            const firstTime = smoothResult.data[0].x.getTime();
-            const lastTime = smoothResult.data[smoothResult.data.length - 1].x.getTime();
+            const firstTime = splineData.data[0].x.getTime();
+            const lastTime = splineData.data[splineData.data.length - 1].x.getTime();
             const timeRange = lastTime - firstTime;
             
             const evalPoints = [];
-            const numPoints = Math.min(100, smoothResult.data.length * 2); // Adaptive point count
+            const numPoints = Math.min(200, splineData.data.length * 3); // More points for tighter curves
             
             for (let i = 0; i <= numPoints; i++) {
                 const t = i / numPoints;
@@ -593,10 +573,10 @@
             // Calculate and add trend lines
             trendLineConfigs.forEach(config => {
                 if (config.data.length >= 4) { // Need at least 4 points for cubic splines
-                    const smoothResult = calculateCubicSpline(config.data, 0.9); // High smoothing value for tight fit
+                    const splineData = prepareSplineData(config.data); // No smoothing for tight fit
                     
-                    if (smoothResult) {
-                        const trendData = generateTrendLine(config.data, smoothResult);
+                    if (splineData) {
+                        const trendData = generateTrendLine(config.data, splineData);
                         
                         if (trendData && trendData.length > 0) {
                             debugChartInstance.data.datasets.push({
@@ -613,7 +593,7 @@
                             });
                         }
                     } else {
-                        console.warn(`Failed to calculate cubic spline for ${config.label}`);
+                        console.warn(`Failed to prepare spline data for ${config.label}`);
                     }
                 }
             });
