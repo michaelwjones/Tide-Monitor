@@ -82,42 +82,146 @@
         let trendLinesVisible = false;
         let currentReadings = [];
 
-        // Linear regression function to calculate line of best fit
-        function calculateLinearRegression(data) {
+        // Polynomial regression function to calculate curved line of best fit
+        function calculatePolynomialRegression(data, degree = 2) {
             const n = data.length;
-            if (n < 2) return null;
+            if (n < degree + 1) return null;
             
-            let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+            // Normalize x values to prevent numerical instability
+            const xValues = data.map(d => d.x.getTime());
+            const yValues = data.map(d => d.y);
+            
+            const minX = Math.min(...xValues);
+            const maxX = Math.max(...xValues);
+            const normalizedX = xValues.map(x => (x - minX) / (maxX - minX));
+            
+            // Build the Vandermonde matrix
+            const matrix = [];
+            const vector = [];
             
             for (let i = 0; i < n; i++) {
-                const x = data[i].x.getTime(); // Convert timestamp to milliseconds
-                const y = data[i].y;
-                sumX += x;
-                sumY += y;
-                sumXY += x * y;
-                sumXX += x * x;
+                const row = [];
+                for (let j = 0; j <= degree; j++) {
+                    row.push(Math.pow(normalizedX[i], j));
+                }
+                matrix.push(row);
+                vector.push(yValues[i]);
             }
             
-            const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-            const intercept = (sumY - slope * sumX) / n;
+            // Solve using normal equations: (A^T * A) * x = A^T * b
+            const coefficients = solveNormalEquations(matrix, vector);
             
-            return { slope, intercept };
+            return coefficients ? {
+                coefficients,
+                minX,
+                maxX,
+                degree
+            } : null;
+        }
+        
+        // Solve normal equations for polynomial regression
+        function solveNormalEquations(A, b) {
+            const n = A.length;
+            const m = A[0].length;
+            
+            // Calculate A^T * A
+            const AtA = [];
+            for (let i = 0; i < m; i++) {
+                AtA[i] = [];
+                for (let j = 0; j < m; j++) {
+                    let sum = 0;
+                    for (let k = 0; k < n; k++) {
+                        sum += A[k][i] * A[k][j];
+                    }
+                    AtA[i][j] = sum;
+                }
+            }
+            
+            // Calculate A^T * b
+            const Atb = [];
+            for (let i = 0; i < m; i++) {
+                let sum = 0;
+                for (let j = 0; j < n; j++) {
+                    sum += A[j][i] * b[j];
+                }
+                Atb[i] = sum;
+            }
+            
+            // Solve using Gaussian elimination
+            return gaussianElimination(AtA, Atb);
+        }
+        
+        // Gaussian elimination solver
+        function gaussianElimination(A, b) {
+            const n = A.length;
+            const augmented = A.map((row, i) => [...row, b[i]]);
+            
+            // Forward elimination
+            for (let i = 0; i < n; i++) {
+                // Find pivot
+                let maxRow = i;
+                for (let k = i + 1; k < n; k++) {
+                    if (Math.abs(augmented[k][i]) > Math.abs(augmented[maxRow][i])) {
+                        maxRow = k;
+                    }
+                }
+                
+                // Swap rows
+                [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
+                
+                // Make all rows below this one 0 in current column
+                for (let k = i + 1; k < n; k++) {
+                    if (Math.abs(augmented[i][i]) < 1e-10) continue;
+                    const factor = augmented[k][i] / augmented[i][i];
+                    for (let j = i; j < n + 1; j++) {
+                        augmented[k][j] -= factor * augmented[i][j];
+                    }
+                }
+            }
+            
+            // Back substitution
+            const solution = new Array(n);
+            for (let i = n - 1; i >= 0; i--) {
+                solution[i] = augmented[i][n];
+                for (let j = i + 1; j < n; j++) {
+                    solution[i] -= augmented[i][j] * solution[j];
+                }
+                if (Math.abs(augmented[i][i]) < 1e-10) return null;
+                solution[i] /= augmented[i][i];
+            }
+            
+            return solution;
         }
 
-        // Generate trend line data points
+        // Generate curved trend line data points
         function generateTrendLine(data, regression) {
             if (!regression || data.length < 2) return [];
             
             const firstTime = data[0].x.getTime();
             const lastTime = data[data.length - 1].x.getTime();
+            const timeRange = lastTime - firstTime;
             
-            const firstY = regression.slope * firstTime + regression.intercept;
-            const lastY = regression.slope * lastTime + regression.intercept;
+            // Generate more points for a smooth curve
+            const points = [];
+            const numPoints = 50; // More points for smoother curve
             
-            return [
-                { x: new Date(firstTime), y: firstY },
-                { x: new Date(lastTime), y: lastY }
-            ];
+            for (let i = 0; i <= numPoints; i++) {
+                const t = i / numPoints;
+                const currentTime = firstTime + t * timeRange;
+                
+                // Normalize time value
+                const normalizedX = (currentTime - regression.minX) / (regression.maxX - regression.minX);
+                
+                // Calculate polynomial value
+                let y = 0;
+                for (let j = 0; j < regression.coefficients.length; j++) {
+                    y += regression.coefficients[j] * Math.pow(normalizedX, j);
+                }
+                
+                points.push({ x: new Date(currentTime), y: y });
+            }
+            
+            return points;
         }
 
         async function fetchDebugData() {
@@ -466,7 +570,7 @@
             // Calculate and add trend lines
             trendLineConfigs.forEach(config => {
                 if (config.data.length >= 2) {
-                    const regression = calculateLinearRegression(config.data);
+                    const regression = calculatePolynomialRegression(config.data, 2); // Use degree 2 polynomial
                     if (regression) {
                         const trendData = generateTrendLine(config.data, regression);
                         
