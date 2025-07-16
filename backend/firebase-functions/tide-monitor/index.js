@@ -68,9 +68,24 @@ exports.enrichTideData = onValueCreated("/readings/{readingId}", async (event) =
         console.log(`NOAA water level data: ${waterLevel} at ${latest.t}, flags: ${latest.f}, quality: ${latest.q}`);
         
         // Check data age (warn if older than 10 minutes)
-        const dataTime = new Date(latest.t);
+        // NOAA API returns time in Eastern Time (EST/EDT) due to time_zone=lst_ldt
+        // Convert to UTC for proper comparison with Firebase Functions time
+        const dataTimeString = latest.t; // e.g., "2025-07-16 16:00"
+        
+        // Parse the Eastern Time and convert to UTC
+        const [datePart, timePart] = dataTimeString.split(' ');
+        const [year, month, day] = datePart.split('-').map(Number);
+        const [hour, minute] = timePart.split(':').map(Number);
+        
+        // Create date in local Eastern Time, then convert to UTC
+        // July is EDT (UTC-4), so we need to add 4 hours to get UTC
+        const dataTime = new Date(year, month - 1, day, hour, minute);
         const now = new Date();
-        const ageMinutes = (now - dataTime) / (1000 * 60);
+        
+        // Assume EDT for now (UTC-4) - could be enhanced to detect EST/EDT
+        const dataTimeUTC = new Date(dataTime.getTime() + (4 * 60 * 60 * 1000));
+        const ageMinutes = (now - dataTimeUTC) / (1000 * 60);
+        
         if (ageMinutes > 10) {
           console.warn(`NOAA water level data is ${ageMinutes.toFixed(1)} minutes old`);
         }
