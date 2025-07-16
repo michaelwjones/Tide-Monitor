@@ -87,36 +87,52 @@
             const n = data.length;
             if (n < degree + 1) return null;
             
-            // Normalize x values to prevent numerical instability
-            const xValues = data.map(d => d.x.getTime());
-            const yValues = data.map(d => d.y);
-            
-            const minX = Math.min(...xValues);
-            const maxX = Math.max(...xValues);
-            const normalizedX = xValues.map(x => (x - minX) / (maxX - minX));
-            
-            // Build the Vandermonde matrix
-            const matrix = [];
-            const vector = [];
-            
-            for (let i = 0; i < n; i++) {
-                const row = [];
-                for (let j = 0; j <= degree; j++) {
-                    row.push(Math.pow(normalizedX[i], j));
+            // Try progressively lower degrees if high degree fails
+            for (let currentDegree = Math.min(degree, Math.floor(n / 2)); currentDegree >= 2; currentDegree--) {
+                try {
+                    // Normalize x values to prevent numerical instability
+                    const xValues = data.map(d => d.x.getTime());
+                    const yValues = data.map(d => d.y);
+                    
+                    const minX = Math.min(...xValues);
+                    const maxX = Math.max(...xValues);
+                    const range = maxX - minX;
+                    
+                    if (range === 0) continue; // Skip if no time variation
+                    
+                    const normalizedX = xValues.map(x => (x - minX) / range);
+                    
+                    // Build the Vandermonde matrix
+                    const matrix = [];
+                    const vector = [];
+                    
+                    for (let i = 0; i < n; i++) {
+                        const row = [];
+                        for (let j = 0; j <= currentDegree; j++) {
+                            row.push(Math.pow(normalizedX[i], j));
+                        }
+                        matrix.push(row);
+                        vector.push(yValues[i]);
+                    }
+                    
+                    // Solve using normal equations: (A^T * A) * x = A^T * b
+                    const coefficients = solveNormalEquations(matrix, vector);
+                    
+                    if (coefficients && coefficients.every(c => isFinite(c))) {
+                        return {
+                            coefficients,
+                            minX,
+                            maxX,
+                            degree: currentDegree
+                        };
+                    }
+                } catch (error) {
+                    console.warn(`Polynomial regression failed at degree ${currentDegree}:`, error);
+                    continue;
                 }
-                matrix.push(row);
-                vector.push(yValues[i]);
             }
             
-            // Solve using normal equations: (A^T * A) * x = A^T * b
-            const coefficients = solveNormalEquations(matrix, vector);
-            
-            return coefficients ? {
-                coefficients,
-                minX,
-                maxX,
-                degree
-            } : null;
+            return null;
         }
         
         // Solve normal equations for polynomial regression
@@ -151,12 +167,13 @@
             return gaussianElimination(AtA, Atb);
         }
         
-        // Gaussian elimination solver
+        // Gaussian elimination solver with improved numerical stability
         function gaussianElimination(A, b) {
             const n = A.length;
             const augmented = A.map((row, i) => [...row, b[i]]);
+            const eps = 1e-12;
             
-            // Forward elimination
+            // Forward elimination with partial pivoting
             for (let i = 0; i < n; i++) {
                 // Find pivot
                 let maxRow = i;
@@ -166,12 +183,16 @@
                     }
                 }
                 
+                // Check for singular matrix
+                if (Math.abs(augmented[maxRow][i]) < eps) {
+                    return null;
+                }
+                
                 // Swap rows
                 [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
                 
                 // Make all rows below this one 0 in current column
                 for (let k = i + 1; k < n; k++) {
-                    if (Math.abs(augmented[i][i]) < 1e-10) continue;
                     const factor = augmented[k][i] / augmented[i][i];
                     for (let j = i; j < n + 1; j++) {
                         augmented[k][j] -= factor * augmented[i][j];
@@ -186,7 +207,7 @@
                 for (let j = i + 1; j < n; j++) {
                     solution[i] -= augmented[i][j] * solution[j];
                 }
-                if (Math.abs(augmented[i][i]) < 1e-10) return null;
+                if (Math.abs(augmented[i][i]) < eps) return null;
                 solution[i] /= augmented[i][i];
             }
             
@@ -569,23 +590,27 @@
             
             // Calculate and add trend lines
             trendLineConfigs.forEach(config => {
-                if (config.data.length >= 2) {
+                if (config.data.length >= 4) { // Need at least 4 points for higher degree polynomials
                     const regression = calculatePolynomialRegression(config.data, 12); // Use degree 12 polynomial for tightest wave fitting
                     if (regression) {
                         const trendData = generateTrendLine(config.data, regression);
                         
-                        debugChartInstance.data.datasets.push({
-                            label: config.label,
-                            data: trendData,
-                            borderColor: config.borderColor,
-                            backgroundColor: 'transparent',
-                            borderWidth: 2,
-                            pointRadius: 0,
-                            pointHoverRadius: 0,
-                            yAxisID: config.yAxisID,
-                            order: 100 + config.datasetIndex,
-                            borderDash: [10, 5]
-                        });
+                        if (trendData && trendData.length > 0) {
+                            debugChartInstance.data.datasets.push({
+                                label: config.label,
+                                data: trendData,
+                                borderColor: config.borderColor,
+                                backgroundColor: 'transparent',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                pointHoverRadius: 0,
+                                yAxisID: config.yAxisID,
+                                order: 100 + config.datasetIndex,
+                                borderDash: [10, 5]
+                            });
+                        }
+                    } else {
+                        console.warn(`Failed to calculate polynomial regression for ${config.label}`);
                     }
                 }
             });
