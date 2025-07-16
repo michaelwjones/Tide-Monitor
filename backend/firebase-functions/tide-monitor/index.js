@@ -64,13 +64,8 @@ exports.enrichTideData = onValueCreated("/readings/{readingId}", async (event) =
         const latest = waterData.data[0];
         const waterLevel = latest.v || "-999";
         
-        // Enhanced validation and logging
+        // Enhanced logging for troubleshooting discontinuous values
         console.log(`NOAA water level data: ${waterLevel} at ${latest.t}, flags: ${latest.f}, quality: ${latest.q}`);
-        
-        // Check for unusual values (outside expected range 0-8 feet)
-        if (waterLevel !== "-999" && (parseFloat(waterLevel) < 0 || parseFloat(waterLevel) > 8)) {
-          console.warn(`Unusual NOAA water level detected: ${waterLevel} feet - outside expected range`);
-        }
         
         // Check data age (warn if older than 10 minutes)
         const dataTime = new Date(latest.t);
