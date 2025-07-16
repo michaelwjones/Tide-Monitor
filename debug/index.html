@@ -570,7 +570,7 @@
             // Calculate and add trend lines
             trendLineConfigs.forEach(config => {
                 if (config.data.length >= 2) {
-                    const regression = calculatePolynomialRegression(config.data, 8); // Use degree 8 polynomial for detailed wave fitting
+                    const regression = calculatePolynomialRegression(config.data, 12); // Use degree 12 polynomial for tightest wave fitting
                     if (regression) {
                         const trendData = generateTrendLine(config.data, regression);
                         
