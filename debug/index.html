@@ -82,177 +82,169 @@
         let trendLinesVisible = false;
         let currentReadings = [];
 
-        // Smooth data using moving average with adjustable window size
-        function calculateSmoothTrend(data, windowSize = 0.1) {
+        // Natural cubic spline interpolation for smooth trends without edge effects
+        function calculateCubicSpline(data, smoothing = 0.8) {
             const n = data.length;
-            if (n < 3) return null;
+            if (n < 4) return null;
             
-            // Calculate adaptive window size based on data length
-            const adaptiveWindow = Math.max(3, Math.floor(n * windowSize));
-            
-            // Sort data by x value to ensure proper ordering
+            // Sort data by x value and remove duplicates
             const sortedData = [...data].sort((a, b) => a.x.getTime() - b.x.getTime());
-            
-            const smoothedPoints = [];
-            
+            const uniqueData = [];
             for (let i = 0; i < sortedData.length; i++) {
-                const halfWindow = Math.floor(adaptiveWindow / 2);
-                const start = Math.max(0, i - halfWindow);
-                const end = Math.min(sortedData.length - 1, i + halfWindow);
+                if (i === 0 || sortedData[i].x.getTime() !== sortedData[i-1].x.getTime()) {
+                    uniqueData.push(sortedData[i]);
+                }
+            }
+            
+            if (uniqueData.length < 4) return null;
+            
+            // Apply smoothing by averaging nearby points
+            const smoothedData = [];
+            const windowSize = Math.max(1, Math.floor(uniqueData.length * (1 - smoothing)));
+            
+            for (let i = 0; i < uniqueData.length; i++) {
+                const start = Math.max(0, i - windowSize);
+                const end = Math.min(uniqueData.length - 1, i + windowSize);
                 
-                // Calculate weighted moving average
-                let weightedSum = 0;
-                let totalWeight = 0;
-                
+                let sum = 0;
+                let count = 0;
                 for (let j = start; j <= end; j++) {
-                    // Use Gaussian-like weighting - closer points have more influence
-                    const distance = Math.abs(j - i);
-                    const weight = Math.exp(-0.5 * Math.pow(distance / (halfWindow / 2), 2));
-                    
-                    weightedSum += sortedData[j].y * weight;
-                    totalWeight += weight;
+                    sum += uniqueData[j].y;
+                    count++;
                 }
                 
-                smoothedPoints.push({
-                    x: sortedData[i].x,
-                    y: weightedSum / totalWeight
+                smoothedData.push({
+                    x: uniqueData[i].x,
+                    y: sum / count
                 });
             }
             
             return {
-                points: smoothedPoints,
-                type: 'smooth'
+                data: smoothedData,
+                type: 'cubic_spline'
             };
         }
         
-        // Alternative: LOWESS (LOcally WEighted Scatterplot Smoothing) for better edge handling
-        function calculateLOWESS(data, bandwidth = 0.3) {
+        // Natural cubic spline computation using Thomas algorithm (O(n) complexity)
+        function computeNaturalCubicSpline(data) {
             const n = data.length;
-            if (n < 5) return null;
+            if (n < 4) return null;
             
-            // Sort data by x value
-            const sortedData = [...data].sort((a, b) => a.x.getTime() - b.x.getTime());
-            const xValues = sortedData.map(d => d.x.getTime());
-            const yValues = sortedData.map(d => d.y);
+            const x = data.map(d => d.x.getTime());
+            const y = data.map(d => d.y);
             
-            const smoothedPoints = [];
-            const h = Math.floor(bandwidth * n); // neighborhood size
+            // Calculate intervals
+            const h = new Array(n - 1);
+            for (let i = 0; i < n - 1; i++) {
+                h[i] = x[i + 1] - x[i];
+                if (h[i] === 0) return null; // Avoid division by zero
+            }
             
-            for (let i = 0; i < n; i++) {
-                const x0 = xValues[i];
-                
-                // Find the h nearest neighbors
-                const distances = xValues.map((x, idx) => ({ 
-                    distance: Math.abs(x - x0), 
-                    index: idx 
-                }));
-                distances.sort((a, b) => a.distance - b.distance);
-                
-                const neighbors = distances.slice(0, h);
-                const maxDist = neighbors[neighbors.length - 1].distance;
-                
-                if (maxDist === 0) {
-                    smoothedPoints.push({
-                        x: sortedData[i].x,
-                        y: yValues[i]
-                    });
-                    continue;
-                }
-                
-                // Calculate weighted linear regression
-                let sumW = 0, sumWX = 0, sumWY = 0, sumWXX = 0, sumWXY = 0;
-                
-                for (const neighbor of neighbors) {
-                    const idx = neighbor.index;
-                    const x = xValues[idx];
-                    const y = yValues[idx];
-                    
-                    // Tricube weight function
-                    const u = neighbor.distance / maxDist;
-                    const w = Math.pow(1 - Math.pow(u, 3), 3);
-                    
-                    sumW += w;
-                    sumWX += w * x;
-                    sumWY += w * y;
-                    sumWXX += w * x * x;
-                    sumWXY += w * x * y;
-                }
-                
-                // Solve for linear regression coefficients
-                const denominator = sumW * sumWXX - sumWX * sumWX;
-                if (Math.abs(denominator) < 1e-10) {
-                    smoothedPoints.push({
-                        x: sortedData[i].x,
-                        y: sumWY / sumW
-                    });
-                } else {
-                    const a = (sumW * sumWXY - sumWX * sumWY) / denominator;
-                    const b = (sumWXX * sumWY - sumWX * sumWXY) / denominator;
-                    
-                    smoothedPoints.push({
-                        x: sortedData[i].x,
-                        y: a * x0 + b
-                    });
-                }
+            // Set up the tridiagonal system for natural spline
+            const alpha = new Array(n - 1);
+            for (let i = 1; i < n - 1; i++) {
+                alpha[i] = (3 / h[i]) * (y[i + 1] - y[i]) - (3 / h[i - 1]) * (y[i] - y[i - 1]);
+            }
+            
+            // Solve tridiagonal system using Thomas algorithm
+            const l = new Array(n);
+            const mu = new Array(n);
+            const z = new Array(n);
+            
+            l[0] = 1;
+            mu[0] = 0;
+            z[0] = 0;
+            
+            for (let i = 1; i < n - 1; i++) {
+                l[i] = 2 * (x[i + 1] - x[i - 1]) - h[i - 1] * mu[i - 1];
+                mu[i] = h[i] / l[i];
+                z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
+            }
+            
+            l[n - 1] = 1;
+            z[n - 1] = 0;
+            
+            // Back substitution
+            const c = new Array(n);
+            c[n - 1] = 0;
+            
+            for (let j = n - 2; j >= 0; j--) {
+                c[j] = z[j] - mu[j] * c[j + 1];
+            }
+            
+            // Calculate spline coefficients
+            const a = new Array(n);
+            const b = new Array(n);
+            const d = new Array(n);
+            
+            for (let i = 0; i < n - 1; i++) {
+                a[i] = y[i];
+                b[i] = (y[i + 1] - y[i]) / h[i] - h[i] * (c[i + 1] + 2 * c[i]) / 3;
+                d[i] = (c[i + 1] - c[i]) / (3 * h[i]);
             }
             
             return {
-                points: smoothedPoints,
-                type: 'lowess'
+                x: x,
+                a: a,
+                b: b,
+                c: c,
+                d: d,
+                n: n
             };
         }
         
-        // Simple but effective Savitzky-Golay filter for smooth trends
-        function calculateSavitzkyGolay(data, windowSize = 5, polyOrder = 2) {
-            const n = data.length;
-            if (n < windowSize) return null;
+        // Evaluate cubic spline at given x values
+        function evaluateCubicSpline(spline, xValues) {
+            const points = [];
             
-            // Ensure odd window size
-            const window = windowSize % 2 === 0 ? windowSize + 1 : windowSize;
-            const halfWindow = Math.floor(window / 2);
-            
-            // Sort data by x value
-            const sortedData = [...data].sort((a, b) => a.x.getTime() - b.x.getTime());
-            const yValues = sortedData.map(d => d.y);
-            
-            const smoothedY = [];
-            
-            for (let i = 0; i < n; i++) {
-                const start = Math.max(0, i - halfWindow);
-                const end = Math.min(n - 1, i + halfWindow);
+            for (const targetX of xValues) {
+                const x = targetX.getTime();
                 
-                // Simple moving average as approximation to Savitzky-Golay
-                let sum = 0;
-                let count = 0;
-                
-                for (let j = start; j <= end; j++) {
-                    // Apply triangular weighting
-                    const distance = Math.abs(j - i);
-                    const weight = Math.max(0, halfWindow + 1 - distance);
-                    sum += yValues[j] * weight;
-                    count += weight;
+                // Find the interval containing x
+                let i = 0;
+                while (i < spline.n - 1 && x > spline.x[i + 1]) {
+                    i++;
                 }
                 
-                smoothedY.push(sum / count);
+                // Clamp to valid range
+                i = Math.max(0, Math.min(i, spline.n - 2));
+                
+                const dx = x - spline.x[i];
+                const y = spline.a[i] + spline.b[i] * dx + spline.c[i] * dx * dx + spline.d[i] * dx * dx * dx;
+                
+                points.push({
+                    x: targetX,
+                    y: y
+                });
             }
             
-            const smoothedPoints = sortedData.map((point, i) => ({
-                x: point.x,
-                y: smoothedY[i]
-            }));
-            
-            return {
-                points: smoothedPoints,
-                type: 'savgol'
-            };
+            return points;
         }
 
-        // Generate smooth trend line data points
+        // Generate smooth trend line data points using cubic splines
         function generateTrendLine(data, smoothResult) {
-            if (!smoothResult || !smoothResult.points || smoothResult.points.length < 2) return [];
+            if (!smoothResult || !smoothResult.data || smoothResult.data.length < 4) return [];
             
-            // Return the smoothed points directly - they're already properly ordered
-            return smoothResult.points;
+            // Compute natural cubic spline
+            const spline = computeNaturalCubicSpline(smoothResult.data);
+            if (!spline) return [];
+            
+            // Generate evaluation points for smooth curve
+            const firstTime = smoothResult.data[0].x.getTime();
+            const lastTime = smoothResult.data[smoothResult.data.length - 1].x.getTime();
+            const timeRange = lastTime - firstTime;
+            
+            const evalPoints = [];
+            const numPoints = Math.min(100, smoothResult.data.length * 2); // Adaptive point count
+            
+            for (let i = 0; i <= numPoints; i++) {
+                const t = i / numPoints;
+                const currentTime = firstTime + t * timeRange;
+                evalPoints.push(new Date(currentTime));
+            }
+            
+            // Evaluate spline at these points
+            return evaluateCubicSpline(spline, evalPoints);
         }
 
         async function fetchDebugData() {
@@ -600,12 +592,8 @@
             
             // Calculate and add trend lines
             trendLineConfigs.forEach(config => {
-                if (config.data.length >= 5) { // Need at least 5 points for smoothing
-                    // Try LOWESS first, fallback to moving average
-                    let smoothResult = calculateLOWESS(config.data, 0.3);
-                    if (!smoothResult) {
-                        smoothResult = calculateSmoothTrend(config.data, 0.15);
-                    }
+                if (config.data.length >= 4) { // Need at least 4 points for cubic splines
+                    const smoothResult = calculateCubicSpline(config.data, 0.9); // High smoothing value for tight fit
                     
                     if (smoothResult) {
                         const trendData = generateTrendLine(config.data, smoothResult);
@@ -625,7 +613,7 @@
                             });
                         }
                     } else {
-                        console.warn(`Failed to calculate smooth trend for ${config.label}`);
+                        console.warn(`Failed to calculate cubic spline for ${config.label}`);
                     }
                 }
             });
