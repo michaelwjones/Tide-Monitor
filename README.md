@@ -48,6 +48,8 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Web Das
 - **Multi-axis charts** for detailed analysis
 - **Enhanced visualization** of wave calculation methods
 - **System diagnostics** with valid sample tracking
+- **Trend line analysis** with toggleable cubic spline curves
+- **NOAA environmental data** integration (wind, water level)
 
 ## 🚀 Quick Start
 
@@ -77,15 +79,26 @@ The system collects readings every minute with the following data points:
   "he": 178,
   "wp": 2445,
   "we": 2431,
-  "vs": 487
+  "vs": 487,
+  "ws": "8.7",
+  "wd": "180",
+  "gs": "12.3",
+  "wm": "2.5"
 }
 ```
 
+### Sensor Data Fields
 - `t`: Timestamp (ISO8601)
 - `w`: Water level in mm (average method)
 - `hp/he`: Wave heights using percentile/envelope methods
 - `wp/we`: Water levels using percentile/envelope methods  
 - `vs`: Valid sample count (out of 512)
+
+### NOAA Environmental Data (added via Cloud Functions)
+- `ws`: Wind speed in m/s from Duke Marine Lab
+- `wd`: Wind direction in degrees from Duke Marine Lab  
+- `gs`: Gust speed in m/s from Duke Marine Lab
+- `wm`: Water level in feet (MLLW datum) from Duke Marine Lab
 
 ## 🔧 Technical Details
 
@@ -105,11 +118,19 @@ The system collects readings every minute with the following data points:
 - **Offline Storage**: Up to 1000 readings stored locally when connectivity is lost
 - **Cloud Sync**: Automatic upload when connection is restored
 
+### Advanced Analytics
+- **Trend Line Analysis**: Natural cubic spline interpolation for smooth trend visualization
+- **7-Point Smoothing**: Adaptive smoothing algorithm for optimal curve fitting
+- **Performance Optimized**: O(n) complexity using Thomas algorithm for fast rendering
+- **Edge-Safe**: Natural splines prevent oscillation artifacts at data boundaries
+- **Toggle Control**: Show/hide trend lines with single button click
+
 ### Security & Performance
 - **Content Security Policy**: Protection against XSS attacks
 - **Optimized Rendering**: Chart animations disabled for performance
 - **Error Handling**: Graceful degradation when data is unavailable
 - **Responsive Design**: Works on desktop and mobile devices
+- **Fast Trend Lines**: Cubic spline computation under 100ms for 1440 data points
 
 ## 📱 Mobile Support
 

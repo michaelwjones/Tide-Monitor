@@ -91,6 +91,15 @@ firebase emulators:start --only functions
 - [Wind data](https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?date=latest&station=8656483&product=wind&units=metric&time_zone=lst_ldt&format=json&application=Michael.wayne.jones@gmail.com)
 - [Water level data](https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?date=latest&station=8656483&product=water_level&datum=MLLW&time_zone=lst_ldt&units=english&format=json&application=Michael.wayne.jones@gmail.com)
 
+### Dashboard Integration
+
+The enriched data is used by the web dashboards for:
+- **Main Dashboard**: Basic water level and wave visualization
+- **Debug Dashboard**: Advanced analytics with trend lines and NOAA data
+  - **Wind visualization**: Real-time wind speed and gust data
+  - **Water level comparison**: Sensor vs NOAA measurements
+  - **Trend analysis**: Cubic spline interpolation with environmental context
+
 ### Troubleshooting
 
 If enrichment is not working:
@@ -98,3 +107,4 @@ If enrichment is not working:
 2. Verify all fields are present in latest Firebase entries
 3. Test NOAA APIs directly using the URLs above
 4. Look for -999 error values indicating API failures
+5. Check debug dashboard for trend line functionality with enriched data
