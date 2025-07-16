@@ -82,167 +82,177 @@
         let trendLinesVisible = false;
         let currentReadings = [];
 
-        // Polynomial regression function to calculate curved line of best fit
-        function calculatePolynomialRegression(data, degree = 2) {
+        // Smooth data using moving average with adjustable window size
+        function calculateSmoothTrend(data, windowSize = 0.1) {
             const n = data.length;
-            if (n < degree + 1) return null;
+            if (n < 3) return null;
             
-            // Try progressively lower degrees if high degree fails
-            for (let currentDegree = Math.min(degree, Math.floor(n / 2)); currentDegree >= 2; currentDegree--) {
-                try {
-                    // Normalize x values to prevent numerical instability
-                    const xValues = data.map(d => d.x.getTime());
-                    const yValues = data.map(d => d.y);
+            // Calculate adaptive window size based on data length
+            const adaptiveWindow = Math.max(3, Math.floor(n * windowSize));
+            
+            // Sort data by x value to ensure proper ordering
+            const sortedData = [...data].sort((a, b) => a.x.getTime() - b.x.getTime());
+            
+            const smoothedPoints = [];
+            
+            for (let i = 0; i < sortedData.length; i++) {
+                const halfWindow = Math.floor(adaptiveWindow / 2);
+                const start = Math.max(0, i - halfWindow);
+                const end = Math.min(sortedData.length - 1, i + halfWindow);
+                
+                // Calculate weighted moving average
+                let weightedSum = 0;
+                let totalWeight = 0;
+                
+                for (let j = start; j <= end; j++) {
+                    // Use Gaussian-like weighting - closer points have more influence
+                    const distance = Math.abs(j - i);
+                    const weight = Math.exp(-0.5 * Math.pow(distance / (halfWindow / 2), 2));
                     
-                    const minX = Math.min(...xValues);
-                    const maxX = Math.max(...xValues);
-                    const range = maxX - minX;
-                    
-                    if (range === 0) continue; // Skip if no time variation
-                    
-                    const normalizedX = xValues.map(x => (x - minX) / range);
-                    
-                    // Build the Vandermonde matrix
-                    const matrix = [];
-                    const vector = [];
-                    
-                    for (let i = 0; i < n; i++) {
-                        const row = [];
-                        for (let j = 0; j <= currentDegree; j++) {
-                            row.push(Math.pow(normalizedX[i], j));
-                        }
-                        matrix.push(row);
-                        vector.push(yValues[i]);
-                    }
-                    
-                    // Solve using normal equations: (A^T * A) * x = A^T * b
-                    const coefficients = solveNormalEquations(matrix, vector);
-                    
-                    if (coefficients && coefficients.every(c => isFinite(c))) {
-                        return {
-                            coefficients,
-                            minX,
-                            maxX,
-                            degree: currentDegree
-                        };
-                    }
-                } catch (error) {
-                    console.warn(`Polynomial regression failed at degree ${currentDegree}:`, error);
+                    weightedSum += sortedData[j].y * weight;
+                    totalWeight += weight;
+                }
+                
+                smoothedPoints.push({
+                    x: sortedData[i].x,
+                    y: weightedSum / totalWeight
+                });
+            }
+            
+            return {
+                points: smoothedPoints,
+                type: 'smooth'
+            };
+        }
+        
+        // Alternative: LOWESS (LOcally WEighted Scatterplot Smoothing) for better edge handling
+        function calculateLOWESS(data, bandwidth = 0.3) {
+            const n = data.length;
+            if (n < 5) return null;
+            
+            // Sort data by x value
+            const sortedData = [...data].sort((a, b) => a.x.getTime() - b.x.getTime());
+            const xValues = sortedData.map(d => d.x.getTime());
+            const yValues = sortedData.map(d => d.y);
+            
+            const smoothedPoints = [];
+            const h = Math.floor(bandwidth * n); // neighborhood size
+            
+            for (let i = 0; i < n; i++) {
+                const x0 = xValues[i];
+                
+                // Find the h nearest neighbors
+                const distances = xValues.map((x, idx) => ({ 
+                    distance: Math.abs(x - x0), 
+                    index: idx 
+                }));
+                distances.sort((a, b) => a.distance - b.distance);
+                
+                const neighbors = distances.slice(0, h);
+                const maxDist = neighbors[neighbors.length - 1].distance;
+                
+                if (maxDist === 0) {
+                    smoothedPoints.push({
+                        x: sortedData[i].x,
+                        y: yValues[i]
+                    });
                     continue;
                 }
-            }
-            
-            return null;
-        }
-        
-        // Solve normal equations for polynomial regression
-        function solveNormalEquations(A, b) {
-            const n = A.length;
-            const m = A[0].length;
-            
-            // Calculate A^T * A
-            const AtA = [];
-            for (let i = 0; i < m; i++) {
-                AtA[i] = [];
-                for (let j = 0; j < m; j++) {
-                    let sum = 0;
-                    for (let k = 0; k < n; k++) {
-                        sum += A[k][i] * A[k][j];
-                    }
-                    AtA[i][j] = sum;
+                
+                // Calculate weighted linear regression
+                let sumW = 0, sumWX = 0, sumWY = 0, sumWXX = 0, sumWXY = 0;
+                
+                for (const neighbor of neighbors) {
+                    const idx = neighbor.index;
+                    const x = xValues[idx];
+                    const y = yValues[idx];
+                    
+                    // Tricube weight function
+                    const u = neighbor.distance / maxDist;
+                    const w = Math.pow(1 - Math.pow(u, 3), 3);
+                    
+                    sumW += w;
+                    sumWX += w * x;
+                    sumWY += w * y;
+                    sumWXX += w * x * x;
+                    sumWXY += w * x * y;
+                }
+                
+                // Solve for linear regression coefficients
+                const denominator = sumW * sumWXX - sumWX * sumWX;
+                if (Math.abs(denominator) < 1e-10) {
+                    smoothedPoints.push({
+                        x: sortedData[i].x,
+                        y: sumWY / sumW
+                    });
+                } else {
+                    const a = (sumW * sumWXY - sumWX * sumWY) / denominator;
+                    const b = (sumWXX * sumWY - sumWX * sumWXY) / denominator;
+                    
+                    smoothedPoints.push({
+                        x: sortedData[i].x,
+                        y: a * x0 + b
+                    });
                 }
             }
             
-            // Calculate A^T * b
-            const Atb = [];
-            for (let i = 0; i < m; i++) {
-                let sum = 0;
-                for (let j = 0; j < n; j++) {
-                    sum += A[j][i] * b[j];
-                }
-                Atb[i] = sum;
-            }
-            
-            // Solve using Gaussian elimination
-            return gaussianElimination(AtA, Atb);
+            return {
+                points: smoothedPoints,
+                type: 'lowess'
+            };
         }
         
-        // Gaussian elimination solver with improved numerical stability
-        function gaussianElimination(A, b) {
-            const n = A.length;
-            const augmented = A.map((row, i) => [...row, b[i]]);
-            const eps = 1e-12;
+        // Simple but effective Savitzky-Golay filter for smooth trends
+        function calculateSavitzkyGolay(data, windowSize = 5, polyOrder = 2) {
+            const n = data.length;
+            if (n < windowSize) return null;
             
-            // Forward elimination with partial pivoting
+            // Ensure odd window size
+            const window = windowSize % 2 === 0 ? windowSize + 1 : windowSize;
+            const halfWindow = Math.floor(window / 2);
+            
+            // Sort data by x value
+            const sortedData = [...data].sort((a, b) => a.x.getTime() - b.x.getTime());
+            const yValues = sortedData.map(d => d.y);
+            
+            const smoothedY = [];
+            
             for (let i = 0; i < n; i++) {
-                // Find pivot
-                let maxRow = i;
-                for (let k = i + 1; k < n; k++) {
-                    if (Math.abs(augmented[k][i]) > Math.abs(augmented[maxRow][i])) {
-                        maxRow = k;
-                    }
+                const start = Math.max(0, i - halfWindow);
+                const end = Math.min(n - 1, i + halfWindow);
+                
+                // Simple moving average as approximation to Savitzky-Golay
+                let sum = 0;
+                let count = 0;
+                
+                for (let j = start; j <= end; j++) {
+                    // Apply triangular weighting
+                    const distance = Math.abs(j - i);
+                    const weight = Math.max(0, halfWindow + 1 - distance);
+                    sum += yValues[j] * weight;
+                    count += weight;
                 }
                 
-                // Check for singular matrix
-                if (Math.abs(augmented[maxRow][i]) < eps) {
-                    return null;
-                }
-                
-                // Swap rows
-                [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
-                
-                // Make all rows below this one 0 in current column
-                for (let k = i + 1; k < n; k++) {
-                    const factor = augmented[k][i] / augmented[i][i];
-                    for (let j = i; j < n + 1; j++) {
-                        augmented[k][j] -= factor * augmented[i][j];
-                    }
-                }
+                smoothedY.push(sum / count);
             }
             
-            // Back substitution
-            const solution = new Array(n);
-            for (let i = n - 1; i >= 0; i--) {
-                solution[i] = augmented[i][n];
-                for (let j = i + 1; j < n; j++) {
-                    solution[i] -= augmented[i][j] * solution[j];
-                }
-                if (Math.abs(augmented[i][i]) < eps) return null;
-                solution[i] /= augmented[i][i];
-            }
+            const smoothedPoints = sortedData.map((point, i) => ({
+                x: point.x,
+                y: smoothedY[i]
+            }));
             
-            return solution;
+            return {
+                points: smoothedPoints,
+                type: 'savgol'
+            };
         }
 
-        // Generate curved trend line data points
-        function generateTrendLine(data, regression) {
-            if (!regression || data.length < 2) return [];
+        // Generate smooth trend line data points
+        function generateTrendLine(data, smoothResult) {
+            if (!smoothResult || !smoothResult.points || smoothResult.points.length < 2) return [];
             
-            const firstTime = data[0].x.getTime();
-            const lastTime = data[data.length - 1].x.getTime();
-            const timeRange = lastTime - firstTime;
-            
-            // Generate more points for a smooth curve
-            const points = [];
-            const numPoints = 50; // More points for smoother curve
-            
-            for (let i = 0; i <= numPoints; i++) {
-                const t = i / numPoints;
-                const currentTime = firstTime + t * timeRange;
-                
-                // Normalize time value
-                const normalizedX = (currentTime - regression.minX) / (regression.maxX - regression.minX);
-                
-                // Calculate polynomial value
-                let y = 0;
-                for (let j = 0; j < regression.coefficients.length; j++) {
-                    y += regression.coefficients[j] * Math.pow(normalizedX, j);
-                }
-                
-                points.push({ x: new Date(currentTime), y: y });
-            }
-            
-            return points;
+            // Return the smoothed points directly - they're already properly ordered
+            return smoothResult.points;
         }
 
         async function fetchDebugData() {
@@ -590,10 +600,15 @@
             
             // Calculate and add trend lines
             trendLineConfigs.forEach(config => {
-                if (config.data.length >= 4) { // Need at least 4 points for higher degree polynomials
-                    const regression = calculatePolynomialRegression(config.data, 12); // Use degree 12 polynomial for tightest wave fitting
-                    if (regression) {
-                        const trendData = generateTrendLine(config.data, regression);
+                if (config.data.length >= 5) { // Need at least 5 points for smoothing
+                    // Try LOWESS first, fallback to moving average
+                    let smoothResult = calculateLOWESS(config.data, 0.3);
+                    if (!smoothResult) {
+                        smoothResult = calculateSmoothTrend(config.data, 0.15);
+                    }
+                    
+                    if (smoothResult) {
+                        const trendData = generateTrendLine(config.data, smoothResult);
                         
                         if (trendData && trendData.length > 0) {
                             debugChartInstance.data.datasets.push({
@@ -610,7 +625,7 @@
                             });
                         }
                     } else {
-                        console.warn(`Failed to calculate polynomial regression for ${config.label}`);
+                        console.warn(`Failed to calculate smooth trend for ${config.label}`);
                     }
                 }
             });
