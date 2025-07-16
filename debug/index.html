@@ -99,15 +99,22 @@
             
             if (uniqueData.length < 4) return null;
             
-            // Apply light smoothing - just 3-point moving average
+            // Apply moderate smoothing - 5-point moving average
             const lightlySmoothed = [];
             for (let i = 0; i < uniqueData.length; i++) {
                 if (i === 0 || i === uniqueData.length - 1) {
                     // Keep endpoints unchanged
                     lightlySmoothed.push(uniqueData[i]);
-                } else {
-                    // Simple 3-point average for middle points
+                } else if (i === 1 || i === uniqueData.length - 2) {
+                    // 3-point average for near-endpoints
                     const smoothedY = (uniqueData[i-1].y + uniqueData[i].y + uniqueData[i+1].y) / 3;
+                    lightlySmoothed.push({
+                        x: uniqueData[i].x,
+                        y: smoothedY
+                    });
+                } else {
+                    // 5-point average for middle points
+                    const smoothedY = (uniqueData[i-2].y + uniqueData[i-1].y + uniqueData[i].y + uniqueData[i+1].y + uniqueData[i+2].y) / 5;
                     lightlySmoothed.push({
                         x: uniqueData[i].x,
                         y: smoothedY
