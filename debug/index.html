@@ -28,6 +28,28 @@
             color: white;
             text-decoration: none;
         }
+        .toggle-trendlines {
+            background: #007bff;
+            color: white;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            transition: background-color 0.2s;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .toggle-trendlines:hover {
+            background: #0056b3;
+        }
+        .toggle-trendlines.active {
+            background: #28a745;
+        }
+        .toggle-trendlines.active:hover {
+            background: #218838;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
@@ -41,7 +63,10 @@
     <div id="content" class="hidden">
         <canvas id="debugChart" width="800" height="600"></canvas>
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px;">
-            <a href="../index.html" class="main-link">← Main Dashboard</a>
+            <div style="display: flex; align-items: center;">
+                <button id="toggleTrendlines" class="toggle-trendlines">Show Trend Lines</button>
+                <a href="../index.html" class="main-link">← Main Dashboard</a>
+            </div>
             <div id="chartLegend" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; font-size: 14px; flex: 1;"></div>
         </div>
     </div>
@@ -55,6 +80,46 @@
         });
 
         let debugChartInstance = null;
+        let trendLinesVisible = false;
+        let currentReadings = [];
+
+        // Linear regression function to calculate line of best fit
+        function calculateLinearRegression(data) {
+            const n = data.length;
+            if (n < 2) return null;
+            
+            let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+            
+            for (let i = 0; i < n; i++) {
+                const x = data[i].x.getTime(); // Convert timestamp to milliseconds
+                const y = data[i].y;
+                sumX += x;
+                sumY += y;
+                sumXY += x * y;
+                sumXX += x * x;
+            }
+            
+            const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+            const intercept = (sumY - slope * sumX) / n;
+            
+            return { slope, intercept };
+        }
+
+        // Generate trend line data points
+        function generateTrendLine(data, regression) {
+            if (!regression || data.length < 2) return [];
+            
+            const firstTime = data[0].x.getTime();
+            const lastTime = data[data.length - 1].x.getTime();
+            
+            const firstY = regression.slope * firstTime + regression.intercept;
+            const lastY = regression.slope * lastTime + regression.intercept;
+            
+            return [
+                { x: new Date(firstTime), y: firstY },
+                { x: new Date(lastTime), y: lastY }
+            ];
+        }
 
         async function fetchDebugData() {
             try {
@@ -88,6 +153,9 @@
                     gustSpeed: (value.gs !== undefined && value.gs !== null && value.gs !== "-999") ? (parseFloat(value.gs) * 1.944).toFixed(1) : '--', // Convert m/s to knots
                     gustSpeedRaw: (value.gs !== undefined && value.gs !== null && value.gs !== "-999") ? (parseFloat(value.gs) * 1.944) : null
                 }));
+                
+                // Store readings for trend line calculations
+                currentReadings = readings;
                 
                 // Create debug chart with all data
                 createDebugChart(readings);
@@ -311,7 +379,137 @@
                     </span>
                 `).join('');
             }
+            
+            // Add trend lines if enabled
+            if (trendLinesVisible) {
+                addTrendLines();
+            }
         }
+
+        // Add trend lines to existing chart
+        function addTrendLines() {
+            if (!debugChartInstance || !currentReadings.length) return;
+            
+            const validReadings = currentReadings.filter(r => r.rawTimestamp.getTime() > 0);
+            
+            // Define datasets that need trend lines (all except Valid Samples)
+            const trendLineConfigs = [
+                {
+                    datasetIndex: 0,
+                    label: 'Water Level (Average) - Trend',
+                    data: validReadings.map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevel)})),
+                    borderColor: 'rgba(0, 0, 255, 0.6)',
+                    yAxisID: 'y'
+                },
+                {
+                    datasetIndex: 1,
+                    label: 'Water Level (Percentile) - Trend',
+                    data: validReadings.filter(r => r.waterLevelPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelPercentile)})),
+                    borderColor: 'rgba(0, 255, 255, 0.6)',
+                    yAxisID: 'y'
+                },
+                {
+                    datasetIndex: 2,
+                    label: 'Water Level (Envelope) - Trend',
+                    data: validReadings.filter(r => r.waterLevelEnvelope !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelEnvelope)})),
+                    borderColor: 'rgba(255, 0, 255, 0.6)',
+                    yAxisID: 'y'
+                },
+                {
+                    datasetIndex: 3,
+                    label: 'Wave Height (Percentile) - Trend',
+                    data: validReadings.filter(r => r.wavesPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesPercentile)})),
+                    borderColor: 'rgba(255, 0, 0, 0.6)',
+                    yAxisID: 'y1'
+                },
+                {
+                    datasetIndex: 4,
+                    label: 'Wave Height (Envelope) - Trend',
+                    data: validReadings.filter(r => r.wavesEnvelope !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesEnvelope)})),
+                    borderColor: 'rgba(255, 165, 0, 0.6)',
+                    yAxisID: 'y1'
+                },
+                {
+                    datasetIndex: 6,
+                    label: 'Duke Marine Lab Water Level - Trend',
+                    data: validReadings.filter(r => r.dukeWaterLevelRaw !== null).map(r => ({x: r.rawTimestamp, y: r.dukeWaterLevelRaw + 1.2})),
+                    borderColor: 'rgba(0, 0, 139, 0.6)',
+                    yAxisID: 'y'
+                },
+                {
+                    datasetIndex: 7,
+                    label: 'Wind Speed - Trend',
+                    data: validReadings.filter(r => r.windSpeedRaw !== null).map(r => ({x: r.rawTimestamp, y: r.windSpeedRaw})),
+                    borderColor: 'rgba(0, 128, 0, 0.6)',
+                    yAxisID: 'y3'
+                },
+                {
+                    datasetIndex: 8,
+                    label: 'Gust Speed - Trend',
+                    data: validReadings.filter(r => r.gustSpeedRaw !== null).map(r => ({x: r.rawTimestamp, y: r.gustSpeedRaw})),
+                    borderColor: 'rgba(0, 100, 0, 0.6)',
+                    yAxisID: 'y3'
+                }
+            ];
+            
+            // Calculate and add trend lines
+            trendLineConfigs.forEach(config => {
+                if (config.data.length >= 2) {
+                    const regression = calculateLinearRegression(config.data);
+                    if (regression) {
+                        const trendData = generateTrendLine(config.data, regression);
+                        
+                        debugChartInstance.data.datasets.push({
+                            label: config.label,
+                            data: trendData,
+                            borderColor: config.borderColor,
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            pointHoverRadius: 0,
+                            yAxisID: config.yAxisID,
+                            order: 100 + config.datasetIndex,
+                            borderDash: [10, 5]
+                        });
+                    }
+                }
+            });
+            
+            debugChartInstance.update();
+        }
+
+        // Remove trend lines from chart
+        function removeTrendLines() {
+            if (!debugChartInstance) return;
+            
+            // Remove all trend line datasets (those with "Trend" in their label)
+            debugChartInstance.data.datasets = debugChartInstance.data.datasets.filter(dataset => 
+                !dataset.label.includes('Trend')
+            );
+            
+            debugChartInstance.update();
+        }
+
+        // Toggle trend lines visibility
+        function toggleTrendLines() {
+            trendLinesVisible = !trendLinesVisible;
+            
+            const button = document.getElementById('toggleTrendlines');
+            if (trendLinesVisible) {
+                button.textContent = 'Hide Trend Lines';
+                button.classList.add('active');
+                addTrendLines();
+            } else {
+                button.textContent = 'Show Trend Lines';
+                button.classList.remove('active');
+                removeTrendLines();
+            }
+        }
+
+        // Initialize toggle button event listener
+        window.addEventListener('load', function() {
+            document.getElementById('toggleTrendlines').addEventListener('click', toggleTrendLines);
+        });
     </script>
 </body>
 </html>
