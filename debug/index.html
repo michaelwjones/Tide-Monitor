@@ -82,8 +82,8 @@
         let trendLinesVisible = false;
         let currentReadings = [];
 
-        // Prepare data for cubic spline interpolation with light smoothing
-        function prepareSplineData(data) {
+        // Prepare data for cubic spline interpolation with light smoothing (Wind/Wave category)
+        function prepareWindWaveSplineData(data) {
             const n = data.length;
             if (n < 4) return null;
             
@@ -135,8 +135,8 @@
             };
         }
         
-        // Natural cubic spline computation using Thomas algorithm (O(n) complexity)
-        function computeNaturalCubicSpline(data) {
+        // Natural cubic spline computation using Thomas algorithm (O(n) complexity) for Wind/Wave category
+        function computeWindWaveNaturalCubicSpline(data) {
             const n = data.length;
             if (n < 4) return null;
             
@@ -203,8 +203,8 @@
             };
         }
         
-        // Evaluate cubic spline at given x values
-        function evaluateCubicSpline(spline, xValues) {
+        // Evaluate cubic spline at given x values for Wind/Wave category
+        function evaluateWindWaveCubicSpline(spline, xValues) {
             const points = [];
             
             for (const targetX of xValues) {
@@ -231,12 +231,12 @@
             return points;
         }
 
-        // Generate tight-fitting trend line data points using cubic splines
-        function generateTrendLine(data, splineData) {
+        // Generate tight-fitting trend line data points using cubic splines for Wind/Wave category
+        function generateWindWaveTrendLine(data, splineData) {
             if (!splineData || !splineData.data || splineData.data.length < 4) return [];
             
             // Compute natural cubic spline directly from the data
-            const spline = computeNaturalCubicSpline(splineData.data);
+            const spline = computeWindWaveNaturalCubicSpline(splineData.data);
             if (!spline) return [];
             
             // Generate evaluation points for smooth curve
@@ -254,7 +254,132 @@
             }
             
             // Evaluate spline at these points
-            return evaluateCubicSpline(spline, evalPoints);
+            return evaluateWindWaveCubicSpline(spline, evalPoints);
+        }
+
+        // Water Level Harmonics Functions
+        
+        // Prepare data for harmonic analysis (Water Level category)
+        function prepareWaterLevelHarmonicData(data) {
+            const n = data.length;
+            if (n < 10) return null; // Need enough points for harmonic analysis
+            
+            // Sort data by x value and remove duplicates
+            const sortedData = [...data].sort((a, b) => a.x.getTime() - b.x.getTime());
+            const uniqueData = [];
+            
+            for (let i = 0; i < sortedData.length; i++) {
+                if (i === 0 || sortedData[i].x.getTime() !== sortedData[i-1].x.getTime()) {
+                    uniqueData.push(sortedData[i]);
+                }
+            }
+            
+            if (uniqueData.length < 10) return null;
+            
+            return {
+                data: uniqueData,
+                type: 'harmonics'
+            };
+        }
+        
+        // Compute harmonic coefficients using 1 harmonic (fundamental frequency)
+        function computeWaterLevelHarmonics(data) {
+            const n = data.length;
+            if (n < 10) return null;
+            
+            const x = data.map(d => d.x.getTime());
+            const y = data.map(d => d.y);
+            
+            // Calculate time period (assume 24 hours for tidal data)
+            const timeRange = x[x.length - 1] - x[0];
+            const period = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+            const omega = 2 * Math.PI / period; // Angular frequency
+            
+            // Calculate harmonic coefficients using least squares
+            let sum_y = 0;
+            let sum_cos = 0;
+            let sum_sin = 0;
+            let sum_y_cos = 0;
+            let sum_y_sin = 0;
+            let sum_cos2 = 0;
+            let sum_sin2 = 0;
+            
+            for (let i = 0; i < n; i++) {
+                const t = x[i] - x[0]; // Normalize time to start from 0
+                const cosVal = Math.cos(omega * t);
+                const sinVal = Math.sin(omega * t);
+                
+                sum_y += y[i];
+                sum_cos += cosVal;
+                sum_sin += sinVal;
+                sum_y_cos += y[i] * cosVal;
+                sum_y_sin += y[i] * sinVal;
+                sum_cos2 += cosVal * cosVal;
+                sum_sin2 += sinVal * sinVal;
+            }
+            
+            // Calculate coefficients
+            const a0 = sum_y / n; // DC component (average)
+            const a1 = (sum_y_cos - (sum_y * sum_cos) / n) / (sum_cos2 - (sum_cos * sum_cos) / n);
+            const b1 = (sum_y_sin - (sum_y * sum_sin) / n) / (sum_sin2 - (sum_sin * sum_sin) / n);
+            
+            // Handle edge cases
+            const a1_final = isNaN(a1) || !isFinite(a1) ? 0 : a1;
+            const b1_final = isNaN(b1) || !isFinite(b1) ? 0 : b1;
+            
+            return {
+                a0: a0,
+                a1: a1_final,
+                b1: b1_final,
+                omega: omega,
+                startTime: x[0],
+                period: period
+            };
+        }
+        
+        // Evaluate harmonic function at given x values
+        function evaluateWaterLevelHarmonics(harmonics, xValues) {
+            const points = [];
+            
+            for (const targetX of xValues) {
+                const t = targetX.getTime() - harmonics.startTime;
+                const y = harmonics.a0 + 
+                         harmonics.a1 * Math.cos(harmonics.omega * t) + 
+                         harmonics.b1 * Math.sin(harmonics.omega * t);
+                
+                points.push({
+                    x: targetX,
+                    y: y
+                });
+            }
+            
+            return points;
+        }
+        
+        // Generate harmonic trend line data points for Water Level category
+        function generateWaterLevelTrendLine(data, harmonicData) {
+            if (!harmonicData || !harmonicData.data || harmonicData.data.length < 10) return [];
+            
+            // Compute harmonic coefficients
+            const harmonics = computeWaterLevelHarmonics(harmonicData.data);
+            if (!harmonics) return [];
+            
+            // Generate evaluation points for smooth curve
+            const firstTime = harmonicData.data[0].x.getTime();
+            const lastTime = harmonicData.data[harmonicData.data.length - 1].x.getTime();
+            const timeRange = lastTime - firstTime;
+            
+            const evalPoints = [];
+            const numPoints = Math.min(200, harmonicData.data.length * 2); // Harmonics need fewer points
+            
+            for (let i = 0; i <= numPoints; i++) {
+                const t = i / numPoints;
+                const currentTime = firstTime + t * timeRange;
+                evalPoints.push(new Date(currentTime));
+            }
+            
+            // Evaluate harmonics at these points
+            return evaluateWaterLevelHarmonics(harmonics, evalPoints);
         }
 
         async function fetchDebugData() {
@@ -459,7 +584,7 @@
                             type: 'linear',
                             position: 'right',
                             min: 0,
-                            max: 30,
+                            max: 40,
                             title: {
                                 display: true,
                                 text: 'Wind Speed (knots)'
@@ -522,15 +647,18 @@
             }
         }
 
-        // Add trend lines to existing chart
-        function addTrendLines() {
+        // Add water level trend lines using harmonics
+        function addWaterLevelTrendLines() {
             if (!debugChartInstance || !currentReadings.length) return;
             
             const validReadings = currentReadings.filter(r => r.rawTimestamp.getTime() > 0);
             
-            // Reduce opacity of original datasets (all except Valid Samples)
+            // Water level dataset indices: 0, 1, 2, 6
+            const waterLevelIndices = [0, 1, 2, 6];
+            
+            // Reduce opacity of water level datasets
             debugChartInstance.data.datasets.forEach((dataset, index) => {
-                if (index !== 5) { // Skip Valid Samples (index 5)
+                if (waterLevelIndices.includes(index)) {
                     dataset.borderColor = dataset.borderColor.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*[^)]+\)/, (match, r, g, b) => {
                         return `rgba(${r}, ${g}, ${b}, 0.3)`;
                     });
@@ -540,73 +668,129 @@
                 }
             });
             
-            // Define datasets that need trend lines (all except Valid Samples)
-            const trendLineConfigs = [
+            // Define water level datasets for harmonic trend lines
+            const waterLevelConfigs = [
                 {
                     datasetIndex: 0,
-                    label: 'Water Level (Average) - Trend',
+                    label: 'Water Level (Average) - Harmonic',
                     data: validReadings.map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevel)})),
-                    borderColor: 'rgba(0, 0, 255, 0.8)',
+                    borderColor: 'rgba(0, 0, 255, 0.9)',
                     yAxisID: 'y'
                 },
                 {
                     datasetIndex: 1,
-                    label: 'Water Level (Percentile) - Trend',
+                    label: 'Water Level (Percentile) - Harmonic',
                     data: validReadings.filter(r => r.waterLevelPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelPercentile)})),
-                    borderColor: 'rgba(0, 255, 255, 0.8)',
+                    borderColor: 'rgba(0, 255, 255, 0.9)',
                     yAxisID: 'y'
                 },
                 {
                     datasetIndex: 2,
-                    label: 'Water Level (Envelope) - Trend',
+                    label: 'Water Level (Envelope) - Harmonic',
                     data: validReadings.filter(r => r.waterLevelEnvelope !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelEnvelope)})),
-                    borderColor: 'rgba(255, 0, 255, 0.8)',
+                    borderColor: 'rgba(255, 0, 255, 0.9)',
                     yAxisID: 'y'
                 },
                 {
+                    datasetIndex: 6,
+                    label: 'Duke Marine Lab Water Level - Harmonic',
+                    data: validReadings.filter(r => r.dukeWaterLevelRaw !== null).map(r => ({x: r.rawTimestamp, y: r.dukeWaterLevelRaw + 1.2})),
+                    borderColor: 'rgba(0, 0, 139, 0.9)',
+                    yAxisID: 'y'
+                }
+            ];
+            
+            // Calculate and add harmonic trend lines
+            waterLevelConfigs.forEach(config => {
+                if (config.data.length >= 10) { // Need at least 10 points for harmonic analysis
+                    const harmonicData = prepareWaterLevelHarmonicData(config.data);
+                    
+                    if (harmonicData) {
+                        const trendData = generateWaterLevelTrendLine(config.data, harmonicData);
+                        
+                        if (trendData && trendData.length > 0) {
+                            debugChartInstance.data.datasets.push({
+                                label: config.label,
+                                data: trendData,
+                                borderColor: config.borderColor,
+                                backgroundColor: 'transparent',
+                                borderWidth: 3,
+                                pointRadius: 0,
+                                pointHoverRadius: 0,
+                                yAxisID: config.yAxisID,
+                                order: 200 + config.datasetIndex,
+                                borderDash: [15, 10]
+                            });
+                        }
+                    } else {
+                        console.warn(`Failed to prepare harmonic data for ${config.label}`);
+                    }
+                }
+            });
+            
+            debugChartInstance.update();
+        }
+        
+        // Add wind/wave trend lines using cubic splines
+        function addWindWaveTrendLines() {
+            if (!debugChartInstance || !currentReadings.length) return;
+            
+            const validReadings = currentReadings.filter(r => r.rawTimestamp.getTime() > 0);
+            
+            // Wind/wave dataset indices: 3, 4, 5, 7, 8
+            const windWaveIndices = [3, 4, 5, 7, 8];
+            
+            // Reduce opacity of wind/wave datasets
+            debugChartInstance.data.datasets.forEach((dataset, index) => {
+                if (windWaveIndices.includes(index)) {
+                    dataset.borderColor = dataset.borderColor.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*[^)]+\)/, (match, r, g, b) => {
+                        return `rgba(${r}, ${g}, ${b}, 0.3)`;
+                    });
+                    dataset.backgroundColor = dataset.backgroundColor.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*[^)]+\)/, (match, r, g, b) => {
+                        return `rgba(${r}, ${g}, ${b}, 0.05)`;
+                    });
+                }
+            });
+            
+            // Define wind/wave datasets for cubic spline trend lines
+            const windWaveConfigs = [
+                {
                     datasetIndex: 3,
-                    label: 'Wave Height (Percentile) - Trend',
+                    label: 'Wave Height (Percentile) - Spline',
                     data: validReadings.filter(r => r.wavesPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesPercentile)})),
                     borderColor: 'rgba(255, 0, 0, 0.8)',
                     yAxisID: 'y1'
                 },
                 {
                     datasetIndex: 4,
-                    label: 'Wave Height (Envelope) - Trend',
+                    label: 'Wave Height (Envelope) - Spline',
                     data: validReadings.filter(r => r.wavesEnvelope !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesEnvelope)})),
                     borderColor: 'rgba(255, 165, 0, 0.8)',
                     yAxisID: 'y1'
                 },
                 {
-                    datasetIndex: 6,
-                    label: 'Duke Marine Lab Water Level - Trend',
-                    data: validReadings.filter(r => r.dukeWaterLevelRaw !== null).map(r => ({x: r.rawTimestamp, y: r.dukeWaterLevelRaw + 1.2})),
-                    borderColor: 'rgba(0, 0, 139, 0.8)',
-                    yAxisID: 'y'
-                },
-                {
                     datasetIndex: 7,
-                    label: 'Wind Speed - Trend',
+                    label: 'Wind Speed - Spline',
                     data: validReadings.filter(r => r.windSpeedRaw !== null).map(r => ({x: r.rawTimestamp, y: r.windSpeedRaw})),
                     borderColor: 'rgba(0, 128, 0, 0.8)',
                     yAxisID: 'y3'
                 },
                 {
                     datasetIndex: 8,
-                    label: 'Gust Speed - Trend',
+                    label: 'Gust Speed - Spline',
                     data: validReadings.filter(r => r.gustSpeedRaw !== null).map(r => ({x: r.rawTimestamp, y: r.gustSpeedRaw})),
                     borderColor: 'rgba(0, 100, 0, 0.8)',
                     yAxisID: 'y3'
                 }
             ];
             
-            // Calculate and add trend lines
-            trendLineConfigs.forEach(config => {
+            // Calculate and add cubic spline trend lines
+            windWaveConfigs.forEach(config => {
                 if (config.data.length >= 4) { // Need at least 4 points for cubic splines
-                    const splineData = prepareSplineData(config.data); // No smoothing for tight fit
+                    const splineData = prepareWindWaveSplineData(config.data);
                     
                     if (splineData) {
-                        const trendData = generateTrendLine(config.data, splineData);
+                        const trendData = generateWindWaveTrendLine(config.data, splineData);
                         
                         if (trendData && trendData.length > 0) {
                             debugChartInstance.data.datasets.push({
@@ -618,8 +802,8 @@
                                 pointRadius: 0,
                                 pointHoverRadius: 0,
                                 yAxisID: config.yAxisID,
-                                order: 100 + config.datasetIndex,
-                                borderDash: [10, 5]
+                                order: 300 + config.datasetIndex,
+                                borderDash: [8, 4]
                             });
                         }
                     } else {
@@ -631,18 +815,19 @@
             debugChartInstance.update();
         }
 
-        // Remove trend lines from chart
-        function removeTrendLines() {
+        // Remove water level trend lines from chart
+        function removeWaterLevelTrendLines() {
             if (!debugChartInstance) return;
             
-            // Remove all trend line datasets (those with "Trend" in their label)
+            // Remove water level trend line datasets (those with "Harmonic" in their label)
             debugChartInstance.data.datasets = debugChartInstance.data.datasets.filter(dataset => 
-                !dataset.label.includes('Trend')
+                !dataset.label.includes('Harmonic')
             );
             
-            // Restore original opacity for original datasets (all except Valid Samples)
+            // Restore original opacity for water level datasets
+            const waterLevelIndices = [0, 1, 2, 6];
             debugChartInstance.data.datasets.forEach((dataset, index) => {
-                if (index !== 5) { // Skip Valid Samples (index 5)
+                if (waterLevelIndices.includes(index)) {
                     // Restore original colors based on dataset type
                     if (dataset.label === 'Water Level (Average)') {
                         dataset.borderColor = 'rgba(0, 0, 255, 1)';
@@ -653,15 +838,36 @@
                     } else if (dataset.label === 'Water Level (Envelope)') {
                         dataset.borderColor = 'rgba(255, 0, 255, 1)';
                         dataset.backgroundColor = 'rgba(255, 0, 255, 0.1)';
-                    } else if (dataset.label === 'Wave Height (Percentile)') {
+                    } else if (dataset.label === 'Duke Marine Lab Water Level') {
+                        dataset.borderColor = 'rgba(0, 0, 139, 1)';
+                        dataset.backgroundColor = 'rgba(0, 0, 139, 0.1)';
+                    }
+                }
+            });
+            
+            debugChartInstance.update();
+        }
+        
+        // Remove wind/wave trend lines from chart
+        function removeWindWaveTrendLines() {
+            if (!debugChartInstance) return;
+            
+            // Remove wind/wave trend line datasets (those with "Spline" in their label)
+            debugChartInstance.data.datasets = debugChartInstance.data.datasets.filter(dataset => 
+                !dataset.label.includes('Spline')
+            );
+            
+            // Restore original opacity for wind/wave datasets
+            const windWaveIndices = [3, 4, 5, 7, 8];
+            debugChartInstance.data.datasets.forEach((dataset, index) => {
+                if (windWaveIndices.includes(index)) {
+                    // Restore original colors based on dataset type
+                    if (dataset.label === 'Wave Height (Percentile)') {
                         dataset.borderColor = 'rgba(255, 0, 0, 1)';
                         dataset.backgroundColor = 'rgba(255, 0, 0, 0.1)';
                     } else if (dataset.label === 'Wave Height (Envelope)') {
                         dataset.borderColor = 'rgba(255, 165, 0, 1)';
                         dataset.backgroundColor = 'rgba(255, 165, 0, 0.1)';
-                    } else if (dataset.label === 'Duke Marine Lab Water Level') {
-                        dataset.borderColor = 'rgba(0, 0, 139, 1)';
-                        dataset.backgroundColor = 'rgba(0, 0, 139, 0.1)';
                     } else if (dataset.label === 'Wind Speed') {
                         dataset.borderColor = 'rgba(0, 128, 0, 1)';
                         dataset.backgroundColor = 'rgba(0, 128, 0, 0.1)';
@@ -675,7 +881,19 @@
             debugChartInstance.update();
         }
 
-        // Toggle trend lines visibility
+        // Add all trend lines (both categories using different methods)
+        function addTrendLines() {
+            addWaterLevelTrendLines();
+            addWindWaveTrendLines();
+        }
+        
+        // Remove all trend lines (both categories)
+        function removeTrendLines() {
+            removeWaterLevelTrendLines();
+            removeWindWaveTrendLines();
+        }
+        
+        // Toggle trend lines visibility (unified interface)
         function toggleTrendLines() {
             trendLinesVisible = !trendLinesVisible;
             
