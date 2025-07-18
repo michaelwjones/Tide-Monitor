@@ -48,8 +48,11 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Web Das
 - **Multi-axis charts** for detailed analysis
 - **Enhanced visualization** of wave calculation methods
 - **System diagnostics** with valid sample tracking
-- **Trend line analysis** with toggleable cubic spline curves
+- **Advanced trend line analysis** with dual methodologies:
+  - **Water Level Harmonics**: Semi-diurnal tidal pattern fitting (12-hour period)
+  - **Wind/Wave Splines**: 11-point smoothed cubic spline interpolation
 - **NOAA environmental data** integration (wind, water level)
+- **Wind range**: 0-40 knots for comprehensive weather tracking
 
 ## 🚀 Quick Start
 
@@ -106,6 +109,21 @@ The system collects readings every minute with the following data points:
 1. **Percentile Method**: Uses statistical percentiles to calculate wave heights
 2. **Envelope Method**: Analyzes the envelope of the wave signal
 
+### Advanced Trend Line Analysis
+
+#### Water Level Harmonics
+- **Mathematical Form**: `f(t) = a0 + a1*sin(a2*t + a3)`
+- **Coefficients**: 4 parameters (DC offset, amplitude, frequency, phase)
+- **Tidal Period**: 12 hours (semi-diurnal tides)
+- **Pattern Recognition**: Captures twice-daily tidal cycles
+- **Least Squares Fitting**: Robust amplitude and phase calculation
+
+#### Wind/Wave Cubic Splines
+- **Smoothing**: Progressive 1-11 point moving averages
+- **Algorithm**: Natural cubic splines with Thomas algorithm (O(n) complexity)
+- **Edge Protection**: Prevents oscillation artifacts at data boundaries
+- **Dynamic Window**: Adaptive smoothing based on distance from edges
+
 ### Failed Analysis Methods
 **Binning Method** (Removed): This method grouped readings into bins for wave analysis but was removed due to:
 - **Higher Erratic Behavior**: Produced more inconsistent results compared to percentile and envelope methods
@@ -119,18 +137,21 @@ The system collects readings every minute with the following data points:
 - **Cloud Sync**: Automatic upload when connection is restored
 
 ### Advanced Analytics
-- **Trend Line Analysis**: Natural cubic spline interpolation for smooth trend visualization
-- **7-Point Smoothing**: Adaptive smoothing algorithm for optimal curve fitting
+- **Dual Methodology Trend Analysis**: Unified interface with specialized algorithms
+  - **Water Levels**: Harmonic analysis for tidal patterns
+  - **Wind/Wave Data**: Enhanced 11-point smoothed cubic splines
 - **Performance Optimized**: O(n) complexity using Thomas algorithm for fast rendering
 - **Edge-Safe**: Natural splines prevent oscillation artifacts at data boundaries
-- **Toggle Control**: Show/hide trend lines with single button click
+- **Toggle Control**: Single button controls both trend line methodologies
+- **Visual Distinction**: Harmonics use thick dashed lines, splines use standard dashing
 
 ### Security & Performance
 - **Content Security Policy**: Protection against XSS attacks
 - **Optimized Rendering**: Chart animations disabled for performance
 - **Error Handling**: Graceful degradation when data is unavailable
 - **Responsive Design**: Works on desktop and mobile devices
-- **Fast Trend Lines**: Cubic spline computation under 100ms for 1440 data points
+- **Fast Trend Lines**: Harmonic computation under 50ms, cubic splines under 100ms for 1440 data points
+- **Semi-Diurnal Tide Recognition**: Automatic 12-hour period detection for accurate tidal modeling
 
 ## 📱 Mobile Support
 

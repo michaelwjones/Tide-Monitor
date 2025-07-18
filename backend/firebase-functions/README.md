@@ -95,10 +95,13 @@ firebase emulators:start --only functions
 
 The enriched data is used by the web dashboards for:
 - **Main Dashboard**: Basic water level and wave visualization
-- **Debug Dashboard**: Advanced analytics with trend lines and NOAA data
-  - **Wind visualization**: Real-time wind speed and gust data
+- **Debug Dashboard**: Advanced analytics with dual trend line methodologies and NOAA data
+  - **Wind visualization**: Real-time wind speed and gust data (0-40 knot range)
   - **Water level comparison**: Sensor vs NOAA measurements
-  - **Trend analysis**: Cubic spline interpolation with environmental context
+  - **Advanced trend analysis**: 
+    - **Water Level Harmonics**: Semi-diurnal tidal fitting (12-hour period)
+    - **Wind/Wave Splines**: 11-point smoothed cubic interpolation
+  - **Environmental context**: Integrated NOAA wind and water level data
 
 ### Troubleshooting
 
@@ -107,4 +110,7 @@ If enrichment is not working:
 2. Verify all fields are present in latest Firebase entries
 3. Test NOAA APIs directly using the URLs above
 4. Look for -999 error values indicating API failures
-5. Check debug dashboard for trend line functionality with enriched data
+5. Check debug dashboard for dual trend line functionality:
+   - Water level harmonic analysis (semi-diurnal tides)
+   - Wind/wave cubic spline smoothing (11-point averaging)
+   - Unified toggle control for both methodologies
