@@ -62,6 +62,178 @@
 
         let chartInstance = null;
 
+        // Prepare data for cubic spline interpolation with light smoothing (Wind/Wave category)
+        function prepareWindWaveSplineData(data) {
+            const n = data.length;
+            if (n < 4) return null;
+            
+            // Sort data by x value and remove duplicates
+            const sortedData = [...data].sort((a, b) => a.x.getTime() - b.x.getTime());
+            const uniqueData = [];
+            
+            for (let i = 0; i < sortedData.length; i++) {
+                if (i === 0 || sortedData[i].x.getTime() !== sortedData[i-1].x.getTime()) {
+                    uniqueData.push(sortedData[i]);
+                }
+            }
+            
+            if (uniqueData.length < 4) return null;
+            
+            // Apply progressive smoothing with up to 30-point moving average
+            const lightlySmoothed = [];
+            for (let i = 0; i < uniqueData.length; i++) {
+                // Determine smoothing window size based on distance from edges
+                const distFromStart = i;
+                const distFromEnd = uniqueData.length - 1 - i;
+                const maxRadius = Math.min(distFromStart, distFromEnd);
+                
+                // Progressive smoothing: 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 30 point averages
+                const windowSizes = [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 30];
+                const radius = Math.min(maxRadius, Math.floor((windowSizes.length - 1)));
+                const windowSize = windowSizes[radius];
+                const halfWindow = Math.floor(windowSize / 2);
+                
+                // Calculate moving average
+                let sum = 0;
+                for (let j = -halfWindow; j <= halfWindow; j++) {
+                    sum += uniqueData[i + j].y;
+                }
+                const smoothedY = sum / windowSize;
+                
+                lightlySmoothed.push({
+                    x: uniqueData[i].x,
+                    y: smoothedY
+                });
+            }
+            
+            return {
+                data: lightlySmoothed,
+                type: 'cubic_spline'
+            };
+        }
+
+        // Natural cubic spline computation using Thomas algorithm (O(n) complexity) for Wind/Wave category
+        function computeWindWaveNaturalCubicSpline(data) {
+            const n = data.length;
+            if (n < 4) return null;
+            
+            const x = data.map(d => d.x.getTime());
+            const y = data.map(d => d.y);
+            
+            // Calculate intervals
+            const h = new Array(n - 1);
+            for (let i = 0; i < n - 1; i++) {
+                h[i] = x[i + 1] - x[i];
+                if (h[i] === 0) return null; // Avoid division by zero
+            }
+            
+            // Set up the tridiagonal system for natural spline
+            const alpha = new Array(n - 1);
+            for (let i = 1; i < n - 1; i++) {
+                alpha[i] = (3 / h[i]) * (y[i + 1] - y[i]) - (3 / h[i - 1]) * (y[i] - y[i - 1]);
+            }
+            
+            // Solve tridiagonal system using Thomas algorithm
+            const l = new Array(n);
+            const mu = new Array(n);
+            const z = new Array(n);
+            
+            l[0] = 1;
+            mu[0] = 0;
+            z[0] = 0;
+            
+            for (let i = 1; i < n - 1; i++) {
+                l[i] = 2 * (x[i + 1] - x[i - 1]) - h[i - 1] * mu[i - 1];
+                mu[i] = h[i] / l[i];
+                z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
+            }
+            
+            l[n - 1] = 1;
+            z[n - 1] = 0;
+            
+            // Back substitution
+            const c = new Array(n);
+            c[n - 1] = 0;
+            
+            for (let j = n - 2; j >= 0; j--) {
+                c[j] = z[j] - mu[j] * c[j + 1];
+            }
+            
+            // Calculate spline coefficients
+            const a = new Array(n);
+            const b = new Array(n);
+            const d = new Array(n);
+            
+            for (let i = 0; i < n - 1; i++) {
+                a[i] = y[i];
+                b[i] = (y[i + 1] - y[i]) / h[i] - h[i] * (c[i + 1] + 2 * c[i]) / 3;
+                d[i] = (c[i + 1] - c[i]) / (3 * h[i]);
+            }
+            
+            return {
+                x: x,
+                a: a,
+                b: b,
+                c: c,
+                d: d,
+                n: n
+            };
+        }
+
+        // Evaluate cubic spline at given x values for Wind/Wave category
+        function evaluateWindWaveCubicSpline(spline, xValues) {
+            const points = [];
+            
+            for (const targetX of xValues) {
+                const x = targetX.getTime();
+                
+                // Find the interval containing x
+                let i = 0;
+                while (i < spline.n - 1 && x > spline.x[i + 1]) {
+                    i++;
+                }
+                
+                // Clamp to valid range
+                i = Math.max(0, Math.min(i, spline.n - 2));
+                
+                const dx = x - spline.x[i];
+                const y = spline.a[i] + spline.b[i] * dx + spline.c[i] * dx * dx + spline.d[i] * dx * dx * dx;
+                
+                points.push({
+                    x: targetX,
+                    y: y
+                });
+            }
+            
+            return points;
+        }
+
+        // Generate tight-fitting trend line data points using cubic splines for Wind/Wave category
+        function generateWindWaveTrendLine(data, splineData) {
+            if (!splineData || !splineData.data || splineData.data.length < 4) return [];
+            
+            // Compute natural cubic spline directly from the data
+            const spline = computeWindWaveNaturalCubicSpline(splineData.data);
+            if (!spline) return [];
+            
+            // Generate evaluation points for smooth curve
+            const firstTime = splineData.data[0].x.getTime();
+            const lastTime = splineData.data[splineData.data.length - 1].x.getTime();
+            const timeRange = lastTime - firstTime;
+            
+            const evalPoints = [];
+            const numPoints = Math.min(200, splineData.data.length * 3); // More points for tighter curves
+            
+            for (let i = 0; i <= numPoints; i++) {
+                const t = i / numPoints;
+                const currentTime = firstTime + t * timeRange;
+                evalPoints.push(new Date(currentTime));
+            }
+            
+            // Evaluate spline at these points
+            return evaluateWindWaveCubicSpline(spline, evalPoints);
+        }
+
         async function fetchTideData() {
             const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/.json?orderBy="$key"&limitToLast=1440');
             const data = await response.json();
@@ -79,8 +251,8 @@
                 }),
                 rawTimestamp: new Date(value.t),
                 wavesPercentile: (value.hp !== undefined && value.hp !== null) ? (value.hp / 304.8).toFixed(2) : '--',
-                wavesEnvelope: (value.he !== undefined && value.he !== null) ? (value.he / 304.8).toFixed(2) : '--',
-                waterLevel: (value.w / 304.8).toFixed(2)
+                waterLevel: (value.w / 304.8).toFixed(2),
+                windSpeed: value.ws
             }));
             
             // Create chart with all data
@@ -101,6 +273,34 @@
             
             // Filter out any invalid timestamps
             const validReadings = readings.filter(r => r.rawTimestamp.getTime() > 0);
+            
+            // Generate smoothed waves (percentile) trend line
+            const wavesRawData = validReadings.filter(r => r.wavesPercentile !== '--').map(r => ({
+                x: r.rawTimestamp, 
+                y: parseFloat(r.wavesPercentile)
+            }));
+            
+            let wavesTrendData = [];
+            if (wavesRawData.length >= 4) {
+                const splineData = prepareWindWaveSplineData(wavesRawData);
+                if (splineData) {
+                    wavesTrendData = generateWindWaveTrendLine(wavesRawData, splineData);
+                }
+            }
+            
+            // Generate smoothed wind speed trend line (convert m/s to knots: 1 m/s = 1.94384 knots)
+            const windRawData = validReadings.filter(r => r.windSpeed !== undefined && r.windSpeed !== null && r.windSpeed !== -999).map(r => ({
+                x: r.rawTimestamp,
+                y: parseFloat(r.windSpeed) * 1.94384 // Convert m/s to knots
+            }));
+            
+            let windTrendData = [];
+            if (windRawData.length >= 4) {
+                const splineData = prepareWindWaveSplineData(windRawData);
+                if (splineData) {
+                    windTrendData = generateWindWaveTrendLine(windRawData, splineData);
+                }
+            }
             
             // Set time range to exactly 24 hours ago to now
             const now = new Date();
@@ -127,7 +327,7 @@
                         order: 1
                     }, {
                         label: 'Waves (Percentile)',
-                        data: validReadings.filter(r => r.wavesPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesPercentile)})),
+                        data: wavesTrendData.length > 0 ? wavesTrendData : validReadings.filter(r => r.wavesPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesPercentile)})),
                         borderColor: 'red',
                         backgroundColor: 'rgba(255, 0, 0, 0.1)',
                         borderWidth: 1,
@@ -136,15 +336,16 @@
                         tension: 0.5,
                         order: 2
                     }, {
-                        label: 'Waves (Envelope)',
-                        data: validReadings.filter(r => r.wavesEnvelope !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesEnvelope)})),
-                        borderColor: 'orange',
-                        backgroundColor: 'rgba(255, 165, 0, 0.1)',
+                        label: 'Wind Speed (knots)',
+                        data: windTrendData.length > 0 ? windTrendData : windRawData,
+                        borderColor: 'purple',
+                        backgroundColor: 'rgba(128, 0, 128, 0.1)',
                         borderWidth: 1,
                         pointRadius: 0,
                         pointHoverRadius: 0,
                         tension: 0.5,
-                        order: 3
+                        order: 3,
+                        yAxisID: 'windSpeed'
                     }, {
                         label: 'Reference Line',
                         data: horizontalLineData,
@@ -167,6 +368,20 @@
                             title: {
                                 display: true,
                                 text: 'Water Level (feet)'
+                            },
+                            position: 'left'
+                        },
+                        windSpeed: {
+                            type: 'linear',
+                            min: 0,
+                            max: 40,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Wind Speed (knots)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
                             }
                         },
                         x: {
@@ -200,7 +415,7 @@
                 const legendItems = [
                     { label: 'Water Level (ft)', color: 'blue' },
                     { label: 'Waves (Percentile)', color: 'red' },
-                    { label: 'Waves (Envelope)', color: 'orange' },
+                    { label: 'Wind Speed (knots)', color: 'purple' },
                     { label: 'Reference Line', color: 'green' }
                 ];
                 
