@@ -279,19 +279,89 @@
             };
         }
         
-        // Compute harmonic coefficients using form: a0 + a1*sin(a2*t + a3)
-        function computeWaterLevelHarmonics(data) {
+        // FFT-based frequency analysis to detect dominant tidal periods
+        function detectDominantFrequencies(data, maxPeaks = 3) {
             const n = data.length;
-            if (n < 10) return null;
+            if (n < 48) return null; // Need at least 48 points for reliable FFT
             
             const x = data.map(d => d.x.getTime());
             const y = data.map(d => d.y);
             
-            // Tidal frequency assumption: a2 = 2π/12hrs (semi-diurnal tidal period)
-            // This assumes the dominant tidal component has a 12-hour period (semi-diurnal tide)
-            // Observation shows 2 full sine waves in 24 hours, confirming semi-diurnal pattern
-            const TIDAL_PERIOD_MS = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
-            const a2 = 2 * Math.PI / TIDAL_PERIOD_MS; // Angular frequency (fixed)
+            // Remove DC component (mean)
+            const mean = y.reduce((sum, val) => sum + val, 0) / n;
+            const yDetrended = y.map(val => val - mean);
+            
+            // Calculate power spectrum using simplified DFT for key frequencies
+            // We'll focus on tidal frequencies (6-48 hour periods)
+            const minPeriodMs = 6 * 60 * 60 * 1000;  // 6 hours minimum
+            const maxPeriodMs = 48 * 60 * 60 * 1000; // 48 hours maximum
+            const timeSpanMs = x[x.length - 1] - x[0];
+            
+            const frequencies = [];
+            const powers = [];
+            
+            // Test frequencies corresponding to periods from 6 to 48 hours
+            for (let periodMs = minPeriodMs; periodMs <= maxPeriodMs; periodMs += 30 * 60 * 1000) { // 30-minute steps
+                const omega = 2 * Math.PI / periodMs;
+                
+                let cosSum = 0, sinSum = 0;
+                for (let i = 0; i < n; i++) {
+                    const t = x[i] - x[0];
+                    cosSum += yDetrended[i] * Math.cos(omega * t);
+                    sinSum += yDetrended[i] * Math.sin(omega * t);
+                }
+                
+                const power = (cosSum * cosSum + sinSum * sinSum) / (n * n);
+                frequencies.push(omega);
+                powers.push(power);
+            }
+            
+            // Find peaks in power spectrum
+            const peaks = [];
+            for (let i = 1; i < powers.length - 1; i++) {
+                if (powers[i] > powers[i-1] && powers[i] > powers[i+1] && powers[i] > 0.01) {
+                    peaks.push({
+                        frequency: frequencies[i],
+                        power: powers[i],
+                        periodMs: 2 * Math.PI / frequencies[i],
+                        periodHours: (2 * Math.PI / frequencies[i]) / (60 * 60 * 1000)
+                    });
+                }
+            }
+            
+            // Sort by power and return top peaks
+            peaks.sort((a, b) => b.power - a.power);
+            return peaks.slice(0, maxPeaks);
+        }
+        
+        // Compute harmonic coefficients using detected frequencies
+        function computeWaterLevelHarmonics(data) {
+            const n = data.length;
+            if (n < 48) return null; // Need more data for FFT analysis
+            
+            const x = data.map(d => d.x.getTime());
+            const y = data.map(d => d.y);
+            
+            // Detect dominant frequencies using FFT analysis
+            const dominantFreqs = detectDominantFrequencies(data, 2);
+            if (!dominantFreqs || dominantFreqs.length === 0) {
+                // Fallback to fixed 12-hour period if FFT fails
+                console.warn('FFT analysis failed, using fallback 12-hour period');
+                const FALLBACK_PERIOD_MS = 12 * 60 * 60 * 1000;
+                dominantFreqs = [{
+                    frequency: 2 * Math.PI / FALLBACK_PERIOD_MS,
+                    periodHours: 12,
+                    power: 1.0
+                }];
+            }
+            
+            console.log('Detected tidal periods:', dominantFreqs.map(f => 
+                `${f.periodHours.toFixed(2)}h (power: ${f.power.toFixed(4)})`
+            ));
+            
+            // Use the strongest frequency for single harmonic fitting
+            const primaryFreq = dominantFreqs[0];
+            const a2 = primaryFreq.frequency; // Angular frequency (data-driven)
             
             // Calculate DC component (mean water level)
             let sum_y = 0;
@@ -349,10 +419,12 @@
             return {
                 a0: a0,      // DC offset (mean level)
                 a1: a1,      // Amplitude
-                a2: a2,      // Angular frequency (fixed at tidal frequency)
+                a2: a2,      // Angular frequency (detected from data)
                 a3: a3,      // Phase shift
                 startTime: x[0],
-                period: TIDAL_PERIOD_MS
+                period: primaryFreq.periodMs,
+                detectedPeriodHours: primaryFreq.periodHours,
+                detectedPower: primaryFreq.power
             };
         }
         
@@ -401,10 +473,11 @@
 
         async function fetchDebugData() {
             try {
-                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/.json?orderBy="$key"&limitToLast=1440');
+                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/.json?orderBy="$key"&limitToLast=4320');
                 const data = await response.json();
                 
-                const readings = Object.entries(data).map(([key, value]) => ({
+                // Convert all data for FFT analysis (72 hours)
+                const allReadings = Object.entries(data).map(([key, value]) => ({
                     id: key,
                     timestamp: new Date(value.t).toLocaleString('en-US', { 
                         timeZone: 'America/New_York',
@@ -432,11 +505,14 @@
                     gustSpeedRaw: (value.gs !== undefined && value.gs !== null && value.gs !== "-999") ? (parseFloat(value.gs) * 1.944) : null
                 }));
                 
-                // Store readings for trend line calculations
-                currentReadings = readings;
+                // Filter to last 24 hours for display
+                const displayReadings = allReadings.filter(r => r.rawTimestamp >= twentyFourHoursAgo);
                 
-                // Create debug chart with all data
-                createDebugChart(readings);
+                // Store all readings for FFT analysis, display readings for chart
+                currentReadings = allReadings;  // Full 72hr dataset for analysis
+                
+                // Create debug chart with 24hr display data
+                createDebugChart(displayReadings);
                 
                 // Hide loading and show content
                 document.getElementById('loading').classList.add('hidden');
@@ -458,9 +534,10 @@
             // Filter out any invalid timestamps
             const validReadings = readings.filter(r => r.rawTimestamp.getTime() > 0);
             
-            // Set time range to exactly 24 hours ago to now
+            // Set time range for display to exactly 24 hours ago to now
             const now = new Date();
             const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+            const seventyTwoHoursAgo = new Date(now.getTime() - (72 * 60 * 60 * 1000));
             
             
             debugChartInstance = new Chart(ctx, {
@@ -668,7 +745,12 @@
         function addWaterLevelTrendLines() {
             if (!debugChartInstance || !currentReadings.length) return;
             
-            const validReadings = currentReadings.filter(r => r.rawTimestamp.getTime() > 0);
+            // Use full 72hr dataset for FFT analysis
+            const allValidReadings = currentReadings.filter(r => r.rawTimestamp.getTime() > 0);
+            
+            // Get display data (last 24 hours) from chart
+            const twentyFourHoursAgo = new Date(Date.now() - (24 * 60 * 60 * 1000));
+            const displayReadings = allValidReadings.filter(r => r.rawTimestamp >= twentyFourHoursAgo);
             
             // Water level dataset indices: 0, 1, 2, 6
             const waterLevelIndices = [0, 1, 2, 6];
@@ -686,32 +768,37 @@
             });
             
             // Define water level datasets for harmonic trend lines
+            // Use full 72hr data for FFT analysis, but generate trends for 24hr display
             const waterLevelConfigs = [
                 {
                     datasetIndex: 0,
                     label: 'Water Level (Average) - Harmonic',
-                    data: validReadings.map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevel)})),
+                    analysisData: allValidReadings.map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevel)})),
+                    displayData: displayReadings.map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevel)})),
                     borderColor: 'rgba(0, 0, 255, 0.9)',
                     yAxisID: 'y'
                 },
                 {
                     datasetIndex: 1,
                     label: 'Water Level (Percentile) - Harmonic',
-                    data: validReadings.filter(r => r.waterLevelPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelPercentile)})),
+                    analysisData: allValidReadings.filter(r => r.waterLevelPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelPercentile)})),
+                    displayData: displayReadings.filter(r => r.waterLevelPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelPercentile)})),
                     borderColor: 'rgba(0, 255, 255, 0.9)',
                     yAxisID: 'y'
                 },
                 {
                     datasetIndex: 2,
                     label: 'Water Level (Envelope) - Harmonic',
-                    data: validReadings.filter(r => r.waterLevelEnvelope !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelEnvelope)})),
+                    analysisData: allValidReadings.filter(r => r.waterLevelEnvelope !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelEnvelope)})),
+                    displayData: displayReadings.filter(r => r.waterLevelEnvelope !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelEnvelope)})),
                     borderColor: 'rgba(255, 0, 255, 0.9)',
                     yAxisID: 'y'
                 },
                 {
                     datasetIndex: 6,
                     label: 'Duke Marine Lab Water Level - Harmonic',
-                    data: validReadings.filter(r => r.dukeWaterLevelRaw !== null).map(r => ({x: r.rawTimestamp, y: r.dukeWaterLevelRaw + 1.2})),
+                    analysisData: allValidReadings.filter(r => r.dukeWaterLevelRaw !== null).map(r => ({x: r.rawTimestamp, y: r.dukeWaterLevelRaw + 1.2})),
+                    displayData: displayReadings.filter(r => r.dukeWaterLevelRaw !== null).map(r => ({x: r.rawTimestamp, y: r.dukeWaterLevelRaw + 1.2})),
                     borderColor: 'rgba(0, 0, 139, 0.9)',
                     yAxisID: 'y'
                 }
@@ -719,11 +806,13 @@
             
             // Calculate and add harmonic trend lines
             waterLevelConfigs.forEach(config => {
-                if (config.data.length >= 10) { // Need at least 10 points for harmonic analysis
-                    const harmonicData = prepareWaterLevelHarmonicData(config.data);
+                if (config.analysisData.length >= 48) { // Need at least 48 points for FFT analysis
+                    // Use full 72hr data for harmonic analysis
+                    const harmonicData = prepareWaterLevelHarmonicData(config.analysisData);
                     
                     if (harmonicData) {
-                        const trendData = generateWaterLevelTrendLine(config.data, harmonicData);
+                        // Generate trend line for display period only
+                        const trendData = generateWaterLevelTrendLine(config.displayData, harmonicData);
                         
                         if (trendData && trendData.length > 0) {
                             debugChartInstance.data.datasets.push({
