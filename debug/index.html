@@ -99,34 +99,31 @@
             
             if (uniqueData.length < 4) return null;
             
-            // Apply moderate smoothing - 7-point moving average
+            // Apply progressive smoothing with up to 11-point moving average
             const lightlySmoothed = [];
             for (let i = 0; i < uniqueData.length; i++) {
-                if (i === 0 || i === uniqueData.length - 1) {
-                    // Keep endpoints unchanged
-                    lightlySmoothed.push(uniqueData[i]);
-                } else if (i === 1 || i === uniqueData.length - 2) {
-                    // 3-point average for near-endpoints
-                    const smoothedY = (uniqueData[i-1].y + uniqueData[i].y + uniqueData[i+1].y) / 3;
-                    lightlySmoothed.push({
-                        x: uniqueData[i].x,
-                        y: smoothedY
-                    });
-                } else if (i === 2 || i === uniqueData.length - 3) {
-                    // 5-point average for intermediate points
-                    const smoothedY = (uniqueData[i-2].y + uniqueData[i-1].y + uniqueData[i].y + uniqueData[i+1].y + uniqueData[i+2].y) / 5;
-                    lightlySmoothed.push({
-                        x: uniqueData[i].x,
-                        y: smoothedY
-                    });
-                } else {
-                    // 7-point average for middle points
-                    const smoothedY = (uniqueData[i-3].y + uniqueData[i-2].y + uniqueData[i-1].y + uniqueData[i].y + uniqueData[i+1].y + uniqueData[i+2].y + uniqueData[i+3].y) / 7;
-                    lightlySmoothed.push({
-                        x: uniqueData[i].x,
-                        y: smoothedY
-                    });
+                // Determine smoothing window size based on distance from edges
+                const distFromStart = i;
+                const distFromEnd = uniqueData.length - 1 - i;
+                const maxRadius = Math.min(distFromStart, distFromEnd);
+                
+                // Progressive smoothing: 1, 3, 5, 7, 9, 11 point averages
+                const windowSizes = [1, 3, 5, 7, 9, 11];
+                const radius = Math.min(maxRadius, Math.floor((windowSizes.length - 1)));
+                const windowSize = windowSizes[radius];
+                const halfWindow = Math.floor(windowSize / 2);
+                
+                // Calculate moving average
+                let sum = 0;
+                for (let j = -halfWindow; j <= halfWindow; j++) {
+                    sum += uniqueData[i + j].y;
                 }
+                const smoothedY = sum / windowSize;
+                
+                lightlySmoothed.push({
+                    x: uniqueData[i].x,
+                    y: smoothedY
+                });
             }
             
             return {
