@@ -252,7 +252,8 @@
                 rawTimestamp: new Date(value.t),
                 wavesPercentile: (value.hp !== undefined && value.hp !== null) ? (value.hp / 304.8).toFixed(2) : '--',
                 waterLevel: (value.w / 304.8).toFixed(2),
-                windSpeed: value.ws
+                windSpeed: (value.ws !== undefined && value.ws !== null && value.ws !== "-999") ? (parseFloat(value.ws) * 1.944).toFixed(1) : '--', // Convert m/s to knots
+                windSpeedRaw: (value.ws !== undefined && value.ws !== null && value.ws !== "-999") ? (parseFloat(value.ws) * 1.944) : null
             }));
             
             // Create chart with all data
@@ -288,10 +289,10 @@
                 }
             }
             
-            // Generate smoothed wind speed trend line (convert m/s to knots: 1 m/s = 1.94384 knots)
-            const windRawData = validReadings.filter(r => r.windSpeed !== undefined && r.windSpeed !== null && r.windSpeed !== -999).map(r => ({
+            // Generate smoothed wind speed trend line (already converted to knots)
+            const windRawData = validReadings.filter(r => r.windSpeedRaw !== null).map(r => ({
                 x: r.rawTimestamp,
-                y: parseFloat(r.windSpeed) * 1.94384 // Convert m/s to knots
+                y: r.windSpeedRaw
             }));
             
             let windTrendData = [];
@@ -326,7 +327,7 @@
                         tension: 0.6,
                         order: 1
                     }, {
-                        label: 'Waves (Percentile)',
+                        label: 'Waves (ft)',
                         data: wavesTrendData.length > 0 ? wavesTrendData : validReadings.filter(r => r.wavesPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesPercentile)})),
                         borderColor: 'red',
                         backgroundColor: 'rgba(255, 0, 0, 0.1)',
@@ -429,7 +430,7 @@
             if (legendContainer) {
                 const legendItems = [
                     { label: 'Water Level (ft)', color: 'blue' },
-                    { label: 'Waves (Percentile)', color: 'red' },
+                    { label: 'Waves (ft)', color: 'red' },
                     { label: 'Wind Speed (knots)', color: 'purple' },
                     { label: 'Reference Line', color: 'green' }
                 ];
