@@ -345,14 +345,9 @@
             // Detect dominant frequencies using FFT analysis
             const dominantFreqs = detectDominantFrequencies(data, 2);
             if (!dominantFreqs || dominantFreqs.length === 0) {
-                // Fallback to fixed 12-hour period if FFT fails
-                console.warn('FFT analysis failed, using fallback 12-hour period');
-                const FALLBACK_PERIOD_MS = 12 * 60 * 60 * 1000;
-                dominantFreqs = [{
-                    frequency: 2 * Math.PI / FALLBACK_PERIOD_MS,
-                    periodHours: 12,
-                    power: 1.0
-                }];
+                // No reliable frequencies detected - skip harmonic analysis
+                console.warn('FFT analysis failed to detect reliable tidal frequencies - skipping harmonic trends');
+                return null;
             }
             
             console.log('Detected tidal periods:', dominantFreqs.map(f => 
@@ -475,6 +470,10 @@
             try {
                 const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/.json?orderBy="$key"&limitToLast=4320');
                 const data = await response.json();
+                
+                // Define time ranges
+                const now = new Date();
+                const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
                 
                 // Convert all data for FFT analysis (72 hours)
                 const allReadings = Object.entries(data).map(([key, value]) => ({
