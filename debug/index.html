@@ -85,7 +85,8 @@
             <div style="display: flex; align-items: center;">
                 <a href="../index.html" class="main-link">← Main Dashboard</a>
                 <button id="toggleTrendlines" class="toggle-trendlines">Show Trend Lines</button>
-                <button id="resetZoom" class="toggle-trendlines" style="background: #6c757d; margin-left: 10px;">Reset Zoom</button>
+                <button id="show24Hours" class="toggle-trendlines" style="background: #007bff; margin-left: 10px;">24 Hours</button>
+                <button id="show72Hours" class="toggle-trendlines" style="background: #6c757d; margin-left: 5px;">72 Hours</button>
             </div>
             <div id="chartLegend" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; font-size: 14px; flex: 1;"></div>
         </div>
@@ -816,6 +817,9 @@
             if (trendLinesVisible) {
                 addTrendLines();
             }
+            
+            // Run tidal frequency analysis on page load
+            runTidalFrequencyAnalysis();
         }
 
         // Add water level trend lines using harmonics
@@ -1171,9 +1175,19 @@
         // Initialize toggle button event listener
         window.addEventListener('load', function() {
             document.getElementById('toggleTrendlines').addEventListener('click', toggleTrendLines);
-            document.getElementById('resetZoom').addEventListener('click', function() {
+            document.getElementById('show24Hours').addEventListener('click', function() {
                 if (debugChartInstance) {
-                    debugChartInstance.resetZoom();
+                    const now = new Date();
+                    const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+                    debugChartInstance.zoomScale('x', {min: twentyFourHoursAgo, max: now});
+                }
+            });
+            
+            document.getElementById('show72Hours').addEventListener('click', function() {
+                if (debugChartInstance) {
+                    const now = new Date();
+                    const seventyTwoHoursAgo = new Date(now.getTime() - (72 * 60 * 60 * 1000));
+                    debugChartInstance.zoomScale('x', {min: seventyTwoHoursAgo, max: now});
                 }
             });
         });
