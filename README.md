@@ -47,7 +47,9 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Web Das
 - **Mobile responsive** design
 
 ### Debug Dashboard  
-- **72-hour comprehensive view** of all sensor and environmental data
+- **Default 24-hour view** with zoom capability to 72 hours for comprehensive analysis
+- **Intuitive time controls**: Dedicated 24-hour and 72-hour buttons for quick navigation
+- **Advanced zoom functionality**: Click-and-drag selection and Ctrl+mouse wheel for precise control
 - **Multi-axis charts** for detailed analysis with extended timeframe
 - **Enhanced visualization** of wave calculation methods
 - **System diagnostics** with valid sample tracking
@@ -55,6 +57,9 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Web Das
   - **Water Level Harmonics**: FFT-detected tidal pattern fitting with automatic period detection
   - **Wind/Wave Splines**: 30-point smoothed cubic spline interpolation
 - **Automatic tidal frequency analysis** with comprehensive results table
+  - **Immediate chart display**: Chart loads instantly when data arrives
+  - **Background analysis**: FFT analysis runs asynchronously for smooth user experience
+  - **Auto-updating**: Analysis refreshes every 2 minutes with new data
 - **NOAA environmental data** integration (wind, water level)
 - **Wind range**: 0-40 knots for comprehensive weather tracking
 - **Real-time tidal constituent identification** (M2, S2, O1, K1, etc.)

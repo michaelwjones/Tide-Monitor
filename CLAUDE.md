@@ -72,9 +72,14 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Cloud F
 
 ### Debug Dashboard (`debug/index.html`)
 - **Chart library**: Chart.js v4.5.0 with date-fns adapter (same as main)
+- **Default view**: 24 hours with zoom capability to full 72-hour dataset
+- **Time controls**: Dedicated 24-hour and 72-hour buttons for quick navigation
+- **Advanced zoom**: Click-and-drag selection and Ctrl+mouse wheel functionality
 - **Data visualization**: All 6 data fields on multi-axis chart
 - **Layout**: Clean design matching main dashboard (no containers/borders)
 - **Navigation**: Link back to main dashboard in top-right corner
+- **Async loading**: Chart displays immediately, tidal analysis runs in background
+- **Auto-refresh**: Updates every 2 minutes with fresh data and analysis
 - **Trend line analysis**: Natural cubic spline interpolation with toggle control
 - **Chart axes**: 
   - Left Y-axis: Water level measurements (0-6 feet)

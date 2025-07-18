@@ -98,13 +98,16 @@ The enriched data is used by the web dashboards for:
   - **Water level and wave height**: Left axis (0-6 feet) with cubic spline smoothing
   - **Wind speed**: Right axis (0-40 knots) with automatic unit conversion
   - **Data processing**: 30-point progressive smoothing and -999 error filtering
-- **Debug Dashboard**: Advanced analytics with 72-hour data window and dual trend methodologies
+- **Debug Dashboard**: Advanced analytics with 24-hour default view and 72-hour zoom capability
+  - **Intuitive controls**: Dedicated time range buttons and advanced zoom functionality
+  - **Async performance**: Chart loads immediately, analysis runs in background
   - **Extended visualization**: 72 hours of wind speed and gust data (0-40 knot range)
   - **Water level comparison**: Sensor vs NOAA measurements over 3-day period
   - **Advanced trend analysis**: 
     - **Water Level Harmonics**: FFT-based automatic tidal period detection
     - **Wind/Wave Splines**: 30-point smoothed cubic interpolation
   - **Automatic tidal analysis**: Real-time frequency table with constituent identification
+  - **Auto-refresh**: Analysis updates every 2 minutes with new data
   - **Environmental context**: Integrated NOAA wind and water level data
 
 ### Troubleshooting
