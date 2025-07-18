@@ -49,6 +49,25 @@
         .toggle-trendlines.active:hover {
             background: #218838;
         }
+        .tidal-analysis-table {
+            margin-top: 20px;
+            border-collapse: collapse;
+            width: 100%;
+            max-width: 600px;
+        }
+        .tidal-analysis-table th,
+        .tidal-analysis-table td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .tidal-analysis-table th {
+            background-color: #f5f5f5;
+            font-weight: 600;
+        }
+        .tidal-analysis-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
@@ -68,6 +87,26 @@
             </div>
             <div id="chartLegend" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; font-size: 14px; flex: 1;"></div>
         </div>
+        
+        <div style="margin-top: 20px;">
+            <h3>Detected Tidal Frequencies</h3>
+            <table id="tidalAnalysisTable" class="tidal-analysis-table">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Period (hours)</th>
+                        <th>Frequency (cycles/day)</th>
+                        <th>Signal Power</th>
+                        <th>Tidal Type</th>
+                    </tr>
+                </thead>
+                <tbody id="tidalAnalysisBody">
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: #666;">Loading tidal analysis...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <script>
@@ -81,6 +120,7 @@
         let debugChartInstance = null;
         let trendLinesVisible = false;
         let currentReadings = [];
+        let detectedTidalFrequencies = null;
 
         // Prepare data for cubic spline interpolation with light smoothing (Wind/Wave category)
         function prepareWindWaveSplineData(data) {
@@ -354,6 +394,9 @@
                 `${f.periodHours.toFixed(2)}h (power: ${f.power.toFixed(4)})`
             ));
             
+            // Store frequencies for table display
+            detectedTidalFrequencies = dominantFreqs;
+            
             // Use the strongest frequency for single harmonic fitting
             const primaryFreq = dominantFreqs[0];
             const a2 = primaryFreq.frequency; // Angular frequency (data-driven)
@@ -509,6 +552,9 @@
                 
                 // Store all readings for FFT analysis, display readings for chart
                 currentReadings = allReadings;  // Full 72hr dataset for analysis
+                
+                // Run automatic tidal analysis for table
+                performTidalAnalysis(allReadings);
                 
                 // Create debug chart with 24hr display data
                 createDebugChart(displayReadings);
@@ -1014,6 +1060,73 @@
             }
         }
 
+        // Perform automatic tidal analysis for table display
+        function performTidalAnalysis(readings) {
+            if (!readings || readings.length < 48) {
+                updateTidalAnalysisTable(null);
+                return;
+            }
+            
+            // Use water level average data for analysis
+            const waterLevelData = readings.map(r => ({
+                x: r.rawTimestamp,
+                y: parseFloat(r.waterLevel)
+            })).filter(d => !isNaN(d.y));
+            
+            if (waterLevelData.length < 48) {
+                updateTidalAnalysisTable(null);
+                return;
+            }
+            
+            // Run FFT analysis
+            const dominantFreqs = detectDominantFrequencies(waterLevelData, 5); // Get top 5 frequencies
+            updateTidalAnalysisTable(dominantFreqs);
+        }
+        
+        // Update the tidal analysis table
+        function updateTidalAnalysisTable(frequencies) {
+            const tableBody = document.getElementById('tidalAnalysisBody');
+            
+            if (!frequencies || frequencies.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999;">No reliable tidal frequencies detected</td></tr>';
+                return;
+            }
+            
+            // Clear existing rows
+            tableBody.innerHTML = '';
+            
+            // Add rows for each detected frequency
+            frequencies.forEach((freq, index) => {
+                const cyclesPerDay = 24 / freq.periodHours;
+                const tidalType = getTidalType(freq.periodHours);
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${freq.periodHours.toFixed(2)}</td>
+                    <td>${cyclesPerDay.toFixed(3)}</td>
+                    <td>${freq.power.toFixed(6)}</td>
+                    <td>${tidalType}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+        
+        // Classify tidal type based on period
+        function getTidalType(periodHours) {
+            if (periodHours >= 23 && periodHours <= 25) {
+                return 'Diurnal (O1/K1)';
+            } else if (periodHours >= 11.5 && periodHours <= 12.5) {
+                return 'Semi-diurnal (M2/S2)';
+            } else if (periodHours >= 6 && periodHours <= 8) {
+                return 'Quarter-diurnal';
+            } else if (periodHours >= 4 && periodHours <= 6) {
+                return 'Higher harmonic';
+            } else {
+                return 'Other';
+            }
+        }
+        
         // Initialize toggle button event listener
         window.addEventListener('load', function() {
             document.getElementById('toggleTrendlines').addEventListener('click', toggleTrendLines);
