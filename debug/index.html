@@ -1076,9 +1076,16 @@
                 return;
             }
             
-            // Run FFT analysis for table (get top 5 frequencies instead of just 2)
-            const dominantFreqs = detectDominantFrequencies(waterLevelData, 5);
-            updateTidalAnalysisTable(dominantFreqs);
+            // Run the same harmonic analysis that happens in trend lines
+            // This will automatically update the table through computeWaterLevelHarmonics
+            const harmonics = computeWaterLevelHarmonics(waterLevelData);
+            
+            // If harmonic analysis failed, try basic FFT as fallback
+            if (!harmonics) {
+                console.log('Harmonic analysis failed, trying basic FFT...');
+                const dominantFreqs = detectDominantFrequencies(waterLevelData, 5);
+                updateTidalAnalysisTable(dominantFreqs);
+            }
         }
         
         // Update the tidal analysis table
