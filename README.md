@@ -44,15 +44,17 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Web Das
 - **Mobile responsive** design
 
 ### Debug Dashboard  
-- **All data fields** from the sensor system
-- **Multi-axis charts** for detailed analysis
+- **72-hour comprehensive view** of all sensor and environmental data
+- **Multi-axis charts** for detailed analysis with extended timeframe
 - **Enhanced visualization** of wave calculation methods
 - **System diagnostics** with valid sample tracking
 - **Advanced trend line analysis** with dual methodologies:
-  - **Water Level Harmonics**: Semi-diurnal tidal pattern fitting (12-hour period)
-  - **Wind/Wave Splines**: 11-point smoothed cubic spline interpolation
+  - **Water Level Harmonics**: FFT-detected tidal pattern fitting with automatic period detection
+  - **Wind/Wave Splines**: 30-point smoothed cubic spline interpolation
+- **Automatic tidal frequency analysis** with comprehensive results table
 - **NOAA environmental data** integration (wind, water level)
 - **Wind range**: 0-40 knots for comprehensive weather tracking
+- **Real-time tidal constituent identification** (M2, S2, O1, K1, etc.)
 
 ## 🚀 Quick Start
 
@@ -114,15 +116,18 @@ The system collects readings every minute with the following data points:
 #### Water Level Harmonics
 - **Mathematical Form**: `f(t) = a0 + a1*sin(a2*t + a3)`
 - **Coefficients**: 4 parameters (DC offset, amplitude, frequency, phase)
-- **Tidal Period**: 12 hours (semi-diurnal tides)
-- **Pattern Recognition**: Captures twice-daily tidal cycles
+- **FFT-Based Detection**: Automatic tidal period discovery from 72 hours of data
+- **Frequency Range**: 6-48 hour periods with 30-minute resolution
+- **Pattern Recognition**: Detects dominant tidal constituents automatically
 - **Least Squares Fitting**: Robust amplitude and phase calculation
+- **Tidal Classification**: Automatic identification of diurnal, semi-diurnal, and harmonic components
 
 #### Wind/Wave Cubic Splines
-- **Smoothing**: Progressive 1-11 point moving averages
+- **Enhanced Smoothing**: Progressive 1-30 point moving averages (16 smoothing levels)
 - **Algorithm**: Natural cubic splines with Thomas algorithm (O(n) complexity)
 - **Edge Protection**: Prevents oscillation artifacts at data boundaries
 - **Dynamic Window**: Adaptive smoothing based on distance from edges
+- **Superior Noise Reduction**: 30-point averaging for highly variable environmental data
 
 ### Failed Analysis Methods
 **Binning Method** (Removed): This method grouped readings into bins for wave analysis but was removed due to:
@@ -138,8 +143,8 @@ The system collects readings every minute with the following data points:
 
 ### Advanced Analytics
 - **Dual Methodology Trend Analysis**: Unified interface with specialized algorithms
-  - **Water Levels**: Harmonic analysis for tidal patterns
-  - **Wind/Wave Data**: Enhanced 11-point smoothed cubic splines
+  - **Water Levels**: FFT-based harmonic analysis with automatic tidal detection
+  - **Wind/Wave Data**: Enhanced 30-point smoothed cubic splines
 - **Performance Optimized**: O(n) complexity using Thomas algorithm for fast rendering
 - **Edge-Safe**: Natural splines prevent oscillation artifacts at data boundaries
 - **Toggle Control**: Single button controls both trend line methodologies
@@ -150,8 +155,9 @@ The system collects readings every minute with the following data points:
 - **Optimized Rendering**: Chart animations disabled for performance
 - **Error Handling**: Graceful degradation when data is unavailable
 - **Responsive Design**: Works on desktop and mobile devices
-- **Fast Trend Lines**: Harmonic computation under 50ms, cubic splines under 100ms for 1440 data points
-- **Semi-Diurnal Tide Recognition**: Automatic 12-hour period detection for accurate tidal modeling
+- **Fast Trend Lines**: Harmonic computation under 100ms, cubic splines under 150ms for 4320 data points
+- **Automatic Tidal Analysis**: FFT-based period detection with comprehensive frequency table
+- **Extended Data Window**: 72-hour analysis provides 3+ tidal cycles for robust frequency detection
 
 ## 📱 Mobile Support
 
@@ -165,7 +171,7 @@ Both dashboards are optimized for mobile viewing with:
 
 - **Sensor readings**: Every minute
 - **Dashboard refresh**: Every 2 minutes
-- **Data retention**: 24 hours visible (1440 readings)
+- **Data retention**: 72 hours visible (4320 readings) for comprehensive analysis
 - **Timezone**: Eastern Time (America/New_York)
 
 ## 🤝 Contributing

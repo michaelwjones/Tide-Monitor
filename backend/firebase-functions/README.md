@@ -95,12 +95,13 @@ firebase emulators:start --only functions
 
 The enriched data is used by the web dashboards for:
 - **Main Dashboard**: Basic water level and wave visualization
-- **Debug Dashboard**: Advanced analytics with dual trend line methodologies and NOAA data
-  - **Wind visualization**: Real-time wind speed and gust data (0-40 knot range)
-  - **Water level comparison**: Sensor vs NOAA measurements
+- **Debug Dashboard**: Advanced analytics with 72-hour data window and dual trend methodologies
+  - **Extended visualization**: 72 hours of wind speed and gust data (0-40 knot range)
+  - **Water level comparison**: Sensor vs NOAA measurements over 3-day period
   - **Advanced trend analysis**: 
-    - **Water Level Harmonics**: Semi-diurnal tidal fitting (12-hour period)
-    - **Wind/Wave Splines**: 11-point smoothed cubic interpolation
+    - **Water Level Harmonics**: FFT-based automatic tidal period detection
+    - **Wind/Wave Splines**: 30-point smoothed cubic interpolation
+  - **Automatic tidal analysis**: Real-time frequency table with constituent identification
   - **Environmental context**: Integrated NOAA wind and water level data
 
 ### Troubleshooting
@@ -110,7 +111,10 @@ If enrichment is not working:
 2. Verify all fields are present in latest Firebase entries
 3. Test NOAA APIs directly using the URLs above
 4. Look for -999 error values indicating API failures
-5. Check debug dashboard for dual trend line functionality:
-   - Water level harmonic analysis (semi-diurnal tides)
-   - Wind/wave cubic spline smoothing (11-point averaging)
-   - Unified toggle control for both methodologies
+5. Check debug dashboard for comprehensive analysis features:
+   - 72-hour data visualization for extended pattern analysis
+   - FFT-based tidal frequency detection with automatic constituent identification
+   - Water level harmonic analysis with data-driven period detection
+   - Wind/wave cubic spline smoothing (30-point averaging)
+   - Automatic tidal analysis table showing detected frequencies and classifications
+   - Unified toggle control for both trend line methodologies
