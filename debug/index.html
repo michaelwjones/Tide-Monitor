@@ -71,6 +71,7 @@
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
 </head>
 <body>
     
@@ -84,6 +85,7 @@
             <div style="display: flex; align-items: center;">
                 <a href="../index.html" class="main-link">← Main Dashboard</a>
                 <button id="toggleTrendlines" class="toggle-trendlines">Show Trend Lines</button>
+                <button id="resetZoom" class="toggle-trendlines" style="background: #6c757d; margin-left: 10px;">Reset Zoom</button>
             </div>
             <div id="chartLegend" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; font-size: 14px; flex: 1;"></div>
         </div>
@@ -751,6 +753,23 @@
                         },
                         title: {
                             display: false
+                        },
+                        zoom: {
+                            zoom: {
+                                wheel: {
+                                    enabled: true,
+                                },
+                                pinch: {
+                                    enabled: true
+                                },
+                                mode: 'x',
+                                scaleMode: 'x'
+                            },
+                            pan: {
+                                enabled: true,
+                                mode: 'x',
+                                scaleMode: 'x'
+                            }
                         }
                     }
                 }
@@ -1138,6 +1157,11 @@
         // Initialize toggle button event listener
         window.addEventListener('load', function() {
             document.getElementById('toggleTrendlines').addEventListener('click', toggleTrendLines);
+            document.getElementById('resetZoom').addEventListener('click', function() {
+                if (debugChartInstance) {
+                    debugChartInstance.resetZoom();
+                }
+            });
         });
     </script>
 </body>
