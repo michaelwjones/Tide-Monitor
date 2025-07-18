@@ -290,10 +290,10 @@
             const x = data.map(d => d.x.getTime());
             const y = data.map(d => d.y);
             
-            // Tidal frequency assumption: a2 = 2π/24hrs (fundamental tidal period)
-            // This assumes the dominant tidal component has a 24-hour period (diurnal tide)
-            // Could be extended to include semi-diurnal (12hr) or other tidal constituents
-            const TIDAL_PERIOD_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+            // Tidal frequency assumption: a2 = 2π/12hrs (semi-diurnal tidal period)
+            // This assumes the dominant tidal component has a 12-hour period (semi-diurnal tide)
+            // Observation shows 2 full sine waves in 24 hours, confirming semi-diurnal pattern
+            const TIDAL_PERIOD_MS = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
             const a2 = 2 * Math.PI / TIDAL_PERIOD_MS; // Angular frequency (fixed)
             
             // Calculate DC component (mean water level)
