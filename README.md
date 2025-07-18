@@ -13,7 +13,8 @@ This system continuously monitors water levels and wave activity using an ultras
 
 ### Key Measurements
 - **Water Level**: Distance from sensor to water surface (converted to feet)
-- **Wave Heights**: Two different calculation methods for wave analysis
+- **Wave Heights**: Smoothed trend analysis using cubic spline interpolation
+- **Wind Speed**: Environmental data from NOAA (converted to knots)
 - **Data Quality**: Valid sample count for each reading
 
 ## 🛠️ System Architecture
@@ -38,7 +39,9 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Web Das
 
 ### Main Dashboard
 - **24-hour water level trend** with smooth line charts
-- **Wave height visualization** using two different analysis methods
+- **Wave height visualization** using cubic spline smoothed trend lines
+- **Wind speed monitoring** with 0-40 knots range on dedicated right axis
+- **Dual-axis display**: Water level (left, 0-6 feet) and wind speed (right, 0-40 knots)
 - **Reference line** at 2.5 feet for context
 - **Auto-refresh** every 2 minutes
 - **Mobile responsive** design
@@ -108,8 +111,14 @@ The system collects readings every minute with the following data points:
 ## 🔧 Technical Details
 
 ### Wave Analysis Methods
-1. **Percentile Method**: Uses statistical percentiles to calculate wave heights
-2. **Envelope Method**: Analyzes the envelope of the wave signal
+1. **Percentile Method**: Uses statistical percentiles to calculate wave heights with cubic spline smoothing
+2. **Envelope Method**: Available in debug dashboard for detailed analysis
+   
+### Main Dashboard Visualization
+- **Smoothed Trend Lines**: All wave and wind data uses 30-point progressive smoothing
+- **Cubic Spline Interpolation**: Natural splines with Thomas algorithm for optimal performance
+- **Unit Conversion**: Wind speed converted from m/s to knots (1 m/s = 1.94384 knots)
+- **Error Filtering**: Automatically excludes NOAA API failure values (-999)
 
 ### Advanced Trend Line Analysis
 

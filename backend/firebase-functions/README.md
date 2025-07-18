@@ -94,7 +94,10 @@ firebase emulators:start --only functions
 ### Dashboard Integration
 
 The enriched data is used by the web dashboards for:
-- **Main Dashboard**: Basic water level and wave visualization
+- **Main Dashboard**: Smoothed trend visualization with dual-axis display
+  - **Water level and wave height**: Left axis (0-6 feet) with cubic spline smoothing
+  - **Wind speed**: Right axis (0-40 knots) with automatic unit conversion
+  - **Data processing**: 30-point progressive smoothing and -999 error filtering
 - **Debug Dashboard**: Advanced analytics with 72-hour data window and dual trend methodologies
   - **Extended visualization**: 72 hours of wind speed and gust data (0-40 knot range)
   - **Water level comparison**: Sensor vs NOAA measurements over 3-day period

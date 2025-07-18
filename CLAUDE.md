@@ -60,7 +60,12 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Cloud F
 ### Web Dashboard (`index.html`)
 - **Chart library**: Chart.js v4.5.0 with date-fns adapter
 - **Data range**: Last 1440 readings (24 hours) from Firebase
-- **Chart features**: Time-series plot with water level and wave measurements
+- **Chart features**: Dual-axis time-series plot with smoothed trend lines
+- **Left Y-axis**: Water level and wave height (0-6 feet)
+- **Right Y-axis**: Wind speed (0-40 knots)
+- **Data smoothing**: 30-point progressive smoothing with cubic spline interpolation
+- **Unit conversion**: Wind speed converted from m/s to knots (1 m/s = 1.94384 knots)
+- **Error filtering**: Excludes NOAA API failure values (-999)
 - **Auto-refresh**: Updates every 2 minutes
 - **Timezone**: Eastern Time (America/New_York)
 - **Navigation**: Link to debug dashboard in top-right corner
@@ -157,9 +162,12 @@ Readings are stored with auto-generated keys containing:
 ## Dashboard Features
 
 ### Main Dashboard Features
-- **Chart visualization**: Water level (blue) and two wave height methods (red, orange)
+- **Chart visualization**: Water level (blue), wave height trend (red), wind speed trend (purple)
+- **Dual-axis display**: Water level/waves on left (0-6 feet), wind speed on right (0-40 knots)
+- **Smoothed trend lines**: 30-point progressive smoothing with cubic spline interpolation
 - **Reference line**: Green horizontal line at 2.5 feet
 - **Custom legend**: Color-coded legend below chart
+- **Data processing**: Automatic unit conversion (m/s to knots) and error filtering
 - **Responsive design**: Works on desktop and mobile devices
 - **Auto-refresh**: Updates every 2 minutes
 - **Security**: CSP headers and content-type protection
