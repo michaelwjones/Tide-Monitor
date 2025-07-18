@@ -755,6 +755,12 @@
                             display: false
                         },
                         zoom: {
+                            limits: {
+                                x: {
+                                    min: seventyTwoHoursAgo,
+                                    max: now
+                                }
+                            },
                             zoom: {
                                 wheel: {
                                     enabled: true,
