@@ -282,7 +282,7 @@
             };
         }
         
-        // Compute harmonic coefficients using 1 harmonic (fundamental frequency)
+        // Compute harmonic coefficients using form: a0 + a1*sin(a2*t + a3)
         function computeWaterLevelHarmonics(data) {
             const n = data.length;
             if (n < 10) return null;
@@ -290,62 +290,82 @@
             const x = data.map(d => d.x.getTime());
             const y = data.map(d => d.y);
             
-            // Calculate time period (assume 24 hours for tidal data)
-            const timeRange = x[x.length - 1] - x[0];
-            const period = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-            const omega = 2 * Math.PI / period; // Angular frequency
+            // Tidal frequency assumption: a2 = 2π/24hrs (fundamental tidal period)
+            // This assumes the dominant tidal component has a 24-hour period (diurnal tide)
+            // Could be extended to include semi-diurnal (12hr) or other tidal constituents
+            const TIDAL_PERIOD_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+            const a2 = 2 * Math.PI / TIDAL_PERIOD_MS; // Angular frequency (fixed)
             
-            // Calculate harmonic coefficients using least squares
+            // Calculate DC component (mean water level)
             let sum_y = 0;
-            let sum_cos = 0;
+            for (let i = 0; i < n; i++) {
+                sum_y += y[i];
+            }
+            const a0 = sum_y / n;
+            
+            // Use least squares to find amplitude (a1) and phase (a3)
+            // We fit: y = a0 + a1*sin(a2*t + a3)
+            // Expanding: y = a0 + a1*sin(a2*t)*cos(a3) + a1*cos(a2*t)*sin(a3)
+            // Let: A = a1*cos(a3), B = a1*sin(a3)
+            // Then: y = a0 + A*sin(a2*t) + B*cos(a2*t)
+            
             let sum_sin = 0;
-            let sum_y_cos = 0;
+            let sum_cos = 0;
             let sum_y_sin = 0;
-            let sum_cos2 = 0;
+            let sum_y_cos = 0;
             let sum_sin2 = 0;
+            let sum_cos2 = 0;
+            let sum_sin_cos = 0;
             
             for (let i = 0; i < n; i++) {
                 const t = x[i] - x[0]; // Normalize time to start from 0
-                const cosVal = Math.cos(omega * t);
-                const sinVal = Math.sin(omega * t);
+                const sinVal = Math.sin(a2 * t);
+                const cosVal = Math.cos(a2 * t);
+                const y_offset = y[i] - a0; // Remove DC component
                 
-                sum_y += y[i];
-                sum_cos += cosVal;
                 sum_sin += sinVal;
-                sum_y_cos += y[i] * cosVal;
-                sum_y_sin += y[i] * sinVal;
-                sum_cos2 += cosVal * cosVal;
+                sum_cos += cosVal;
+                sum_y_sin += y_offset * sinVal;
+                sum_y_cos += y_offset * cosVal;
                 sum_sin2 += sinVal * sinVal;
+                sum_cos2 += cosVal * cosVal;
+                sum_sin_cos += sinVal * cosVal;
             }
             
-            // Calculate coefficients
-            const a0 = sum_y / n; // DC component (average)
-            const a1 = (sum_y_cos - (sum_y * sum_cos) / n) / (sum_cos2 - (sum_cos * sum_cos) / n);
-            const b1 = (sum_y_sin - (sum_y * sum_sin) / n) / (sum_sin2 - (sum_sin * sum_sin) / n);
+            // Solve 2x2 system for A and B using Cramer's rule
+            const det = sum_sin2 * sum_cos2 - sum_sin_cos * sum_sin_cos;
             
-            // Handle edge cases
-            const a1_final = isNaN(a1) || !isFinite(a1) ? 0 : a1;
-            const b1_final = isNaN(b1) || !isFinite(b1) ? 0 : b1;
+            let A, B;
+            if (Math.abs(det) > 1e-10) {
+                A = (sum_y_sin * sum_cos2 - sum_y_cos * sum_sin_cos) / det;
+                B = (sum_y_cos * sum_sin2 - sum_y_sin * sum_sin_cos) / det;
+            } else {
+                // Handle near-singular matrix (very little variation at this frequency)
+                A = 0;
+                B = 0;
+            }
+            
+            // Convert back to amplitude and phase
+            const a1 = Math.sqrt(A * A + B * B); // Amplitude
+            const a3 = Math.atan2(B, A); // Phase shift
             
             return {
-                a0: a0,
-                a1: a1_final,
-                b1: b1_final,
-                omega: omega,
+                a0: a0,      // DC offset (mean level)
+                a1: a1,      // Amplitude
+                a2: a2,      // Angular frequency (fixed at tidal frequency)
+                a3: a3,      // Phase shift
                 startTime: x[0],
-                period: period
+                period: TIDAL_PERIOD_MS
             };
         }
         
-        // Evaluate harmonic function at given x values
+        // Evaluate harmonic function: a0 + a1*sin(a2*t + a3)
         function evaluateWaterLevelHarmonics(harmonics, xValues) {
             const points = [];
             
             for (const targetX of xValues) {
                 const t = targetX.getTime() - harmonics.startTime;
-                const y = harmonics.a0 + 
-                         harmonics.a1 * Math.cos(harmonics.omega * t) + 
-                         harmonics.b1 * Math.sin(harmonics.omega * t);
+                const y = harmonics.a0 + harmonics.a1 * Math.sin(harmonics.a2 * t + harmonics.a3);
                 
                 points.push({
                     x: targetX,
