@@ -334,7 +334,8 @@
                         pointRadius: 0,
                         pointHoverRadius: 0,
                         tension: 0.5,
-                        order: 2
+                        order: 2,
+                        yAxisID: 'waveHeight'
                     }, {
                         label: 'Wind Speed (knots)',
                         data: windTrendData.length > 0 ? windTrendData : windRawData,
@@ -371,6 +372,19 @@
                             },
                             position: 'left'
                         },
+                        waveHeight: {
+                            type: 'linear',
+                            min: 0,
+                            max: 2,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Wave Height (feet)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        },
                         windSpeed: {
                             type: 'linear',
                             min: 0,
@@ -382,7 +396,8 @@
                             },
                             grid: {
                                 drawOnChartArea: false
-                            }
+                            },
+                            offset: true
                         },
                         x: {
                             type: 'time',

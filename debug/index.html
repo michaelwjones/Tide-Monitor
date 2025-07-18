@@ -581,8 +581,9 @@
             // Filter out any invalid timestamps
             const validReadings = readings.filter(r => r.rawTimestamp.getTime() > 0);
             
-            // Set time range for display to exactly 72 hours ago to now
+            // Set time range - default display 24 hours, but allow zoom to 72 hours
             const now = new Date();
+            const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
             const seventyTwoHoursAgo = new Date(now.getTime() - (72 * 60 * 60 * 1000));
             
             
@@ -735,7 +736,7 @@
                         },
                         x: {
                             type: 'time',
-                            min: seventyTwoHoursAgo,
+                            min: twentyFourHoursAgo,
                             max: now,
                             time: {
                                 displayFormats: {
@@ -764,6 +765,13 @@
                             zoom: {
                                 wheel: {
                                     enabled: true,
+                                    modifierKey: 'ctrl'
+                                },
+                                drag: {
+                                    enabled: true,
+                                    backgroundColor: 'rgba(225,225,225,0.3)',
+                                    borderColor: 'rgba(225,225,225,1)',
+                                    borderWidth: 1
                                 },
                                 pinch: {
                                     enabled: true
