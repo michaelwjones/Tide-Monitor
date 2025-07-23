@@ -113,6 +113,8 @@ The system collects readings every minute with the following data points:
 - `gs`: Gust speed in m/s from Duke Marine Lab
 - `wm`: Water level in feet (MLLW datum) from Duke Marine Lab
 
+**Note**: NOAA fields show -999 when APIs are unavailable or data validation fails. The system uses the last element from NOAA data arrays because the API occasionally returns the whole day's data instead of just the latest reading.
+
 ## 🔧 Technical Details
 
 ### Wave Analysis Methods

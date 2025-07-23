@@ -35,13 +35,27 @@ The `enrichTideData` function automatically triggers when new readings are writt
 
 ## Error Handling
 
-If NOAA APIs are unavailable, the function sets error values:
+The function performs strict validation to ensure data quality:
+
+### Data Validation Rules
+- **Wind data**: Must contain at least 1 data point with fields `s`, `d`, and `g` (uses last element)
+- **Water data**: Must contain at least 1 data point with fields `v` and `t` (uses last element)
+- **Field presence**: All expected fields must be present and not null/undefined
+- **Data selection**: Always uses the last element from the data array because NOAA API occasionally returns the whole day's data instead of just the latest reading
+
+### Error Scenarios
+If any validation fails, the function sets error values and logs detailed error messages:
 - **ws**: -999 (wind speed error)
-- **wd**: -999 (wind direction error)
+- **wd**: -999 (wind direction error)  
 - **gs**: -999 (gust speed error)
 - **wm**: -999 (water level error)
 
-These -999 values indicate API failures, not actual measurements.
+### Error Logging
+- **Missing fields**: Logs actual field values received for debugging
+- **Array length**: Logs actual data array length when empty or missing
+- **API failures**: Logs fetch errors with full error details
+
+These -999 values indicate validation failures or API errors, not actual measurements.
 
 ## Example Complete Entry
 

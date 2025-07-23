@@ -29,7 +29,10 @@ This is a **Tide Monitor** project that measures water levels and wave heights u
    - Automatically trigger when new readings arrive
    - Fetch real-time wind and water level data from NOAA station 8656483 (Duke Marine Lab)
    - Enrich each reading with environmental conditions
-   - Handle API failures gracefully with error codes
+   - Perform strict data validation requiring at least 1 data point (uses last element)
+   - Validate all expected fields are present (wind: s,d,g; water: v,t)
+   - Handle variable API response sizes (NOAA occasionally returns full day data)
+   - Handle API failures gracefully with error codes and detailed logging
 
 ## Data Flow Architecture
 
@@ -104,7 +107,11 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Cloud F
 - **Trigger**: `onValueCreated` for new readings in `/readings/` path
 - **APIs**: NOAA station 8656483 (Duke Marine Lab, Beaufort, NC)
 - **Data added**: Wind speed (ws), direction (wd), gust (gs), water level (wm)
-- **Error handling**: Sets -999 values when NOAA APIs fail
+- **Data validation**: Requires exactly 1 data point with all expected fields present
+- **Wind validation**: Fields s (speed), d (direction), g (gust) must exist
+- **Water validation**: Fields v (value), t (time) must exist
+- **Error handling**: Sets -999 values when APIs fail or validation fails
+- **Error logging**: Detailed console logs for missing fields and array length issues
 - **Framework**: Firebase Functions v6 with Node.js 22
 
 ## Development Commands
@@ -162,7 +169,7 @@ Readings are stored with auto-generated keys containing:
 - `gs`: Gust speed in m/s from Duke Marine Lab
 - `wm`: Water level in feet (MLLW datum) from Duke Marine Lab
 
-**Note**: NOAA fields show -999 when APIs are unavailable
+**Note**: NOAA fields show -999 when APIs are unavailable or validation fails (wrong array length or missing fields)
 
 ## Dashboard Features
 
