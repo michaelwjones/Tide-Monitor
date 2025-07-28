@@ -1182,7 +1182,9 @@
                 if (debugChartInstance) {
                     const now = new Date();
                     const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-                    debugChartInstance.zoomScale('x', {min: twentyFourHoursAgo, max: now});
+                    debugChartInstance.options.scales.x.min = twentyFourHoursAgo;
+                    debugChartInstance.options.scales.x.max = now;
+                    debugChartInstance.update();
                 }
             });
             
