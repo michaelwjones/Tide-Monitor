@@ -528,8 +528,8 @@
             
             // Fit multiple harmonics using simultaneous least squares
             // Model: y = a0 + Σ[An*sin(ωn*t) + Bn*cos(ωn*t)]
-            // Use more harmonics since we have all frequencies, but limit to prevent overfitting
-            const numFreqs = Math.min(allFreqs.length, 15); // Use up to 15 harmonics from ALL frequencies
+            // Use ALL frequencies - no limits
+            const numFreqs = allFreqs.length; // Use ALL frequencies
             const harmonics = [];
             
             if (numFreqs === 1) {
