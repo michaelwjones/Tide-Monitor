@@ -342,7 +342,7 @@
             const powers = [];
             
             // Test ALL frequencies in the tidal range
-            for (let periodMs = minPeriodMs; periodMs <= maxPeriodMs; periodMs += 30 * 60 * 1000) { // 30-minute steps
+            for (let periodMs = minPeriodMs; periodMs <= maxPeriodMs; periodMs += 60 * 1000) { // 1-minute steps
                 const omega = 2 * Math.PI / periodMs;
                 
                 let cosSum = 0, sinSum = 0;
@@ -392,7 +392,7 @@
             const powers = [];
             
             // Test frequencies corresponding to periods from 6 to 48 hours
-            for (let periodMs = minPeriodMs; periodMs <= maxPeriodMs; periodMs += 30 * 60 * 1000) { // 30-minute steps
+            for (let periodMs = minPeriodMs; periodMs <= maxPeriodMs; periodMs += 60 * 1000) { // 1-minute steps
                 const omega = 2 * Math.PI / periodMs;
                 
                 let cosSum = 0, sinSum = 0;
