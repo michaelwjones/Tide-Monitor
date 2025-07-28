@@ -384,6 +384,57 @@
             }
         }
         
+        // Solve linear system Ax = b using Gaussian elimination with partial pivoting
+        function solveLinearSystem(A, b) {
+            const n = A.length;
+            const augmented = [];
+            
+            // Create augmented matrix
+            for (let i = 0; i < n; i++) {
+                augmented[i] = [...A[i], b[i]];
+            }
+            
+            // Forward elimination with partial pivoting
+            for (let i = 0; i < n; i++) {
+                // Find pivot
+                let maxRow = i;
+                for (let k = i + 1; k < n; k++) {
+                    if (Math.abs(augmented[k][i]) > Math.abs(augmented[maxRow][i])) {
+                        maxRow = k;
+                    }
+                }
+                
+                // Swap rows
+                [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
+                
+                // Check for singular matrix
+                if (Math.abs(augmented[i][i]) < 1e-12) {
+                    console.warn('Singular or near-singular matrix detected in harmonic fitting');
+                    return null;
+                }
+                
+                // Eliminate column
+                for (let k = i + 1; k < n; k++) {
+                    const factor = augmented[k][i] / augmented[i][i];
+                    for (let j = i; j <= n; j++) {
+                        augmented[k][j] -= factor * augmented[i][j];
+                    }
+                }
+            }
+            
+            // Back substitution
+            const x = new Array(n);
+            for (let i = n - 1; i >= 0; i--) {
+                x[i] = augmented[i][n];
+                for (let j = i + 1; j < n; j++) {
+                    x[i] -= augmented[i][j] * x[j];
+                }
+                x[i] /= augmented[i][i];
+            }
+            
+            return x;
+        }
+
         // Compute harmonic coefficients using all significant detected frequencies
         function computeWaterLevelHarmonics(data) {
             const n = data.length;
@@ -427,14 +478,14 @@
             }
             const a0 = sum_y / n;
             
-            // Fit multiple harmonics using least squares
+            // Fit multiple harmonics using simultaneous least squares
             // Model: y = a0 + Σ[An*sin(ωn*t) + Bn*cos(ωn*t)]
-            const numFreqs = Math.min(allFreqs.length, 10); // Limit to 10 harmonics to prevent overfitting
+            const numFreqs = Math.min(allFreqs.length, 5); // Reduce to 5 to prevent overfitting
             const harmonics = [];
             
-            // For each frequency, compute amplitude and phase using least squares
-            for (let freqIdx = 0; freqIdx < numFreqs; freqIdx++) {
-                const omega = allFreqs[freqIdx].frequency;
+            if (numFreqs === 1) {
+                // Single harmonic - use simple fitting
+                const omega = allFreqs[0].frequency;
                 
                 let sum_sin2 = 0;
                 let sum_cos2 = 0;
@@ -443,10 +494,10 @@
                 let sum_y_cos = 0;
                 
                 for (let i = 0; i < n; i++) {
-                    const t = x[i] - x[0]; // Normalize time to start from 0
+                    const t = x[i] - x[0];
                     const sinVal = Math.sin(omega * t);
                     const cosVal = Math.cos(omega * t);
-                    const y_offset = y[i] - a0; // Remove DC component
+                    const y_offset = y[i] - a0;
                     
                     sum_sin2 += sinVal * sinVal;
                     sum_cos2 += cosVal * cosVal;
@@ -455,20 +506,14 @@
                     sum_y_cos += y_offset * cosVal;
                 }
                 
-                // Solve 2x2 system for A and B using Cramer's rule
                 const det = sum_sin2 * sum_cos2 - sum_sin_cos * sum_sin_cos;
                 
-                let A, B;
+                let A = 0, B = 0;
                 if (Math.abs(det) > 1e-10) {
                     A = (sum_y_sin * sum_cos2 - sum_y_cos * sum_sin_cos) / det;
                     B = (sum_y_cos * sum_sin2 - sum_y_sin * sum_sin_cos) / det;
-                } else {
-                    // Handle near-singular matrix
-                    A = 0;
-                    B = 0;
                 }
                 
-                // Convert to amplitude and phase
                 const amplitude = Math.sqrt(A * A + B * B);
                 const phase = Math.atan2(B, A);
                 
@@ -476,10 +521,81 @@
                     omega: omega,
                     amplitude: amplitude,
                     phase: phase,
-                    periodMs: allFreqs[freqIdx].periodMs,
-                    periodHours: allFreqs[freqIdx].periodHours,
-                    power: allFreqs[freqIdx].power
+                    periodMs: allFreqs[0].periodMs,
+                    periodHours: allFreqs[0].periodHours,
+                    power: allFreqs[0].power
                 });
+            } else {
+                // Multiple harmonics - use matrix least squares
+                // Build design matrix: [sin(ω1*t) cos(ω1*t) sin(ω2*t) cos(ω2*t) ...]
+                const numParams = numFreqs * 2; // 2 parameters per frequency (sin, cos)
+                const A_matrix = [];
+                const b_vector = [];
+                
+                for (let i = 0; i < n; i++) {
+                    const t = x[i] - x[0];
+                    const row = [];
+                    
+                    for (let freqIdx = 0; freqIdx < numFreqs; freqIdx++) {
+                        const omega = allFreqs[freqIdx].frequency;
+                        row.push(Math.sin(omega * t));
+                        row.push(Math.cos(omega * t));
+                    }
+                    
+                    A_matrix.push(row);
+                    b_vector.push(y[i] - a0);
+                }
+                
+                // Solve normal equations: (A^T * A) * x = A^T * b
+                const AtA = [];
+                const Atb = [];
+                
+                // Compute A^T * A
+                for (let i = 0; i < numParams; i++) {
+                    AtA[i] = [];
+                    for (let j = 0; j < numParams; j++) {
+                        let sum = 0;
+                        for (let k = 0; k < n; k++) {
+                            sum += A_matrix[k][i] * A_matrix[k][j];
+                        }
+                        AtA[i][j] = sum;
+                    }
+                }
+                
+                // Compute A^T * b
+                for (let i = 0; i < numParams; i++) {
+                    let sum = 0;
+                    for (let k = 0; k < n; k++) {
+                        sum += A_matrix[k][i] * b_vector[k];
+                    }
+                    Atb[i] = sum;
+                }
+                
+                // Solve using Gaussian elimination (simplified for small matrices)
+                const coeffs = solveLinearSystem(AtA, Atb);
+                
+                if (coeffs) {
+                    for (let freqIdx = 0; freqIdx < numFreqs; freqIdx++) {
+                        const sinCoeff = coeffs[freqIdx * 2];
+                        const cosCoeff = coeffs[freqIdx * 2 + 1];
+                        
+                        const amplitude = Math.sqrt(sinCoeff * sinCoeff + cosCoeff * cosCoeff);
+                        const phase = Math.atan2(cosCoeff, sinCoeff);
+                        
+                        harmonics.push({
+                            omega: allFreqs[freqIdx].frequency,
+                            amplitude: amplitude,
+                            phase: phase,
+                            periodMs: allFreqs[freqIdx].periodMs,
+                            periodHours: allFreqs[freqIdx].periodHours,
+                            power: allFreqs[freqIdx].power
+                        });
+                    }
+                } else {
+                    // Fallback to single strongest harmonic if matrix solution fails
+                    console.warn('Matrix solution failed, using single harmonic');
+                    return computeWaterLevelHarmonics(data); // Recursive call will hit single harmonic case
+                }
             }
             
             return {
