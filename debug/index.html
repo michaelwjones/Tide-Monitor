@@ -386,12 +386,12 @@
             return Math.pow(2, Math.ceil(Math.log2(n)));
         }
 
-        // Return ALL frequencies for harmonic fitting using FFT
+        // Return ALL frequencies for harmonic fitting using optimized DFT for exact frequencies
         function detectAllFrequencies(data) {
             const n = data.length;
             if (n < 48) return null;
             
-            console.log('Using FFT for frequency detection with', n, 'data points');
+            console.log('Using optimized DFT for exact frequency detection with', n, 'data points');
             
             const x = data.map(d => d.x.getTime());
             const y = data.map(d => d.y);
@@ -400,50 +400,30 @@
             const mean = y.reduce((sum, val) => sum + val, 0) / n;
             const yDetrended = y.map(val => val - mean);
             
-            // Pad to next power of 2 for FFT efficiency
-            const fftSize = nextPowerOf2(n);
-            const paddedSignal = [];
+            // Pre-compute time values relative to start (for efficiency)
+            const timeValues = x.map(t => t - x[0]);
             
-            for (let i = 0; i < fftSize; i++) {
-                if (i < n) {
-                    paddedSignal.push({ real: yDetrended[i], imag: 0 });
-                } else {
-                    paddedSignal.push({ real: 0, imag: 0 }); // Zero padding
-                }
-            }
-            
-            // Compute FFT
-            const fftResult = fft(paddedSignal);
-            
-            // Calculate sampling parameters
-            const timeSpanMs = x[x.length - 1] - x[0];
-            const samplingRateHz = (n - 1) / (timeSpanMs / 1000); // samples per second
-            const frequencyResolutionHz = samplingRateHz / fftSize;
-            
-            // Extract tidal frequencies (6-48 hour periods)
-            const minPeriodMs = 6 * 60 * 60 * 1000;  // 6 hours
-            const maxPeriodMs = 48 * 60 * 60 * 1000; // 48 hours
-            const minFreqHz = 1 / (maxPeriodMs / 1000); // Hz for 48 hours
-            const maxFreqHz = 1 / (minPeriodMs / 1000); // Hz for 6 hours
-            
-            const minBin = Math.max(1, Math.floor(minFreqHz / frequencyResolutionHz));
-            const maxBin = Math.min(fftSize / 2, Math.ceil(maxFreqHz / frequencyResolutionHz));
+            // Calculate power spectrum for ALL tidal frequencies (6-48 hour periods)
+            const minPeriodMs = 6 * 60 * 60 * 1000;  // 6 hours minimum
+            const maxPeriodMs = 48 * 60 * 60 * 1000; // 48 hours maximum
             
             const allPeaks = [];
             
-            // Extract power and frequency for each bin in tidal range
-            for (let bin = minBin; bin <= maxBin; bin++) {
-                const frequencyHz = bin * frequencyResolutionHz;
-                const omega = 2 * Math.PI * frequencyHz; // rad/s
-                const periodMs = 2 * Math.PI / omega * 1000; // Convert to ms
+            // Use exact 1-minute steps for precise frequency control
+            for (let periodMs = minPeriodMs; periodMs <= maxPeriodMs; periodMs += 60 * 1000) {
+                const omega = 2 * Math.PI / periodMs;
                 
-                // Skip if outside our desired range (safety check)
-                if (periodMs < minPeriodMs || periodMs > maxPeriodMs) continue;
+                let cosSum = 0, sinSum = 0;
                 
-                // Calculate power from complex FFT result
-                const real = fftResult[bin].real;
-                const imag = fftResult[bin].imag;
-                const power = (real * real + imag * imag) / (n * n);
+                // Optimized inner loop - pre-compute sin/cos for all time points
+                for (let i = 0; i < n; i++) {
+                    const angle = omega * timeValues[i];
+                    cosSum += yDetrended[i] * Math.cos(angle);
+                    sinSum += yDetrended[i] * Math.sin(angle);
+                }
+                
+                // Calculate power - keep original scaling
+                const power = (cosSum * cosSum + sinSum * sinSum) / (n * n);
                 
                 allPeaks.push({
                     frequency: omega,
@@ -453,7 +433,7 @@
                 });
             }
             
-            console.log('FFT extracted', allPeaks.length, 'frequencies in tidal range');
+            console.log('Optimized DFT extracted', allPeaks.length, 'exact frequencies in tidal range');
             
             // Sort by power (strongest first) but return ALL
             allPeaks.sort((a, b) => b.power - a.power);
