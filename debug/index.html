@@ -322,6 +322,54 @@
             };
         }
         
+        // Return ALL frequencies for harmonic fitting (no filtering)
+        function detectAllFrequencies(data) {
+            const n = data.length;
+            if (n < 48) return null;
+            
+            const x = data.map(d => d.x.getTime());
+            const y = data.map(d => d.y);
+            
+            // Remove DC component (mean)
+            const mean = y.reduce((sum, val) => sum + val, 0) / n;
+            const yDetrended = y.map(val => val - mean);
+            
+            // Calculate power spectrum for ALL tidal frequencies (6-48 hour periods)
+            const minPeriodMs = 6 * 60 * 60 * 1000;  // 6 hours minimum
+            const maxPeriodMs = 48 * 60 * 60 * 1000; // 48 hours maximum
+            
+            const frequencies = [];
+            const powers = [];
+            
+            // Test ALL frequencies in the tidal range
+            for (let periodMs = minPeriodMs; periodMs <= maxPeriodMs; periodMs += 30 * 60 * 1000) { // 30-minute steps
+                const omega = 2 * Math.PI / periodMs;
+                
+                let cosSum = 0, sinSum = 0;
+                for (let i = 0; i < n; i++) {
+                    const t = x[i] - x[0];
+                    cosSum += yDetrended[i] * Math.cos(omega * t);
+                    sinSum += yDetrended[i] * Math.sin(omega * t);
+                }
+                
+                const power = (cosSum * cosSum + sinSum * sinSum) / (n * n);
+                frequencies.push(omega);
+                powers.push(power);
+            }
+            
+            // Build array of ALL frequencies with their power
+            const allPeaks = frequencies.map((freq, i) => ({
+                frequency: freq,
+                power: powers[i],
+                periodMs: 2 * Math.PI / freq,
+                periodHours: (2 * Math.PI / freq) / (60 * 60 * 1000)
+            }));
+            
+            // Sort by power (strongest first) but return ALL
+            allPeaks.sort((a, b) => b.power - a.power);
+            return allPeaks;
+        }
+
         // FFT-based frequency analysis to detect dominant tidal periods
         function detectDominantFrequencies(data, maxPeaks = 3, returnAllSignificant = false) {
             const n = data.length;
@@ -459,15 +507,15 @@
             detectedTidalFrequencies = topFreqs;
             updateTidalAnalysisTable(topFreqs);
             
-            // Get all significant frequencies for harmonic fitting
-            const allFreqs = detectDominantFrequencies(data, 5, true);
+            // Get ALL frequencies for harmonic fitting (not just significant ones)
+            const allFreqs = detectAllFrequencies(data);
             if (!allFreqs || allFreqs.length === 0) {
-                console.warn('No significant frequencies found for multi-harmonic fitting');
+                console.warn('No frequencies found for multi-harmonic fitting');
                 return null;
             }
             
-            console.log('Using', allFreqs.length, 'significant frequencies for harmonic fitting');
-            console.log('Frequencies:', allFreqs.map(f => 
+            console.log('Using', allFreqs.length, 'total frequencies for harmonic fitting');
+            console.log('Top frequencies:', allFreqs.slice(0, 10).map(f => 
                 `${f.periodHours.toFixed(2)}h (power: ${f.power.toFixed(6)})`
             ));
             
@@ -480,7 +528,8 @@
             
             // Fit multiple harmonics using simultaneous least squares
             // Model: y = a0 + Σ[An*sin(ωn*t) + Bn*cos(ωn*t)]
-            const numFreqs = Math.min(allFreqs.length, 5); // Reduce to 5 to prevent overfitting
+            // Use more harmonics since we have all frequencies, but limit to prevent overfitting
+            const numFreqs = Math.min(allFreqs.length, 15); // Use up to 15 harmonics from ALL frequencies
             const harmonics = [];
             
             if (numFreqs === 1) {
