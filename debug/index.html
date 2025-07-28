@@ -382,7 +382,8 @@
             
             console.log('Running harmonic analysis on', n, 'data points');
             console.log('First data point:', data[0]);
-            console.log('x type:', typeof data[0].x, 'x value:', data[0].x);
+            console.log('Last data point:', data[data.length - 1]);
+            console.log('Caller stack:', new Error().stack.split('\n')[1]);
             
             const x = data.map(d => d.x.getTime());
             const y = data.map(d => d.y);
@@ -1101,8 +1102,11 @@
                 return;
             }
             
-            // Use water level average data for analysis
-            const waterLevelData = readings.map(r => ({
+            // Use same data filtering as trend lines for consistency
+            const allValidReadings = readings.filter(r => r.rawTimestamp.getTime() > 0);
+            
+            // Use water level average data for analysis (same as trend lines)
+            const waterLevelData = allValidReadings.map(r => ({
                 x: r.rawTimestamp,
                 y: parseFloat(r.waterLevel)
             })).filter(d => !isNaN(d.y));
