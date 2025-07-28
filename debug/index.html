@@ -355,6 +355,9 @@
                 }
                 
                 const power = (cosSum * cosSum + sinSum * sinSum) / (n * n);
+                if (isNaN(power)) {
+                    console.log('NaN power detected:', {omega, cosSum, sinSum, n, power});
+                }
                 frequencies.push(omega);
                 powers.push(power);
             }
@@ -378,6 +381,8 @@
             if (n < 48) return null; // Need more data for FFT analysis
             
             console.log('Running harmonic analysis on', n, 'data points');
+            console.log('First data point:', data[0]);
+            console.log('x type:', typeof data[0].x, 'x value:', data[0].x);
             
             const x = data.map(d => d.x.getTime());
             const y = data.map(d => d.y);
