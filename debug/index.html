@@ -359,18 +359,13 @@
                 powers.push(power);
             }
             
-            // Find peaks in power spectrum
-            const peaks = [];
-            for (let i = 1; i < powers.length - 1; i++) {
-                if (powers[i] > powers[i-1] && powers[i] > powers[i+1] && powers[i] > 0.01) {
-                    peaks.push({
-                        frequency: frequencies[i],
-                        power: powers[i],
-                        periodMs: 2 * Math.PI / frequencies[i],
-                        periodHours: (2 * Math.PI / frequencies[i]) / (60 * 60 * 1000)
-                    });
-                }
-            }
+            // Build array of all frequencies with their power
+            const peaks = frequencies.map((freq, i) => ({
+                frequency: freq,
+                power: powers[i],
+                periodMs: 2 * Math.PI / freq,
+                periodHours: (2 * Math.PI / freq) / (60 * 60 * 1000)
+            }));
             
             // Sort by power and return top peaks
             peaks.sort((a, b) => b.power - a.power);
