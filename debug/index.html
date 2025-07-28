@@ -323,7 +323,7 @@
         }
         
         // FFT-based frequency analysis to detect dominant tidal periods
-        function detectDominantFrequencies(data, maxPeaks = 3) {
+        function detectDominantFrequencies(data, maxPeaks = 3, returnAllSignificant = false) {
             const n = data.length;
             if (n < 48) return null; // Need at least 48 points for reliable FFT
             
@@ -370,17 +370,26 @@
                 periodHours: (2 * Math.PI / freq) / (60 * 60 * 1000)
             }));
             
-            // Sort by power and return top peaks
+            // Sort by power
             peaks.sort((a, b) => b.power - a.power);
-            return peaks.slice(0, maxPeaks);
+            
+            if (returnAllSignificant) {
+                // Return all frequencies with power above 10% of the strongest peak
+                const maxPower = peaks[0].power;
+                const threshold = maxPower * 0.1;
+                return peaks.filter(peak => peak.power >= threshold);
+            } else {
+                // Return top peaks for table display
+                return peaks.slice(0, maxPeaks);
+            }
         }
         
-        // Compute harmonic coefficients using detected frequencies
+        // Compute harmonic coefficients using all significant detected frequencies
         function computeWaterLevelHarmonics(data) {
             const n = data.length;
             if (n < 48) return null; // Need more data for FFT analysis
             
-            console.log('Running harmonic analysis on', n, 'data points');
+            console.log('Running multi-harmonic analysis on', n, 'data points');
             console.log('First data point:', data[0]);
             console.log('Last data point:', data[data.length - 1]);
             console.log('Caller stack:', new Error().stack.split('\n')[1]);
@@ -388,25 +397,28 @@
             const x = data.map(d => d.x.getTime());
             const y = data.map(d => d.y);
             
-            // Detect dominant frequencies using FFT analysis
-            const dominantFreqs = detectDominantFrequencies(data, 5); // Get 5 for table display
-            if (!dominantFreqs || dominantFreqs.length === 0) {
-                // No reliable frequencies detected - skip harmonic analysis
+            // Get frequencies for table display (top 5)
+            const topFreqs = detectDominantFrequencies(data, 5, false);
+            if (!topFreqs || topFreqs.length === 0) {
                 console.warn('FFT analysis failed to detect reliable tidal frequencies - skipping harmonic trends');
                 return null;
             }
             
-            console.log('Detected tidal periods:', dominantFreqs.map(f => 
-                `${f.periodHours.toFixed(2)}h (power: ${f.power.toFixed(4)})`
-            ));
-            
             // Store frequencies for table display and update table immediately
-            detectedTidalFrequencies = dominantFreqs;
-            updateTidalAnalysisTable(dominantFreqs);
+            detectedTidalFrequencies = topFreqs;
+            updateTidalAnalysisTable(topFreqs);
             
-            // Use the strongest frequency for single harmonic fitting
-            const primaryFreq = dominantFreqs[0];
-            const a2 = primaryFreq.frequency; // Angular frequency (data-driven)
+            // Get all significant frequencies for harmonic fitting
+            const allFreqs = detectDominantFrequencies(data, 5, true);
+            if (!allFreqs || allFreqs.length === 0) {
+                console.warn('No significant frequencies found for multi-harmonic fitting');
+                return null;
+            }
+            
+            console.log('Using', allFreqs.length, 'significant frequencies for harmonic fitting');
+            console.log('Frequencies:', allFreqs.map(f => 
+                `${f.periodHours.toFixed(2)}h (power: ${f.power.toFixed(6)})`
+            ));
             
             // Calculate DC component (mean water level)
             let sum_y = 0;
@@ -415,71 +427,85 @@
             }
             const a0 = sum_y / n;
             
-            // Use least squares to find amplitude (a1) and phase (a3)
-            // We fit: y = a0 + a1*sin(a2*t + a3)
-            // Expanding: y = a0 + a1*sin(a2*t)*cos(a3) + a1*cos(a2*t)*sin(a3)
-            // Let: A = a1*cos(a3), B = a1*sin(a3)
-            // Then: y = a0 + A*sin(a2*t) + B*cos(a2*t)
+            // Fit multiple harmonics using least squares
+            // Model: y = a0 + Σ[An*sin(ωn*t) + Bn*cos(ωn*t)]
+            const numFreqs = Math.min(allFreqs.length, 10); // Limit to 10 harmonics to prevent overfitting
+            const harmonics = [];
             
-            let sum_sin = 0;
-            let sum_cos = 0;
-            let sum_y_sin = 0;
-            let sum_y_cos = 0;
-            let sum_sin2 = 0;
-            let sum_cos2 = 0;
-            let sum_sin_cos = 0;
-            
-            for (let i = 0; i < n; i++) {
-                const t = x[i] - x[0]; // Normalize time to start from 0
-                const sinVal = Math.sin(a2 * t);
-                const cosVal = Math.cos(a2 * t);
-                const y_offset = y[i] - a0; // Remove DC component
+            // For each frequency, compute amplitude and phase using least squares
+            for (let freqIdx = 0; freqIdx < numFreqs; freqIdx++) {
+                const omega = allFreqs[freqIdx].frequency;
                 
-                sum_sin += sinVal;
-                sum_cos += cosVal;
-                sum_y_sin += y_offset * sinVal;
-                sum_y_cos += y_offset * cosVal;
-                sum_sin2 += sinVal * sinVal;
-                sum_cos2 += cosVal * cosVal;
-                sum_sin_cos += sinVal * cosVal;
+                let sum_sin2 = 0;
+                let sum_cos2 = 0;
+                let sum_sin_cos = 0;
+                let sum_y_sin = 0;
+                let sum_y_cos = 0;
+                
+                for (let i = 0; i < n; i++) {
+                    const t = x[i] - x[0]; // Normalize time to start from 0
+                    const sinVal = Math.sin(omega * t);
+                    const cosVal = Math.cos(omega * t);
+                    const y_offset = y[i] - a0; // Remove DC component
+                    
+                    sum_sin2 += sinVal * sinVal;
+                    sum_cos2 += cosVal * cosVal;
+                    sum_sin_cos += sinVal * cosVal;
+                    sum_y_sin += y_offset * sinVal;
+                    sum_y_cos += y_offset * cosVal;
+                }
+                
+                // Solve 2x2 system for A and B using Cramer's rule
+                const det = sum_sin2 * sum_cos2 - sum_sin_cos * sum_sin_cos;
+                
+                let A, B;
+                if (Math.abs(det) > 1e-10) {
+                    A = (sum_y_sin * sum_cos2 - sum_y_cos * sum_sin_cos) / det;
+                    B = (sum_y_cos * sum_sin2 - sum_y_sin * sum_sin_cos) / det;
+                } else {
+                    // Handle near-singular matrix
+                    A = 0;
+                    B = 0;
+                }
+                
+                // Convert to amplitude and phase
+                const amplitude = Math.sqrt(A * A + B * B);
+                const phase = Math.atan2(B, A);
+                
+                harmonics.push({
+                    omega: omega,
+                    amplitude: amplitude,
+                    phase: phase,
+                    periodMs: allFreqs[freqIdx].periodMs,
+                    periodHours: allFreqs[freqIdx].periodHours,
+                    power: allFreqs[freqIdx].power
+                });
             }
-            
-            // Solve 2x2 system for A and B using Cramer's rule
-            const det = sum_sin2 * sum_cos2 - sum_sin_cos * sum_sin_cos;
-            
-            let A, B;
-            if (Math.abs(det) > 1e-10) {
-                A = (sum_y_sin * sum_cos2 - sum_y_cos * sum_sin_cos) / det;
-                B = (sum_y_cos * sum_sin2 - sum_y_sin * sum_sin_cos) / det;
-            } else {
-                // Handle near-singular matrix (very little variation at this frequency)
-                A = 0;
-                B = 0;
-            }
-            
-            // Convert back to amplitude and phase
-            const a1 = Math.sqrt(A * A + B * B); // Amplitude
-            const a3 = Math.atan2(B, A); // Phase shift
             
             return {
-                a0: a0,      // DC offset (mean level)
-                a1: a1,      // Amplitude
-                a2: a2,      // Angular frequency (detected from data)
-                a3: a3,      // Phase shift
+                a0: a0,           // DC offset (mean level)
+                harmonics: harmonics, // Array of harmonic components
                 startTime: x[0],
-                period: primaryFreq.periodMs,
-                detectedPeriodHours: primaryFreq.periodHours,
-                detectedPower: primaryFreq.power
+                primaryPeriod: topFreqs[0].periodMs,
+                primaryPeriodHours: topFreqs[0].periodHours,
+                primaryPower: topFreqs[0].power
             };
         }
         
-        // Evaluate harmonic function: a0 + a1*sin(a2*t + a3)
-        function evaluateWaterLevelHarmonics(harmonics, xValues) {
+        // Evaluate multi-harmonic function: a0 + Σ[An*sin(ωn*t + φn)]
+        function evaluateWaterLevelHarmonics(harmonicData, xValues) {
             const points = [];
             
             for (const targetX of xValues) {
-                const t = targetX.getTime() - harmonics.startTime;
-                const y = harmonics.a0 + harmonics.a1 * Math.sin(harmonics.a2 * t + harmonics.a3);
+                const t = targetX.getTime() - harmonicData.startTime;
+                
+                // Start with DC component
+                let y = harmonicData.a0;
+                
+                // Add all harmonic components
+                for (const harmonic of harmonicData.harmonics) {
+                    y += harmonic.amplitude * Math.sin(harmonic.omega * t + harmonic.phase);
+                }
                 
                 points.push({
                     x: targetX,
