@@ -386,12 +386,12 @@
             return Math.pow(2, Math.ceil(Math.log2(n)));
         }
 
-        // Return ALL frequencies for harmonic fitting using optimized DFT for exact frequencies
+        // Return ALL frequencies for harmonic fitting using FFT with heavy zero-padding for fine resolution
         function detectAllFrequencies(data) {
             const n = data.length;
             if (n < 48) return null;
             
-            console.log('Using optimized DFT for exact frequency detection with', n, 'data points');
+            console.log('Using FFT with heavy zero-padding for exact frequency detection with', n, 'data points');
             
             const x = data.map(d => d.x.getTime());
             const y = data.map(d => d.y);
@@ -400,40 +400,70 @@
             const mean = y.reduce((sum, val) => sum + val, 0) / n;
             const yDetrended = y.map(val => val - mean);
             
-            // Pre-compute time values relative to start (for efficiency)
-            const timeValues = x.map(t => t - x[0]);
+            // Heavy zero-padding for ultra-fine frequency resolution
+            // Use much larger FFT size to get bins close to our desired 1-minute frequency steps
+            const fftSize = 32768; // Large FFT for fine resolution
+            const paddedSignal = [];
             
-            // Calculate power spectrum for ALL tidal frequencies (6-48 hour periods)
-            const minPeriodMs = 6 * 60 * 60 * 1000;  // 6 hours minimum
-            const maxPeriodMs = 48 * 60 * 60 * 1000; // 48 hours maximum
+            for (let i = 0; i < fftSize; i++) {
+                if (i < n) {
+                    paddedSignal.push({ real: yDetrended[i], imag: 0 });
+                } else {
+                    paddedSignal.push({ real: 0, imag: 0 }); // Heavy zero padding
+                }
+            }
+            
+            console.log('Computing FFT with size', fftSize, 'for ultra-fine resolution');
+            
+            // Compute FFT
+            const fftResult = fft(paddedSignal);
+            
+            // Calculate sampling parameters
+            const timeSpanMs = x[x.length - 1] - x[0];
+            const samplingRateHz = (n - 1) / (timeSpanMs / 1000);
+            const frequencyResolutionHz = samplingRateHz / fftSize;
+            
+            console.log('FFT frequency resolution:', frequencyResolutionHz, 'Hz');
+            
+            // For each desired 1-minute frequency step, find the closest FFT bin
+            const minPeriodMs = 6 * 60 * 60 * 1000;  // 6 hours
+            const maxPeriodMs = 48 * 60 * 60 * 1000; // 48 hours
             
             const allPeaks = [];
             
-            // Use exact 1-minute steps for precise frequency control
+            // Generate exact frequencies we want (1-minute steps)
             for (let periodMs = minPeriodMs; periodMs <= maxPeriodMs; periodMs += 60 * 1000) {
-                const omega = 2 * Math.PI / periodMs;
+                const desiredFreqHz = 1 / (periodMs / 1000);
+                const omega = 2 * Math.PI * desiredFreqHz;
                 
-                let cosSum = 0, sinSum = 0;
+                // Find closest FFT bin
+                const closestBin = Math.round(desiredFreqHz / frequencyResolutionHz);
                 
-                // Optimized inner loop - pre-compute sin/cos for all time points
-                for (let i = 0; i < n; i++) {
-                    const angle = omega * timeValues[i];
-                    cosSum += yDetrended[i] * Math.cos(angle);
-                    sinSum += yDetrended[i] * Math.sin(angle);
-                }
+                // Safety bounds check
+                if (closestBin < 1 || closestBin >= fftSize / 2) continue;
                 
-                // Calculate power - keep original scaling
-                const power = (cosSum * cosSum + sinSum * sinSum) / (n * n);
+                // Get power from FFT result
+                const real = fftResult[closestBin].real;
+                const imag = fftResult[closestBin].imag;
+                
+                // Use standard FFT power scaling
+                const power = (real * real + imag * imag) / (n * n);
                 
                 allPeaks.push({
                     frequency: omega,
                     power: power,
                     periodMs: periodMs,
-                    periodHours: periodMs / (60 * 60 * 1000)
+                    periodHours: periodMs / (60 * 60 * 1000),
+                    fftBin: closestBin,
+                    actualFreqHz: closestBin * frequencyResolutionHz,
+                    desiredFreqHz: desiredFreqHz
                 });
             }
             
-            console.log('Optimized DFT extracted', allPeaks.length, 'exact frequencies in tidal range');
+            console.log('FFT extracted', allPeaks.length, 'frequencies with fine resolution');
+            console.log('Sample frequency matches:', allPeaks.slice(0, 3).map(p => 
+                `Period: ${p.periodHours.toFixed(2)}h, Desired: ${p.desiredFreqHz.toFixed(8)}Hz, Actual: ${p.actualFreqHz.toFixed(8)}Hz, Error: ${Math.abs(p.desiredFreqHz - p.actualFreqHz).toFixed(10)}Hz`
+            ));
             
             // Sort by power (strongest first) but return ALL
             allPeaks.sort((a, b) => b.power - a.power);
