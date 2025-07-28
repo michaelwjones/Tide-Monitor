@@ -1149,9 +1149,14 @@
                 const tidalType = getTidalType(freq.periodHours);
                 
                 const row = document.createElement('tr');
+                const periodMinutes = Math.round(freq.periodHours * 60);
+                const displayHours = Math.floor(periodMinutes / 60);
+                const displayMins = periodMinutes % 60;
+                const periodDisplay = displayMins === 0 ? `${displayHours}h` : `${displayHours}h ${displayMins}m`;
+                
                 row.innerHTML = `
                     <td>${index + 1}</td>
-                    <td>${freq.periodHours.toFixed(2)}</td>
+                    <td>${periodDisplay}</td>
                     <td>${cyclesPerDay.toFixed(3)}</td>
                     <td>${freq.power.toFixed(6)}</td>
                     <td>${tidalType}</td>
