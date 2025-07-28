@@ -400,9 +400,9 @@
             const mean = y.reduce((sum, val) => sum + val, 0) / n;
             const yDetrended = y.map(val => val - mean);
             
-            // Heavy zero-padding for ultra-fine frequency resolution
-            // Use much larger FFT size to get bins close to our desired 1-minute frequency steps
-            const fftSize = 32768; // Large FFT for fine resolution
+            // Reasonable zero-padding for good frequency resolution without being too slow
+            // Use 4x padding - good balance of speed and resolution
+            const fftSize = Math.max(nextPowerOf2(n * 4), 2048); // 4x padding, minimum 2048
             const paddedSignal = [];
             
             for (let i = 0; i < fftSize; i++) {
@@ -413,7 +413,7 @@
                 }
             }
             
-            console.log('Computing FFT with size', fftSize, 'for ultra-fine resolution');
+            console.log('Computing FFT with size', fftSize, 'for balanced speed/resolution');
             
             // Compute FFT
             const fftResult = fft(paddedSignal);
