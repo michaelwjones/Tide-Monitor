@@ -322,10 +322,76 @@
             };
         }
         
-        // Return ALL frequencies for harmonic fitting (no filtering)
+        // Fast FFT implementation using Cooley-Tukey algorithm
+        function fft(signal) {
+            const n = signal.length;
+            if (n <= 1) return signal;
+            
+            // Base case
+            if (n === 2) {
+                const even = signal[0];
+                const odd = signal[1];
+                return [
+                    { real: even.real + odd.real, imag: even.imag + odd.imag },
+                    { real: even.real - odd.real, imag: even.imag - odd.imag }
+                ];
+            }
+            
+            // Divide
+            const even = [];
+            const odd = [];
+            for (let i = 0; i < n; i++) {
+                if (i % 2 === 0) {
+                    even.push(signal[i]);
+                } else {
+                    odd.push(signal[i]);
+                }
+            }
+            
+            // Conquer
+            const evenFFT = fft(even);
+            const oddFFT = fft(odd);
+            
+            // Combine
+            const result = new Array(n);
+            for (let k = 0; k < n / 2; k++) {
+                const angle = -2 * Math.PI * k / n;
+                const twiddle = {
+                    real: Math.cos(angle),
+                    imag: Math.sin(angle)
+                };
+                
+                // Complex multiplication: twiddle * oddFFT[k]
+                const twiddledOdd = {
+                    real: twiddle.real * oddFFT[k].real - twiddle.imag * oddFFT[k].imag,
+                    imag: twiddle.real * oddFFT[k].imag + twiddle.imag * oddFFT[k].real
+                };
+                
+                result[k] = {
+                    real: evenFFT[k].real + twiddledOdd.real,
+                    imag: evenFFT[k].imag + twiddledOdd.imag
+                };
+                
+                result[k + n / 2] = {
+                    real: evenFFT[k].real - twiddledOdd.real,
+                    imag: evenFFT[k].imag - twiddledOdd.imag
+                };
+            }
+            
+            return result;
+        }
+
+        // Find next power of 2 greater than or equal to n
+        function nextPowerOf2(n) {
+            return Math.pow(2, Math.ceil(Math.log2(n)));
+        }
+
+        // Return ALL frequencies for harmonic fitting using FFT
         function detectAllFrequencies(data) {
             const n = data.length;
             if (n < 48) return null;
+            
+            console.log('Using FFT for frequency detection with', n, 'data points');
             
             const x = data.map(d => d.x.getTime());
             const y = data.map(d => d.y);
@@ -334,36 +400,60 @@
             const mean = y.reduce((sum, val) => sum + val, 0) / n;
             const yDetrended = y.map(val => val - mean);
             
-            // Calculate power spectrum for ALL tidal frequencies (6-48 hour periods)
-            const minPeriodMs = 6 * 60 * 60 * 1000;  // 6 hours minimum
-            const maxPeriodMs = 48 * 60 * 60 * 1000; // 48 hours maximum
+            // Pad to next power of 2 for FFT efficiency
+            const fftSize = nextPowerOf2(n);
+            const paddedSignal = [];
             
-            const frequencies = [];
-            const powers = [];
-            
-            // Test ALL frequencies in the tidal range
-            for (let periodMs = minPeriodMs; periodMs <= maxPeriodMs; periodMs += 60 * 1000) { // 1-minute steps
-                const omega = 2 * Math.PI / periodMs;
-                
-                let cosSum = 0, sinSum = 0;
-                for (let i = 0; i < n; i++) {
-                    const t = x[i] - x[0];
-                    cosSum += yDetrended[i] * Math.cos(omega * t);
-                    sinSum += yDetrended[i] * Math.sin(omega * t);
+            for (let i = 0; i < fftSize; i++) {
+                if (i < n) {
+                    paddedSignal.push({ real: yDetrended[i], imag: 0 });
+                } else {
+                    paddedSignal.push({ real: 0, imag: 0 }); // Zero padding
                 }
-                
-                const power = (cosSum * cosSum + sinSum * sinSum) / (n * n);
-                frequencies.push(omega);
-                powers.push(power);
             }
             
-            // Build array of ALL frequencies with their power
-            const allPeaks = frequencies.map((freq, i) => ({
-                frequency: freq,
-                power: powers[i],
-                periodMs: 2 * Math.PI / freq,
-                periodHours: (2 * Math.PI / freq) / (60 * 60 * 1000)
-            }));
+            // Compute FFT
+            const fftResult = fft(paddedSignal);
+            
+            // Calculate sampling parameters
+            const timeSpanMs = x[x.length - 1] - x[0];
+            const samplingRateHz = (n - 1) / (timeSpanMs / 1000); // samples per second
+            const frequencyResolutionHz = samplingRateHz / fftSize;
+            
+            // Extract tidal frequencies (6-48 hour periods)
+            const minPeriodMs = 6 * 60 * 60 * 1000;  // 6 hours
+            const maxPeriodMs = 48 * 60 * 60 * 1000; // 48 hours
+            const minFreqHz = 1 / (maxPeriodMs / 1000); // Hz for 48 hours
+            const maxFreqHz = 1 / (minPeriodMs / 1000); // Hz for 6 hours
+            
+            const minBin = Math.max(1, Math.floor(minFreqHz / frequencyResolutionHz));
+            const maxBin = Math.min(fftSize / 2, Math.ceil(maxFreqHz / frequencyResolutionHz));
+            
+            const allPeaks = [];
+            
+            // Extract power and frequency for each bin in tidal range
+            for (let bin = minBin; bin <= maxBin; bin++) {
+                const frequencyHz = bin * frequencyResolutionHz;
+                const omega = 2 * Math.PI * frequencyHz; // rad/s
+                const periodMs = 2 * Math.PI / omega * 1000; // Convert to ms
+                
+                // Skip if outside our desired range (safety check)
+                if (periodMs < minPeriodMs || periodMs > maxPeriodMs) continue;
+                
+                // Calculate power from complex FFT result
+                const real = fftResult[bin].real;
+                const imag = fftResult[bin].imag;
+                const power = (real * real + imag * imag) / (n * n);
+                
+                allPeaks.push({
+                    frequency: omega,
+                    power: power,
+                    periodMs: periodMs,
+                    periodHours: periodMs / (60 * 60 * 1000)
+                });
+            }
+            
+            console.log('FFT extracted', allPeaks.length, 'frequencies in tidal range');
             
             // Sort by power (strongest first) but return ALL
             allPeaks.sort((a, b) => b.power - a.power);
@@ -372,63 +462,18 @@
 
         // FFT-based frequency analysis to detect dominant tidal periods
         function detectDominantFrequencies(data, maxPeaks = 3, returnAllSignificant = false) {
-            const n = data.length;
-            if (n < 48) return null; // Need at least 48 points for reliable FFT
-            
-            const x = data.map(d => d.x.getTime());
-            const y = data.map(d => d.y);
-            
-            // Remove DC component (mean)
-            const mean = y.reduce((sum, val) => sum + val, 0) / n;
-            const yDetrended = y.map(val => val - mean);
-            
-            // Calculate power spectrum using simplified DFT for key frequencies
-            // We'll focus on tidal frequencies (6-48 hour periods)
-            const minPeriodMs = 6 * 60 * 60 * 1000;  // 6 hours minimum
-            const maxPeriodMs = 48 * 60 * 60 * 1000; // 48 hours maximum
-            const timeSpanMs = x[x.length - 1] - x[0];
-            
-            const frequencies = [];
-            const powers = [];
-            
-            // Test frequencies corresponding to periods from 6 to 48 hours
-            for (let periodMs = minPeriodMs; periodMs <= maxPeriodMs; periodMs += 60 * 1000) { // 1-minute steps
-                const omega = 2 * Math.PI / periodMs;
-                
-                let cosSum = 0, sinSum = 0;
-                for (let i = 0; i < n; i++) {
-                    const t = x[i] - x[0];
-                    cosSum += yDetrended[i] * Math.cos(omega * t);
-                    sinSum += yDetrended[i] * Math.sin(omega * t);
-                }
-                
-                const power = (cosSum * cosSum + sinSum * sinSum) / (n * n);
-                if (isNaN(power)) {
-                    console.log('NaN power detected:', {omega, cosSum, sinSum, n, power});
-                }
-                frequencies.push(omega);
-                powers.push(power);
-            }
-            
-            // Build array of all frequencies with their power
-            const peaks = frequencies.map((freq, i) => ({
-                frequency: freq,
-                power: powers[i],
-                periodMs: 2 * Math.PI / freq,
-                periodHours: (2 * Math.PI / freq) / (60 * 60 * 1000)
-            }));
-            
-            // Sort by power
-            peaks.sort((a, b) => b.power - a.power);
+            // Use the same FFT-based detection as detectAllFrequencies
+            const allFreqs = detectAllFrequencies(data);
+            if (!allFreqs || allFreqs.length === 0) return null;
             
             if (returnAllSignificant) {
                 // Return all frequencies with power above 10% of the strongest peak
-                const maxPower = peaks[0].power;
+                const maxPower = allFreqs[0].power;
                 const threshold = maxPower * 0.1;
-                return peaks.filter(peak => peak.power >= threshold);
+                return allFreqs.filter(peak => peak.power >= threshold);
             } else {
                 // Return top peaks for table display
-                return peaks.slice(0, maxPeaks);
+                return allFreqs.slice(0, maxPeaks);
             }
         }
         
