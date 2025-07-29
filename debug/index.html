@@ -588,21 +588,22 @@
                 `${f.periodHours.toFixed(2)}h (power: ${f.power.toFixed(6)})`
             ));
             
-            // Calculate DC component (mean water level)
-            let sum_y = 0;
-            for (let i = 0; i < n; i++) {
-                sum_y += y[i];
-            }
-            const a0 = sum_y / n;
+            // Get DC component directly from FFT bin 0
+            const a0 = fftResult[0].real / n; // DC component from FFT
+            console.log('DC component from FFT:', a0.toFixed(4));
             
-            // Use FFT amplitudes and phases directly - no least squares fitting needed!
-            console.log('Using direct FFT reconstruction with', allFreqs.length, 'harmonics');
+            // Use only the strongest harmonics to avoid artifacts from weak components
+            const maxHarmonics = Math.min(allFreqs.length, 10); // Limit to top 10 harmonics
+            const strongFreqs = allFreqs.slice(0, maxHarmonics); // Already sorted by power
+            
+            console.log('Using direct FFT reconstruction with', strongFreqs.length, 'strongest harmonics');
+            console.log('Amplitude range:', strongFreqs[0].amplitude.toFixed(4), 'to', strongFreqs[strongFreqs.length-1].amplitude.toFixed(4));
             
             const harmonics = [];
             
-            // Simply copy the FFT amplitude and phase for each frequency
-            for (let freqIdx = 0; freqIdx < allFreqs.length; freqIdx++) {
-                const freq = allFreqs[freqIdx];
+            // Use only the strongest harmonics for cleaner reconstruction
+            for (let freqIdx = 0; freqIdx < strongFreqs.length; freqIdx++) {
+                const freq = strongFreqs[freqIdx];
                 
                 harmonics.push({
                     omega: freq.frequency,
