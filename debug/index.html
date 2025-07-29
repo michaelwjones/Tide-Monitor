@@ -396,9 +396,12 @@
             const x = data.map(d => d.x.getTime());
             const y = data.map(d => d.y);
             
-            // Remove DC component (mean)
-            const mean = y.reduce((sum, val) => sum + val, 0) / n;
-            const yDetrended = y.map(val => val - mean);
+            // Calculate original signal mean (this is our true DC component)
+            const originalMean = y.reduce((sum, val) => sum + val, 0) / n;
+            console.log('Original signal mean (DC):', originalMean.toFixed(4));
+            
+            // Remove DC component for FFT processing
+            const yDetrended = y.map(val => val - originalMean);
             
             // Use data size directly - no padding
             const fftSize = nextPowerOf2(n); // No padding, just round up to power of 2
@@ -416,10 +419,6 @@
             
             // Compute FFT
             const fftResult = fft(paddedSignal);
-            
-            // Extract DC component from FFT bin 0
-            const dcComponent = fftResult[0].real / n;
-            console.log('DC component from FFT:', dcComponent.toFixed(4));
             
             // Calculate sampling parameters
             const timeSpanMs = x[x.length - 1] - x[0];
@@ -472,7 +471,7 @@
                     fftBin: bin,
                     fftReal: real,
                     fftImag: imag,
-                    dcComponent: dcComponent // ← Pass DC component through
+                    dcComponent: originalMean // ← Pass original signal mean as DC component
                 });
             }
             
