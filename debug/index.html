@@ -391,14 +391,12 @@
             const n = data.length;
             if (n < 48) return null;
             
-            console.log('Using FFT for frequency detection with', n, 'data points');
             
             const x = data.map(d => d.x.getTime());
             const y = data.map(d => d.y);
             
             // Calculate original signal mean (this is our true DC component)
             const originalMean = y.reduce((sum, val) => sum + val, 0) / n;
-            console.log('Original signal mean (DC):', originalMean.toFixed(4));
             
             // Remove DC component for FFT processing
             const yDetrended = y.map(val => val - originalMean);
@@ -415,7 +413,6 @@
                 }
             }
             
-            console.log('Computing FFT with size', fftSize);
             
             // Compute FFT
             const fftResult = fft(paddedSignal);
@@ -425,9 +422,6 @@
             const samplingRateHz = (n - 1) / (timeSpanMs / 1000);
             const frequencyResolutionHz = samplingRateHz / fftSize;
             
-            console.log('FFT frequency resolution:', frequencyResolutionHz, 'Hz');
-            console.log('Time span:', timeSpanMs / 1000 / 3600, 'hours');
-            console.log('Sampling rate:', samplingRateHz, 'Hz');
             
             // Extract tidal frequencies (6-48 hour periods)
             const minPeriodMs = 6 * 60 * 60 * 1000;  // 6 hours
@@ -438,8 +432,6 @@
             const minBin = Math.max(1, Math.floor(minFreqHz / frequencyResolutionHz));
             const maxBin = Math.min(fftSize / 2, Math.ceil(maxFreqHz / frequencyResolutionHz));
             
-            console.log('Frequency range:', minFreqHz, 'to', maxFreqHz, 'Hz');
-            console.log('Bin range:', minBin, 'to', maxBin);
             
             const allPeaks = [];
             
@@ -475,13 +467,6 @@
                 });
             }
             
-            console.log('FFT extracted', allPeaks.length, 'frequencies');
-            console.log('Frequency range check:');
-            console.log('  Min period should be 6h, got:', (allPeaks[allPeaks.length-1].periodHours).toFixed(2), 'h');
-            console.log('  Max period should be 48h, got:', (allPeaks[0].periodHours).toFixed(2), 'h');
-            console.log('Sample results:', allPeaks.slice(0, 5).map(p => 
-                `Bin: ${p.fftBin}, Period: ${p.periodHours.toFixed(2)}h, Freq: ${(p.frequency/(2*Math.PI)).toFixed(6)}Hz, Amplitude: ${p.amplitude.toFixed(4)}`
-            ));
             
             // Sort by power (strongest first) but return ALL
             allPeaks.sort((a, b) => b.power - a.power);
@@ -561,10 +546,6 @@
             const n = data.length;
             if (n < 48) return null; // Need more data for FFT analysis
             
-            console.log('Running multi-harmonic analysis on', n, 'data points');
-            console.log('First data point:', data[0]);
-            console.log('Last data point:', data[data.length - 1]);
-            console.log('Caller stack:', new Error().stack.split('\n')[1]);
             
             const x = data.map(d => d.x.getTime());
             const y = data.map(d => d.y);
@@ -587,21 +568,14 @@
                 return null;
             }
             
-            console.log('Using', allFreqs.length, 'total frequencies for harmonic fitting');
-            console.log('Top frequencies:', allFreqs.slice(0, 10).map(f => 
-                `${f.periodHours.toFixed(2)}h (power: ${f.power.toFixed(6)})`
-            ));
             
             // Get DC component from the frequency data (all frequencies have the same DC component)
             const a0 = allFreqs.length > 0 ? allFreqs[0].dcComponent : 0;
-            console.log('Using DC component:', a0.toFixed(4));
             
             // Use only the strongest harmonics to avoid artifacts from weak components
             const maxHarmonics = Math.min(allFreqs.length, 10); // Limit to top 10 harmonics
             const strongFreqs = allFreqs.slice(0, maxHarmonics); // Already sorted by power
             
-            console.log('Using direct FFT reconstruction with', strongFreqs.length, 'strongest harmonics');
-            console.log('Amplitude range:', strongFreqs[0].amplitude.toFixed(4), 'to', strongFreqs[strongFreqs.length-1].amplitude.toFixed(4));
             
             const harmonics = [];
             
@@ -1285,7 +1259,6 @@
             
             // If harmonic analysis failed, try basic FFT as fallback
             if (!harmonics) {
-                console.log('Harmonic analysis failed, trying basic FFT...');
                 const dominantFreqs = detectDominantFrequencies(waterLevelData, 5);
                 updateTidalAnalysisTable(dominantFreqs);
             }
@@ -1295,10 +1268,8 @@
         function updateTidalAnalysisTable(frequencies) {
             const tableBody = document.getElementById('tidalAnalysisBody');
             
-            console.log('Updating tidal table with frequencies:', frequencies);
             
             if (!frequencies || frequencies.length === 0) {
-                console.log('No frequencies to display in table');
                 tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999;">No reliable tidal frequencies detected</td></tr>';
                 return;
             }
