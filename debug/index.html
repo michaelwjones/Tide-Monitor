@@ -299,28 +299,6 @@
 
         // Water Level Harmonics Functions
         
-        // Prepare data for harmonic analysis (Water Level category)
-        function prepareWaterLevelHarmonicData(data) {
-            const n = data.length;
-            if (n < 10) return null; // Need enough points for harmonic analysis
-            
-            // Sort data by x value and remove duplicates
-            const sortedData = [...data].sort((a, b) => a.x.getTime() - b.x.getTime());
-            const uniqueData = [];
-            
-            for (let i = 0; i < sortedData.length; i++) {
-                if (i === 0 || sortedData[i].x.getTime() !== sortedData[i-1].x.getTime()) {
-                    uniqueData.push(sortedData[i]);
-                }
-            }
-            
-            if (uniqueData.length < 10) return null;
-            
-            return {
-                data: uniqueData,
-                type: 'harmonics'
-            };
-        }
         
         // Fast FFT implementation using Cooley-Tukey algorithm
         function fft(signal) {
@@ -628,20 +606,20 @@
         }
         
         // Generate harmonic trend line data points for Water Level category
-        function generateWaterLevelTrendLine(data, harmonicData) {
-            if (!harmonicData || !harmonicData.data || harmonicData.data.length < 10) return [];
+        function generateWaterLevelTrendLine(displayData, analysisData) {
+            if (!analysisData || analysisData.length < 48) return [];
             
-            // Compute harmonic coefficients
-            const harmonics = computeWaterLevelHarmonics(harmonicData.data);
+            // Compute harmonic coefficients from analysis data
+            const harmonics = computeWaterLevelHarmonics(analysisData);
             if (!harmonics) return [];
             
-            // Generate evaluation points for smooth curve
-            const firstTime = harmonicData.data[0].x.getTime();
-            const lastTime = harmonicData.data[harmonicData.data.length - 1].x.getTime();
+            // Generate evaluation points for smooth curve using display data timeframe
+            const firstTime = displayData[0].x.getTime();
+            const lastTime = displayData[displayData.length - 1].x.getTime();
             const timeRange = lastTime - firstTime;
             
             const evalPoints = [];
-            const numPoints = Math.min(200, harmonicData.data.length * 2); // Harmonics need fewer points
+            const numPoints = Math.min(200, displayData.length * 2); // Harmonics need fewer points
             
             for (let i = 0; i <= numPoints; i++) {
                 const t = i / numPoints;
@@ -1024,29 +1002,22 @@
             // Calculate and add harmonic trend lines
             waterLevelConfigs.forEach(config => {
                 if (config.analysisData.length >= 48) { // Need at least 48 points for FFT analysis
-                    // Use full 72hr data for harmonic analysis
-                    const harmonicData = prepareWaterLevelHarmonicData(config.analysisData);
+                    // Generate trend line directly from analysis data
+                    const trendData = generateWaterLevelTrendLine(config.displayData, config.analysisData);
                     
-                    if (harmonicData) {
-                        // Generate trend line for display period only
-                        const trendData = generateWaterLevelTrendLine(config.displayData, harmonicData);
-                        
-                        if (trendData && trendData.length > 0) {
-                            debugChartInstance.data.datasets.push({
-                                label: config.label,
-                                data: trendData,
-                                borderColor: config.borderColor,
-                                backgroundColor: 'transparent',
-                                borderWidth: 3,
-                                pointRadius: 0,
-                                pointHoverRadius: 0,
-                                yAxisID: config.yAxisID,
-                                order: 200 + config.datasetIndex,
-                                borderDash: [15, 10]
-                            });
-                        }
-                    } else {
-                        console.warn(`Failed to prepare harmonic data for ${config.label}`);
+                    if (trendData && trendData.length > 0) {
+                        debugChartInstance.data.datasets.push({
+                            label: config.label,
+                            data: trendData,
+                            borderColor: config.borderColor,
+                            backgroundColor: 'transparent',
+                            borderWidth: 3,
+                            pointRadius: 0,
+                            pointHoverRadius: 0,
+                            yAxisID: config.yAxisID,
+                            order: 200 + config.datasetIndex,
+                            borderDash: [15, 10]
+                        });
                     }
                 }
             });
