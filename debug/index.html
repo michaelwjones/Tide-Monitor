@@ -92,7 +92,7 @@
         </div>
         
         <div style="margin-top: 20px;">
-            <h3>Detected Tidal Frequencies</h3>
+            <h3>All Detected Tidal Frequencies</h3>
             <table id="tidalAnalysisTable" class="tidal-analysis-table">
                 <thead>
                     <tr>
@@ -412,7 +412,8 @@
                 const imag = fftResult[bin].imag;
                 
                 // Use FFT magnitude and phase directly for reconstruction
-                const amplitude = Math.sqrt(real * real + imag * imag) / n; // Proper FFT amplitude scaling
+                const magnitude = Math.sqrt(real * real + imag * imag);
+                const amplitude = bin === 0 ? magnitude / fftSize : (2 * magnitude) / fftSize; // Correct FFT amplitude scaling: DC = mag/N, others = 2*mag/N
                 const phase = -Math.atan2(imag, real); // FFT phase (negative for cosine reconstruction)
                 const power = amplitude * amplitude; // Power for sorting
                 
@@ -426,7 +427,8 @@
                     fftBin: bin,
                     fftReal: real,
                     fftImag: imag,
-                    dcComponent: truncatedMean // ← Pass truncated signal mean as DC component
+                    dcComponent: truncatedMean, // ← Pass truncated signal mean as DC component
+                    truncatedStartTime: truncatedX[0] // ← Pass truncated data start time for proper phase alignment
                 });
             }
             
@@ -504,12 +506,9 @@
                 return null;
             }
             
-            // Get top 5 frequencies for table display (reuse same data)
-            const topFreqs = allFreqs.slice(0, 5);
-            
-            // Store frequencies for table display and update table immediately
-            detectedTidalFrequencies = topFreqs;
-            updateTidalAnalysisTable(topFreqs);
+            // Store all frequencies for table display and update table immediately
+            detectedTidalFrequencies = allFreqs;
+            updateTidalAnalysisTable(allFreqs);
             
             
             // Get DC component from the frequency data (all frequencies have the same DC component)
@@ -539,10 +538,10 @@
             return {
                 a0: a0,           // DC offset (mean level)
                 harmonics: harmonics, // Array of harmonic components
-                startTime: x[0],
-                primaryPeriod: topFreqs[0].periodMs,
-                primaryPeriodHours: topFreqs[0].periodHours,
-                primaryPower: topFreqs[0].power
+                startTime: allFreqs[0].truncatedStartTime, // Use truncated data start time to match FFT reference
+                primaryPeriod: allFreqs[0].periodMs,
+                primaryPeriodHours: allFreqs[0].periodHours,
+                primaryPower: allFreqs[0].power
             };
         }
         
@@ -1197,8 +1196,7 @@
             // If harmonic analysis failed, try basic FFT as fallback
             if (!harmonics) {
                 const allFreqs = detectAllFrequencies(waterLevelData);
-                const topFreqs = allFreqs ? allFreqs.slice(0, 5) : null;
-                updateTidalAnalysisTable(topFreqs);
+                updateTidalAnalysisTable(allFreqs);
             }
         }
         
