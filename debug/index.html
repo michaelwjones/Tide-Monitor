@@ -380,9 +380,10 @@
             // Compute FFT
             const fftResult = fft(signal);
             
-            // Calculate sampling parameters using truncated data
+            // Calculate sampling parameters using truncated data (regular timestamps assumed)
             const timeSpanMs = truncatedX[truncatedX.length - 1] - truncatedX[0];
-            const samplingRateHz = (fftSize - 1) / (timeSpanMs / 1000);
+            const timeSpanSec = timeSpanMs / 1000;
+            const samplingRateHz = (fftSize - 1) / timeSpanSec;
             const frequencyResolutionHz = samplingRateHz / fftSize;
             
             
@@ -427,8 +428,10 @@
                     fftBin: bin,
                     fftReal: real,
                     fftImag: imag,
-                    dcComponent: truncatedMean, // ← Pass truncated signal mean as DC component
-                    truncatedStartTime: truncatedX[0] // ← Pass truncated data start time for proper phase alignment
+                    dcComponent: truncatedMean, // ← DC component from truncated data
+                    truncatedStartTime: truncatedX[0], // ← Start time of FFT window
+                    truncatedEndTime: truncatedX[truncatedX.length - 1], // ← End time of FFT window
+                    timeSpanSec: timeSpanSec // ← Duration of FFT window for proper scaling
                 });
             }
             
@@ -538,8 +541,9 @@
             return {
                 a0: a0,           // DC offset (mean level)
                 harmonics: harmonics, // Array of harmonic components
-                startTime: x[0], // Use original data start time for display alignment
-                truncatedStartTime: allFreqs[0].truncatedStartTime, // Keep truncated reference for phase correction
+                fftStartTime: allFreqs[0].truncatedStartTime, // Start of FFT window
+                fftEndTime: allFreqs[0].truncatedEndTime, // End of FFT window  
+                fftTimeSpan: allFreqs[0].timeSpanSec, // Duration of FFT window in seconds
                 primaryPeriod: allFreqs[0].periodMs,
                 primaryPeriodHours: allFreqs[0].periodHours,
                 primaryPower: allFreqs[0].power
@@ -547,22 +551,23 @@
         }
         
         // Evaluate multi-harmonic function: a0 + Σ[An*cos(ωn*t + φn)]
+        // Maps FFT domain [0, T] back to real timestamps properly
         function evaluateWaterLevelHarmonics(harmonicData, xValues) {
             const points = [];
             
-            // Calculate phase correction for time offset between FFT reference and display range
-            const timeOffset = (harmonicData.startTime - harmonicData.truncatedStartTime) / 1000; // seconds
-            
             for (const targetX of xValues) {
-                const t = (targetX.getTime() - harmonicData.startTime) / 1000; // Convert to SECONDS
+                // Map real timestamp to normalized FFT time domain [0, T]
+                // FFT was computed on window [fftStartTime, fftEndTime] -> [0, fftTimeSpan]
+                const realTime = targetX.getTime();
+                const normalizedTime = (realTime - harmonicData.fftStartTime) / 1000; // seconds from FFT start
                 
                 // Start with DC component
                 let y = harmonicData.a0;
                 
-                // Add all harmonic components with phase correction for time offset
+                // Add all harmonic components using normalized time
+                // FFT phases are already correct for the [0, T] domain
                 for (const harmonic of harmonicData.harmonics) {
-                    const correctedPhase = harmonic.phase - harmonic.omega * timeOffset;
-                    y += harmonic.amplitude * Math.cos(harmonic.omega * t + correctedPhase);
+                    y += harmonic.amplitude * Math.cos(harmonic.omega * normalizedTime + harmonic.phase);
                 }
                 
                 points.push({
