@@ -400,15 +400,15 @@
             const mean = y.reduce((sum, val) => sum + val, 0) / n;
             const yDetrended = y.map(val => val - mean);
             
-            // Use reasonable FFT size - not too big for speed
-            const fftSize = nextPowerOf2(n * 2); // 2x padding for reasonable resolution
+            // Use data size directly - no padding
+            const fftSize = nextPowerOf2(n); // No padding, just round up to power of 2
             const paddedSignal = [];
             
             for (let i = 0; i < fftSize; i++) {
                 if (i < n) {
                     paddedSignal.push({ real: yDetrended[i], imag: 0 });
                 } else {
-                    paddedSignal.push({ real: 0, imag: 0 }); // Zero padding
+                    paddedSignal.push({ real: 0, imag: 0 }); // Minimal padding to reach power of 2
                 }
             }
             
