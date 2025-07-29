@@ -356,10 +356,6 @@
             return result;
         }
 
-        // Find next power of 2 greater than or equal to n
-        function nextPowerOf2(n) {
-            return Math.pow(2, Math.ceil(Math.log2(n)));
-        }
 
         // Return ALL frequencies for harmonic fitting using FFT (back to original approach)
         function detectAllFrequencies(data) {
@@ -376,21 +372,13 @@
             // Remove DC component for FFT processing
             const yDetrended = y.map(val => val - originalMean);
             
-            // Use data size directly - no padding
-            const fftSize = nextPowerOf2(n); // No padding, just round up to power of 2
-            const paddedSignal = [];
-            
-            for (let i = 0; i < fftSize; i++) {
-                if (i < n) {
-                    paddedSignal.push({ real: yDetrended[i], imag: 0 });
-                } else {
-                    paddedSignal.push({ real: 0, imag: 0 }); // Minimal padding to reach power of 2
-                }
-            }
+            // Use data size directly - should already be power of 2
+            const fftSize = n; // No padding needed since we fetch power of 2 samples
+            const signal = yDetrended.map(val => ({ real: val, imag: 0 }));
             
             
             // Compute FFT
-            const fftResult = fft(paddedSignal);
+            const fftResult = fft(signal);
             
             // Calculate sampling parameters
             const timeSpanMs = x[x.length - 1] - x[0];
@@ -610,7 +598,8 @@
 
         async function fetchDebugData() {
             try {
-                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/.json?orderBy="$key"&limitToLast=4320');
+                // Fetch next power of 2 samples (4096 is closest power of 2 to 4320)
+                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/.json?orderBy="$key"&limitToLast=4096');
                 const data = await response.json();
                 
                 // Define time ranges
