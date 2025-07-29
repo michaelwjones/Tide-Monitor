@@ -366,23 +366,23 @@
             const x = data.map(d => d.x.getTime());
             const y = data.map(d => d.y);
             
-            // Calculate original signal mean (this is our true DC component)
-            const originalMean = y.reduce((sum, val) => sum + val, 0) / n;
+            // Truncate to exactly 4096 samples for optimal FFT performance
+            const fftSize = 4096;
+            const truncatedY = y.slice(-fftSize); // Use most recent 4096 samples
+            const truncatedX = x.slice(-fftSize); // Corresponding time values
             
-            // Remove DC component for FFT processing
-            const yDetrended = y.map(val => val - originalMean);
-            
-            // Use data size directly - should already be power of 2
-            const fftSize = n; // No padding needed since we fetch power of 2 samples
+            // Calculate DC component from truncated data for accurate FFT processing
+            const truncatedMean = truncatedY.reduce((sum, val) => sum + val, 0) / fftSize;
+            const yDetrended = truncatedY.map(val => val - truncatedMean);
             const signal = yDetrended.map(val => ({ real: val, imag: 0 }));
             
             
             // Compute FFT
             const fftResult = fft(signal);
             
-            // Calculate sampling parameters
-            const timeSpanMs = x[x.length - 1] - x[0];
-            const samplingRateHz = (n - 1) / (timeSpanMs / 1000);
+            // Calculate sampling parameters using truncated data
+            const timeSpanMs = truncatedX[truncatedX.length - 1] - truncatedX[0];
+            const samplingRateHz = (fftSize - 1) / (timeSpanMs / 1000);
             const frequencyResolutionHz = samplingRateHz / fftSize;
             
             
@@ -426,7 +426,7 @@
                     fftBin: bin,
                     fftReal: real,
                     fftImag: imag,
-                    dcComponent: originalMean // ← Pass original signal mean as DC component
+                    dcComponent: truncatedMean // ← Pass truncated signal mean as DC component
                 });
             }
             
@@ -598,8 +598,8 @@
 
         async function fetchDebugData() {
             try {
-                // Fetch next power of 2 samples (4096 is closest power of 2 to 4320)
-                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/.json?orderBy="$key"&limitToLast=4096');
+                // Fetch full 72 hours of data for display and analysis
+                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/.json?orderBy="$key"&limitToLast=4320');
                 const data = await response.json();
                 
                 // Define time ranges
