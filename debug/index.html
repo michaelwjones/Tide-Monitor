@@ -634,7 +634,7 @@
             const points = [];
             
             for (const targetX of xValues) {
-                const t = targetX.getTime() - harmonicData.startTime;
+                const t = (targetX.getTime() - harmonicData.startTime) / 1000; // Convert to SECONDS
                 
                 // Start with DC component
                 let y = harmonicData.a0;
