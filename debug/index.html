@@ -458,7 +458,7 @@
                 
                 // Use FFT magnitude and phase directly for reconstruction
                 const amplitude = Math.sqrt(real * real + imag * imag) / n; // Proper FFT amplitude scaling
-                const phase = Math.atan2(imag, real); // FFT phase
+                const phase = -Math.atan2(imag, real); // FFT phase (negative for cosine reconstruction)
                 const power = amplitude * amplitude; // Power for sorting
                 
                 allPeaks.push({
@@ -639,9 +639,9 @@
                 // Start with DC component
                 let y = harmonicData.a0;
                 
-                // Add all harmonic components
+                // Add all harmonic components using proper FFT reconstruction formula
                 for (const harmonic of harmonicData.harmonics) {
-                    y += harmonic.amplitude * Math.sin(harmonic.omega * t + harmonic.phase);
+                    y += harmonic.amplitude * Math.cos(harmonic.omega * t + harmonic.phase);
                 }
                 
                 points.push({
