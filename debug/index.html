@@ -448,22 +448,6 @@
             return allPeaks;
         }
 
-        // FFT-based frequency analysis to detect dominant tidal periods
-        function detectDominantFrequencies(data, maxPeaks = 3, returnAllSignificant = false) {
-            // Use the same FFT-based detection as detectAllFrequencies
-            const allFreqs = detectAllFrequencies(data);
-            if (!allFreqs || allFreqs.length === 0) return null;
-            
-            if (returnAllSignificant) {
-                // Return all frequencies with power above 10% of the strongest peak
-                const maxPower = allFreqs[0].power;
-                const threshold = maxPower * 0.1;
-                return allFreqs.filter(peak => peak.power >= threshold);
-            } else {
-                // Return top peaks for table display
-                return allFreqs.slice(0, maxPeaks);
-            }
-        }
         
         // Solve linear system Ax = b using Gaussian elimination with partial pivoting
         function solveLinearSystem(A, b) {
@@ -525,23 +509,19 @@
             const x = data.map(d => d.x.getTime());
             const y = data.map(d => d.y);
             
-            // Get frequencies for table display (top 5)
-            const topFreqs = detectDominantFrequencies(data, 5, false);
-            if (!topFreqs || topFreqs.length === 0) {
+            // Get ALL frequencies using single FFT call
+            const allFreqs = detectAllFrequencies(data);
+            if (!allFreqs || allFreqs.length === 0) {
                 console.warn('FFT analysis failed to detect reliable tidal frequencies - skipping harmonic trends');
                 return null;
             }
             
+            // Get top 5 frequencies for table display (reuse same data)
+            const topFreqs = allFreqs.slice(0, 5);
+            
             // Store frequencies for table display and update table immediately
             detectedTidalFrequencies = topFreqs;
             updateTidalAnalysisTable(topFreqs);
-            
-            // Get ALL frequencies for harmonic fitting (not just significant ones)
-            const allFreqs = detectAllFrequencies(data);
-            if (!allFreqs || allFreqs.length === 0) {
-                console.warn('No frequencies found for multi-harmonic fitting');
-                return null;
-            }
             
             
             // Get DC component from the frequency data (all frequencies have the same DC component)
@@ -1227,8 +1207,9 @@
             
             // If harmonic analysis failed, try basic FFT as fallback
             if (!harmonics) {
-                const dominantFreqs = detectDominantFrequencies(waterLevelData, 5);
-                updateTidalAnalysisTable(dominantFreqs);
+                const allFreqs = detectAllFrequencies(waterLevelData);
+                const topFreqs = allFreqs ? allFreqs.slice(0, 5) : null;
+                updateTidalAnalysisTable(topFreqs);
             }
         }
         
