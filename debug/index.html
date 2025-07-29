@@ -449,28 +449,31 @@
                 // Skip if outside our desired range (safety check)
                 if (periodMs < minPeriodMs || periodMs > maxPeriodMs) continue;
                 
-                // Get power from FFT result - let's try different scaling approaches
+                // Extract magnitude and phase directly from FFT
                 const real = fftResult[bin].real;
                 const imag = fftResult[bin].imag;
                 
-                // Original scaling - let's see what this gives us
-                const power = (real * real + imag * imag) / (n * n);
+                // Use FFT magnitude and phase directly for reconstruction
+                const amplitude = Math.sqrt(real * real + imag * imag) / n; // Proper FFT amplitude scaling
+                const phase = Math.atan2(imag, real); // FFT phase
+                const power = amplitude * amplitude; // Power for sorting
                 
                 allPeaks.push({
                     frequency: omega,
                     power: power,
+                    amplitude: amplitude, // ← Direct FFT amplitude
+                    phase: phase,         // ← Direct FFT phase
                     periodMs: periodMs,
                     periodHours: periodMs / (60 * 60 * 1000),
                     fftBin: bin,
                     fftReal: real,
-                    fftImag: imag,
-                    rawMagnitude: Math.sqrt(real * real + imag * imag)
+                    fftImag: imag
                 });
             }
             
             console.log('FFT extracted', allPeaks.length, 'frequencies');
             console.log('Sample results:', allPeaks.slice(0, 3).map(p => 
-                `Period: ${p.periodHours.toFixed(2)}h, Power: ${p.power.toFixed(8)}, RawMag: ${p.rawMagnitude.toFixed(2)}`
+                `Period: ${p.periodHours.toFixed(2)}h, Amplitude: ${p.amplitude.toFixed(4)}, Phase: ${p.phase.toFixed(4)}`
             ));
             
             // Sort by power (strongest first) but return ALL
@@ -589,125 +592,23 @@
             }
             const a0 = sum_y / n;
             
-            // Fit multiple harmonics using simultaneous least squares
-            // Model: y = a0 + Σ[An*sin(ωn*t) + Bn*cos(ωn*t)]
-            // Use ALL frequencies - no limits
-            const numFreqs = allFreqs.length; // Use ALL frequencies
+            // Use FFT amplitudes and phases directly - no least squares fitting needed!
+            console.log('Using direct FFT reconstruction with', allFreqs.length, 'harmonics');
+            
             const harmonics = [];
             
-            if (numFreqs === 1) {
-                // Single harmonic - use simple fitting
-                const omega = allFreqs[0].frequency;
-                
-                let sum_sin2 = 0;
-                let sum_cos2 = 0;
-                let sum_sin_cos = 0;
-                let sum_y_sin = 0;
-                let sum_y_cos = 0;
-                
-                for (let i = 0; i < n; i++) {
-                    const t = x[i] - x[0];
-                    const sinVal = Math.sin(omega * t);
-                    const cosVal = Math.cos(omega * t);
-                    const y_offset = y[i] - a0;
-                    
-                    sum_sin2 += sinVal * sinVal;
-                    sum_cos2 += cosVal * cosVal;
-                    sum_sin_cos += sinVal * cosVal;
-                    sum_y_sin += y_offset * sinVal;
-                    sum_y_cos += y_offset * cosVal;
-                }
-                
-                const det = sum_sin2 * sum_cos2 - sum_sin_cos * sum_sin_cos;
-                
-                let A = 0, B = 0;
-                if (Math.abs(det) > 1e-10) {
-                    A = (sum_y_sin * sum_cos2 - sum_y_cos * sum_sin_cos) / det;
-                    B = (sum_y_cos * sum_sin2 - sum_y_sin * sum_sin_cos) / det;
-                }
-                
-                const amplitude = Math.sqrt(A * A + B * B);
-                const phase = Math.atan2(B, A);
+            // Simply copy the FFT amplitude and phase for each frequency
+            for (let freqIdx = 0; freqIdx < allFreqs.length; freqIdx++) {
+                const freq = allFreqs[freqIdx];
                 
                 harmonics.push({
-                    omega: omega,
-                    amplitude: amplitude,
-                    phase: phase,
-                    periodMs: allFreqs[0].periodMs,
-                    periodHours: allFreqs[0].periodHours,
-                    power: allFreqs[0].power
+                    omega: freq.frequency,
+                    amplitude: freq.amplitude, // Direct from FFT
+                    phase: freq.phase,         // Direct from FFT
+                    periodMs: freq.periodMs,
+                    periodHours: freq.periodHours,
+                    power: freq.power
                 });
-            } else {
-                // Multiple harmonics - use matrix least squares
-                // Build design matrix: [sin(ω1*t) cos(ω1*t) sin(ω2*t) cos(ω2*t) ...]
-                const numParams = numFreqs * 2; // 2 parameters per frequency (sin, cos)
-                const A_matrix = [];
-                const b_vector = [];
-                
-                for (let i = 0; i < n; i++) {
-                    const t = x[i] - x[0];
-                    const row = [];
-                    
-                    for (let freqIdx = 0; freqIdx < numFreqs; freqIdx++) {
-                        const omega = allFreqs[freqIdx].frequency;
-                        row.push(Math.sin(omega * t));
-                        row.push(Math.cos(omega * t));
-                    }
-                    
-                    A_matrix.push(row);
-                    b_vector.push(y[i] - a0);
-                }
-                
-                // Solve normal equations: (A^T * A) * x = A^T * b
-                const AtA = [];
-                const Atb = [];
-                
-                // Compute A^T * A
-                for (let i = 0; i < numParams; i++) {
-                    AtA[i] = [];
-                    for (let j = 0; j < numParams; j++) {
-                        let sum = 0;
-                        for (let k = 0; k < n; k++) {
-                            sum += A_matrix[k][i] * A_matrix[k][j];
-                        }
-                        AtA[i][j] = sum;
-                    }
-                }
-                
-                // Compute A^T * b
-                for (let i = 0; i < numParams; i++) {
-                    let sum = 0;
-                    for (let k = 0; k < n; k++) {
-                        sum += A_matrix[k][i] * b_vector[k];
-                    }
-                    Atb[i] = sum;
-                }
-                
-                // Solve using Gaussian elimination (simplified for small matrices)
-                const coeffs = solveLinearSystem(AtA, Atb);
-                
-                if (coeffs) {
-                    for (let freqIdx = 0; freqIdx < numFreqs; freqIdx++) {
-                        const sinCoeff = coeffs[freqIdx * 2];
-                        const cosCoeff = coeffs[freqIdx * 2 + 1];
-                        
-                        const amplitude = Math.sqrt(sinCoeff * sinCoeff + cosCoeff * cosCoeff);
-                        const phase = Math.atan2(cosCoeff, sinCoeff);
-                        
-                        harmonics.push({
-                            omega: allFreqs[freqIdx].frequency,
-                            amplitude: amplitude,
-                            phase: phase,
-                            periodMs: allFreqs[freqIdx].periodMs,
-                            periodHours: allFreqs[freqIdx].periodHours,
-                            power: allFreqs[freqIdx].power
-                        });
-                    }
-                } else {
-                    // Fallback to single strongest harmonic if matrix solution fails
-                    console.warn('Matrix solution failed, using single harmonic');
-                    return computeWaterLevelHarmonics(data); // Recursive call will hit single harmonic case
-                }
             }
             
             return {
