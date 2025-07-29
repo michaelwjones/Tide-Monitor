@@ -417,6 +417,10 @@
             // Compute FFT
             const fftResult = fft(paddedSignal);
             
+            // Extract DC component from FFT bin 0
+            const dcComponent = fftResult[0].real / n;
+            console.log('DC component from FFT:', dcComponent.toFixed(4));
+            
             // Calculate sampling parameters
             const timeSpanMs = x[x.length - 1] - x[0];
             const samplingRateHz = (n - 1) / (timeSpanMs / 1000);
@@ -467,7 +471,8 @@
                     periodHours: periodMs / (60 * 60 * 1000),
                     fftBin: bin,
                     fftReal: real,
-                    fftImag: imag
+                    fftImag: imag,
+                    dcComponent: dcComponent // ← Pass DC component through
                 });
             }
             
@@ -588,9 +593,9 @@
                 `${f.periodHours.toFixed(2)}h (power: ${f.power.toFixed(6)})`
             ));
             
-            // Get DC component directly from FFT bin 0
-            const a0 = fftResult[0].real / n; // DC component from FFT
-            console.log('DC component from FFT:', a0.toFixed(4));
+            // Get DC component from the frequency data (all frequencies have the same DC component)
+            const a0 = allFreqs.length > 0 ? allFreqs[0].dcComponent : 0;
+            console.log('Using DC component:', a0.toFixed(4));
             
             // Use only the strongest harmonics to avoid artifacts from weak components
             const maxHarmonics = Math.min(allFreqs.length, 10); // Limit to top 10 harmonics
