@@ -47,8 +47,8 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Web Das
 - **Mobile responsive** design
 
 ### Debug Dashboard  
-- **Default 24-hour view** with zoom capability to 72 hours for comprehensive analysis
-- **Intuitive time controls**: Dedicated 24-hour and 72-hour buttons for quick navigation
+- **Default 24-hour view** with zoom capability to ~68.5 hours for comprehensive analysis
+- **Intuitive time controls**: Dedicated 24-hour and 68.5-hour buttons for quick navigation
 - **Advanced zoom functionality**: Click-and-drag selection and Ctrl+mouse wheel for precise control
 - **Multi-axis charts** for detailed analysis with extended timeframe
 - **Enhanced visualization** of wave calculation methods
@@ -132,7 +132,7 @@ The system collects readings every minute with the following data points:
 #### Water Level Harmonics
 - **Mathematical Form**: `f(t) = a0 + a1*sin(a2*t + a3)`
 - **Coefficients**: 4 parameters (DC offset, amplitude, frequency, phase)
-- **FFT-Based Detection**: Automatic tidal period discovery from 72 hours of data
+- **FFT-Based Detection**: Automatic tidal period discovery from 4096 samples (~68.5 hours)
 - **Frequency Range**: 6-48 hour periods with 30-minute resolution
 - **Pattern Recognition**: Detects dominant tidal constituents automatically
 - **Least Squares Fitting**: Robust amplitude and phase calculation
@@ -171,9 +171,9 @@ The system collects readings every minute with the following data points:
 - **Optimized Rendering**: Chart animations disabled for performance
 - **Error Handling**: Graceful degradation when data is unavailable
 - **Responsive Design**: Works on desktop and mobile devices
-- **Fast Trend Lines**: Harmonic computation under 100ms, cubic splines under 150ms for 4320 data points
+- **Fast Trend Lines**: Optimized FFT harmonic computation, cubic splines under 150ms for 4096 data points
 - **Automatic Tidal Analysis**: FFT-based period detection with comprehensive frequency table
-- **Extended Data Window**: 72-hour analysis provides 3+ tidal cycles for robust frequency detection
+- **Extended Data Window**: ~68.5-hour analysis provides 3+ tidal cycles for robust frequency detection
 
 ## 📱 Mobile Support
 
@@ -187,7 +187,7 @@ Both dashboards are optimized for mobile viewing with:
 
 - **Sensor readings**: Every minute
 - **Dashboard refresh**: Every 2 minutes
-- **Data retention**: 72 hours visible (4320 readings) for comprehensive analysis
+- **Data retention**: ~68.5 hours visible (4096 readings) optimized for FFT analysis
 - **Timezone**: Eastern Time (America/New_York)
 
 ## 🤝 Contributing

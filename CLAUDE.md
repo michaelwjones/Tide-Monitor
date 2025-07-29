@@ -75,8 +75,8 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Cloud F
 
 ### Debug Dashboard (`debug/index.html`)
 - **Chart library**: Chart.js v4.5.0 with date-fns adapter (same as main)
-- **Default view**: 24 hours with zoom capability to full 72-hour dataset
-- **Time controls**: Dedicated 24-hour and 72-hour buttons for quick navigation
+- **Default view**: 24 hours with zoom capability to full 4096-sample dataset (~68.5 hours)
+- **Time controls**: Dedicated 24-hour and 68.5-hour buttons for quick navigation
 - **Advanced zoom**: Click-and-drag selection and Ctrl+mouse wheel functionality
 - **Data visualization**: All 6 data fields on multi-axis chart
 - **Layout**: Clean design matching main dashboard (no containers/borders)
