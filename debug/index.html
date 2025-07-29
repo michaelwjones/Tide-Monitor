@@ -414,7 +414,7 @@
                 // Use FFT magnitude and phase directly for reconstruction
                 const magnitude = Math.sqrt(real * real + imag * imag);
                 const amplitude = bin === 0 ? magnitude / fftSize : (2 * magnitude) / fftSize; // Correct FFT amplitude scaling: DC = mag/N, others = 2*mag/N
-                const phase = -Math.atan2(imag, real); // FFT phase (negative for cosine reconstruction)
+                const phase = Math.atan2(imag, real); // FFT phase for cosine reconstruction
                 const power = amplitude * amplitude; // Power for sorting
                 
                 allPeaks.push({
@@ -538,16 +538,20 @@
             return {
                 a0: a0,           // DC offset (mean level)
                 harmonics: harmonics, // Array of harmonic components
-                startTime: allFreqs[0].truncatedStartTime, // Use truncated data start time to match FFT reference
+                startTime: x[0], // Use original data start time for display alignment
+                truncatedStartTime: allFreqs[0].truncatedStartTime, // Keep truncated reference for phase correction
                 primaryPeriod: allFreqs[0].periodMs,
                 primaryPeriodHours: allFreqs[0].periodHours,
                 primaryPower: allFreqs[0].power
             };
         }
         
-        // Evaluate multi-harmonic function: a0 + Σ[An*sin(ωn*t + φn)]
+        // Evaluate multi-harmonic function: a0 + Σ[An*cos(ωn*t + φn)]
         function evaluateWaterLevelHarmonics(harmonicData, xValues) {
             const points = [];
+            
+            // Calculate phase correction for time offset between FFT reference and display range
+            const timeOffset = (harmonicData.startTime - harmonicData.truncatedStartTime) / 1000; // seconds
             
             for (const targetX of xValues) {
                 const t = (targetX.getTime() - harmonicData.startTime) / 1000; // Convert to SECONDS
@@ -555,9 +559,10 @@
                 // Start with DC component
                 let y = harmonicData.a0;
                 
-                // Add all harmonic components using proper FFT reconstruction formula
+                // Add all harmonic components with phase correction for time offset
                 for (const harmonic of harmonicData.harmonics) {
-                    y += harmonic.amplitude * Math.cos(harmonic.omega * t + harmonic.phase);
+                    const correctedPhase = harmonic.phase - harmonic.omega * timeOffset;
+                    y += harmonic.amplitude * Math.cos(harmonic.omega * t + correctedPhase);
                 }
                 
                 points.push({
