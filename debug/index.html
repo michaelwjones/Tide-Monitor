@@ -444,7 +444,7 @@
             for (let bin = minBin; bin <= maxBin; bin++) {
                 const frequencyHz = bin * frequencyResolutionHz;
                 const omega = 2 * Math.PI * frequencyHz;
-                const periodMs = 1000 / frequencyHz; // Convert to ms
+                const periodMs = (1 / frequencyHz) * 1000; // Period in seconds, then convert to ms
                 
                 // Skip if outside our desired range (safety check)
                 if (periodMs < minPeriodMs || periodMs > maxPeriodMs) continue;
@@ -472,8 +472,11 @@
             }
             
             console.log('FFT extracted', allPeaks.length, 'frequencies');
-            console.log('Sample results:', allPeaks.slice(0, 3).map(p => 
-                `Period: ${p.periodHours.toFixed(2)}h, Amplitude: ${p.amplitude.toFixed(4)}, Phase: ${p.phase.toFixed(4)}`
+            console.log('Frequency range check:');
+            console.log('  Min period should be 6h, got:', (allPeaks[allPeaks.length-1].periodHours).toFixed(2), 'h');
+            console.log('  Max period should be 48h, got:', (allPeaks[0].periodHours).toFixed(2), 'h');
+            console.log('Sample results:', allPeaks.slice(0, 5).map(p => 
+                `Bin: ${p.fftBin}, Period: ${p.periodHours.toFixed(2)}h, Freq: ${(p.frequency/(2*Math.PI)).toFixed(6)}Hz, Amplitude: ${p.amplitude.toFixed(4)}`
             ));
             
             // Sort by power (strongest first) but return ALL
