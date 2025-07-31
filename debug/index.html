@@ -528,13 +528,18 @@
             // Extract signal parameters from eigenvalues - TEMPORARILY limit to 1 component
             const signalComponents = [];
             
-            // Process ALL eigenvalues to detect multiple tidal frequencies
+            // Process eigenvalues to detect tidal frequencies, keeping only positive frequencies
             for (let k = 0; k < eigenvalues.length; k++) {
                 const lambda = eigenvalues[k];
                 const magnitude = Math.sqrt((lambda.real || 0) * (lambda.real || 0) + (lambda.imag || 0) * (lambda.imag || 0));
                 
                 // Skip eigenvalues that are too small or exactly 1 (DC component)
                 if (magnitude < 1e-6 || Math.abs(magnitude - 1.0) < 1e-6) {
+                    continue;
+                }
+                
+                // Only process eigenvalues with positive imaginary part to avoid conjugate duplicates
+                if ((lambda.imag || 0) <= 0) {
                     continue;
                 }
                 
