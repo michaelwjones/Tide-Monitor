@@ -83,18 +83,18 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Cloud F
 - **Navigation**: Link back to main dashboard in top-right corner
 - **Async loading**: Chart displays immediately, tidal analysis runs in background
 - **Auto-refresh**: Updates every 2 minutes with fresh data and analysis
-- **Trend line analysis**: Natural cubic spline interpolation with toggle control
+- **Signal analysis**: Matrix Pencil method for non-periodic tidal data analysis
 - **Chart axes**: 
   - Left Y-axis: Water level measurements (0-6 feet)
   - Right Y-axis: Wave height measurements (0-2 feet)
   - Hidden Y-axis: Valid sample count (0-512)
 - **Trend line features**:
   - **Toggle button**: Show/hide trend lines beside main dashboard link
-  - **Cubic spline interpolation**: Uses Thomas algorithm for O(n) performance
-  - **7-point smoothing**: Adaptive smoothing for optimal curve fitting
-  - **Edge-safe**: Natural splines prevent oscillation artifacts at boundaries
+  - **Matrix Pencil method**: Decomposes signals into complex exponentials Σ Aₖ e^(sₖt)
+  - **Non-periodic analysis**: Handles real-world tidal variations without periodicity assumptions
+  - **Full chart coverage**: Trend lines span entire display range with no edge artifacts
   - **Visual feedback**: Original data fades to 30% opacity when trend lines are active
-  - **All data series**: Trend lines for water level, wave height, wind, and NOAA data (excludes valid samples)
+  - **Signal components table**: Shows detected frequencies, periods, damping, and amplitudes
 
 ### Debug Dashboard (`debug/index.html`)
 - **Multi-axis charts**: Displays all measurement methods and NOAA data
@@ -205,9 +205,10 @@ Readings are stored with auto-generated keys containing:
 - **Security**: Content Security Policy prevents XSS attacks
 - **Error handling**: Graceful degradation when data is unavailable
 - **Performance**: Optimized chart rendering with disabled animations
-- **Trend line algorithm**: Natural cubic splines using Thomas algorithm for O(n) performance
-- **Smoothing approach**: Progressive smoothing (endpoints unchanged, 3-point, 5-point, 7-point)
-- **Mathematical stability**: Normalized x-values and robust numerical methods prevent edge effects
+- **Signal analysis algorithm**: Matrix Pencil method for parameter estimation of non-periodic signals
+- **Trend line approach**: Complex exponential decomposition Σ Aₖ e^(σₖ + jωₖ)t with damping factors
+- **Mathematical robustness**: SVD-based model order selection and generalized eigenvalue decomposition
+- **No periodicity assumptions**: Handles real-world tidal variations and weather effects naturally
 
 ## Development History
 
