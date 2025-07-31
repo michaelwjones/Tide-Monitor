@@ -421,29 +421,16 @@
             const n = data.length;
             if (n < 20) return null; // Need sufficient data for Matrix Pencil
             
-            // Use more samples for better frequency resolution
-            const maxSamples = 1000; // Increase for better tidal frequency detection
-            let sampledData = data;
-            let downsampleFactor = 1;
+            const sn = data.length;
+            const x = data.map(d => d.x.getTime());
+            const y = data.map(d => d.y);
             
-            if (n > maxSamples) {
-                downsampleFactor = Math.floor(n / maxSamples);
-                sampledData = [];
-                for (let i = 0; i < n; i += downsampleFactor) {
-                    sampledData.push(data[i]);
-                }
-            }
-            
-            const sn = sampledData.length;
-            const x = sampledData.map(d => d.x.getTime());
-            const y = sampledData.map(d => d.y);
-            
-            console.log(`Matrix Pencil: Processing ${sn} samples (downsampled from ${n})`);
+            console.log(`Matrix Pencil: Processing ${sn} samples`);
             
             // Calculate sampling parameters (assume regular intervals)
             const timeSpanMs = x[x.length - 1] - x[0];
             const timeSpanSec = timeSpanMs / 1000;
-            const samplingInterval = (timeSpanSec / (sn - 1)) * downsampleFactor; // Adjust for downsampling
+            const samplingInterval = timeSpanSec / (sn - 1);
             const startTime = x[0];
             
             // Remove DC component
