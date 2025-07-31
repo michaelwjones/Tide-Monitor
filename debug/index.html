@@ -92,7 +92,7 @@
         </div>
         
         <div style="margin-top: 20px;">
-            <h3>Detected Signal Components (Matrix Pencil)</h3>
+            <h3>Dominant Signal Component (Matrix Pencil - Single Frequency Mode)</h3>
             <table id="tidalAnalysisTable" class="tidal-analysis-table">
                 <thead>
                     <tr>
@@ -432,21 +432,10 @@
             // SVD of Y0 to determine signal subspace
             const svd = computeSVD(Y0);
             
-            // Determine model order using SVD threshold (keep components > 1% of max singular value)
-            const threshold = 0.01 * Math.max(...svd.S);
-            let modelOrder = 0;
-            for (let i = 0; i < svd.S.length; i++) {
-                if (svd.S[i] > threshold) {
-                    modelOrder++;
-                } else {
-                    break;
-                }
-            }
+            // TEMPORARILY: Force model order to 2 (for 1 complex frequency pair)
+            const modelOrder = 2;
             
-            // Limit model order to reasonable range
-            modelOrder = Math.min(modelOrder, Math.floor(L / 2), 50);
-            
-            if (modelOrder < 2) return null;
+            if (svd.S.length < modelOrder) return null;
             
             // Extract signal subspace (first modelOrder columns of U and Vt)
             const Us = svd.U.slice(0, modelOrder);
@@ -467,41 +456,54 @@
             
             if (!eigenvalues || eigenvalues.length === 0) return null;
             
-            // Extract signal parameters from eigenvalues
+            // Extract signal parameters from eigenvalues - TEMPORARILY limit to 1 component
             const signalComponents = [];
+            
+            // Find the eigenvalue with largest magnitude (dominant frequency)
+            let dominantEigenvalue = null;
+            let maxMagnitude = 0;
             
             for (let k = 0; k < eigenvalues.length; k++) {
                 const lambda = eigenvalues[k];
+                const magnitude = Math.sqrt((lambda.real || 0) * (lambda.real || 0) + (lambda.imag || 0) * (lambda.imag || 0));
+                
+                if (magnitude > maxMagnitude && magnitude > 1e-6) {
+                    maxMagnitude = magnitude;
+                    dominantEigenvalue = lambda;
+                }
+            }
+            
+            if (dominantEigenvalue) {
+                const lambda = dominantEigenvalue;
                 
                 // Convert eigenvalue to continuous-time parameters
                 const logLambda = Math.log(Math.abs(lambda));
                 const s_real = logLambda / samplingInterval; // Damping (σ)
                 const s_imag = Math.atan2(lambda.imag || 0, lambda.real || Math.abs(lambda)) / samplingInterval; // Frequency (ω)
                 
-                // Skip DC and very low frequency components
                 const frequency = Math.abs(s_imag);
-                if (frequency < 1e-6) continue;
-                
-                const periodSec = (2 * Math.PI) / frequency;
-                const periodMs = periodSec * 1000;
-                const periodHours = periodMs / (60 * 60 * 1000);
-                
-                // Estimate amplitude and phase using least squares fitting
-                const amplitude = estimateAmplitudePhase(x, yDetrended, s_real, s_imag, startTime, samplingInterval);
-                const phase = amplitude.phase;
-                const amplitudeMag = amplitude.magnitude;
-                const dampingCoeff = s_real;
-                
-                signalComponents.push({
-                    frequency: frequency,         // rad/sec
-                    periodMs: periodMs,
-                    periodHours: periodHours,
-                    damping: dampingCoeff,        // damping coefficient (σ)
-                    amplitude: amplitudeMag,      // complex amplitude magnitude
-                    phase: phase,                 // phase in radians
-                    eigenvalue: lambda,           // original eigenvalue
-                    power: amplitudeMag * amplitudeMag  // power measure for sorting
-                });
+                if (frequency > 1e-6) {
+                    const periodSec = (2 * Math.PI) / frequency;
+                    const periodMs = periodSec * 1000;
+                    const periodHours = periodMs / (60 * 60 * 1000);
+                    
+                    // Estimate amplitude and phase using least squares fitting
+                    const amplitude = estimateAmplitudePhase(x, yDetrended, s_real, s_imag, startTime, samplingInterval);
+                    const phase = amplitude.phase;
+                    const amplitudeMag = amplitude.magnitude;
+                    const dampingCoeff = s_real;
+                    
+                    signalComponents.push({
+                        frequency: frequency,         // rad/sec
+                        periodMs: periodMs,
+                        periodHours: periodHours,
+                        damping: dampingCoeff,        // damping coefficient (σ)
+                        amplitude: amplitudeMag,      // complex amplitude magnitude
+                        phase: phase,                 // phase in radians
+                        eigenvalue: lambda,           // original eigenvalue
+                        power: amplitudeMag * amplitudeMag  // power measure for sorting
+                    });
+                }
             }
             
             // Sort by power (amplitude squared)
