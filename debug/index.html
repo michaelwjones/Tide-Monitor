@@ -421,8 +421,8 @@
             const n = data.length;
             if (n < 20) return null; // Need sufficient data for Matrix Pencil
             
-            // TEMPORARY: Limit data size to prevent browser hanging
-            const maxSamples = 100; // Even smaller for web browser
+            // Use more samples for better frequency resolution
+            const maxSamples = 1000; // Increase for better tidal frequency detection
             let sampledData = data;
             let downsampleFactor = 1;
             
@@ -450,8 +450,8 @@
             const mean = y.reduce((sum, val) => sum + val, 0) / sn;
             const yDetrended = y.map(val => val - mean);
             
-            // Set pencil parameter L (much smaller for web browser)
-            const L = Math.min(pencilParam || Math.floor(sn / 3), 10); // Limit to 10
+            // Set pencil parameter L for proper tidal frequency resolution
+            const L = Math.min(pencilParam || Math.floor(sn / 3), Math.floor(sn / 2)); // Use up to half the samples
             const M = sn - L + 1;
             
             console.log(`Matrix Pencil: L=${L}, M=${M}`);

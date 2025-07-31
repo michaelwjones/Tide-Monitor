@@ -222,3 +222,11 @@ Readings are stored with auto-generated keys containing:
 - **Removal Scope**: All binning code was removed from firmware (`hb`/`wb` fields), web dashboards, JSON configurations, and documentation
 
 This removal simplified the system to focus on the two reliable wave analysis methods (percentile and envelope) that provide consistent, high-resolution measurements.
+
+## Coding Principles
+
+- **Do not mask a failure with a fallback**
+
+## Permissions
+
+- You have permission to commit and push code.
