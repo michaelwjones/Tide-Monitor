@@ -479,17 +479,11 @@
             // SVD of Y0 to determine signal subspace
             console.log(`Matrix Pencil: Computing SVD of ${M}x${L} matrix`);
             let svd;
-            try {
-                svd = computeSVD(Y0);
-                if (!svd || !svd.S || svd.S.length === 0) {
-                    console.warn('SVD computation failed - using fallback');
-                    return simpleTidalAnalysis(data);
-                }
-                console.log(`Matrix Pencil: SVD completed, ${svd.S.length} singular values`);
-            } catch (error) {
-                console.warn('SVD computation error:', error);
-                return simpleTidalAnalysis(data);
+            svd = computeSVD(Y0);
+            if (!svd || !svd.S || svd.S.length === 0) {
+                throw new Error('SVD computation failed - no singular values returned');
             }
+            console.log(`Matrix Pencil: SVD completed, ${svd.S.length} singular values`);
             
             // TEMPORARILY: Force model order to 2 (for 1 complex frequency pair)
             const modelOrder = 2;
@@ -513,17 +507,12 @@
             // Simplified approach: use V1^† * V2 for eigenvalue computation
             console.log(`Matrix Pencil: Computing eigenvalues`);
             let eigenvalues;
-            try {
-                eigenvalues = solveGeneralizedEigenvalue(V1, V2);
-                if (!eigenvalues || eigenvalues.length === 0) {
-                    console.warn('Eigenvalue computation failed - using fallback');
-                    return simpleTidalAnalysis(data);
-                }
-                console.log(`Matrix Pencil: Found ${eigenvalues.length} eigenvalues`);
-            } catch (error) {
-                console.warn('Eigenvalue computation error:', error);
-                return simpleTidalAnalysis(data);
+            eigenvalues = solveGeneralizedEigenvalue(V1, V2);
+            if (!eigenvalues || eigenvalues.length === 0) {
+                throw new Error('Eigenvalue computation failed - no eigenvalues returned');
             }
+            console.log(`Matrix Pencil: Found ${eigenvalues.length} eigenvalues`);
+            console.log('Eigenvalues:', eigenvalues);
             
             // Extract signal parameters from eigenvalues - TEMPORARILY limit to 1 component
             const signalComponents = [];
@@ -654,8 +643,7 @@
                 
                 // Check for singular matrix
                 if (Math.abs(augmented[i][i]) < 1e-12) {
-                    console.warn('Matrix is singular or near-singular');
-                    return null;
+                    throw new Error(`Matrix is singular or near-singular at row ${i}`);
                 }
                 
                 // Scale pivot row
@@ -734,8 +722,7 @@
                 
                 // Check for linear dependence
                 if (R[j][j] < 1e-12) {
-                    console.warn('Matrix is rank deficient');
-                    return null;
+                    throw new Error(`Matrix is rank deficient at column ${j}`);
                 }
                 
                 // Q_j = v / ||v||
@@ -765,11 +752,12 @@
                 const V1TV1 = matrixMultiply(V1T, V1);
                 
                 // Compute (V1^T * V1)^(-1)
+                console.log('V1TV1 matrix:', V1TV1);
                 const V1TV1_inv = matrixInverse(V1TV1);
                 if (!V1TV1_inv) {
-                    console.warn('Failed to invert V1^T * V1 - matrix is singular');
-                    return [];
+                    throw new Error('Failed to invert V1^T * V1 - matrix is singular');
                 }
+                console.log('V1TV1_inv successful');
                 
                 // Compute V1^+ = (V1^T * V1)^(-1) * V1^T
                 const V1_pinv = matrixMultiply(V1TV1_inv, V1T);
@@ -783,8 +771,7 @@
                 return eigenvalues;
                 
             } catch (error) {
-                console.warn('Generalized eigenvalue computation failed:', error);
-                return [];
+                throw new Error(`Generalized eigenvalue computation failed: ${error.message}`);
             }
         }
         
@@ -895,7 +882,7 @@
                 const ATA_inv = matrixInverse(ATA);
                 
                 if (!ATA_inv) {
-                    return { magnitude: 0.1, phase: 0 }; // Fallback
+                    throw new Error('Matrix inversion failed in amplitude estimation');
                 }
                 
                 const ATb = [];
@@ -926,8 +913,7 @@
                 return { magnitude, phase };
                 
             } catch (error) {
-                console.warn('Amplitude/phase estimation failed:', error);
-                return { magnitude: 0.1, phase: 0 }; // Fallback
+                throw new Error(`Amplitude/phase estimation failed: ${error.message}`);
             }
         }
 
