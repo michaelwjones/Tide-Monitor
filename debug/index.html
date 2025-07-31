@@ -308,8 +308,8 @@
             
             // Simple power iteration SVD for our use case
             // For production, would use more robust algorithm
-            const tolerance = 1e-12;
-            const maxIterations = 1000;
+            const tolerance = 1e-6; // Relaxed tolerance for speed
+            const maxIterations = 50; // Much fewer iterations for web browser
             
             const U = [];
             const S = [];
@@ -318,7 +318,7 @@
             // Create copy of matrix for decomposition
             let A = matrix.map(row => [...row]);
             
-            const rank = Math.min(m, n);
+            const rank = Math.min(m, n, 5); // Limit to first 5 singular values for speed
             
             for (let k = 0; k < rank; k++) {
                 // Power iteration to find dominant singular value/vector
@@ -386,28 +386,81 @@
         }
 
 
+        // TEMPORARY: Simple fallback for testing - just return a mock tidal frequency
+        function simpleTidalAnalysis(data) {
+            const n = data.length;
+            const y = data.map(d => d.y);
+            const mean = y.reduce((sum, val) => sum + val, 0) / n;
+            
+            // Mock M2 tidal component (12.42 hours)
+            const mockComponent = {
+                frequency: 2 * Math.PI / (12.42 * 3600), // rad/sec
+                periodMs: 12.42 * 60 * 60 * 1000,
+                periodHours: 12.42,
+                damping: -1e-6, // Slight decay
+                amplitude: 0.5, // 0.5 feet amplitude
+                phase: 0.0,
+                eigenvalue: { real: 0.99, imag: 0.1 },
+                power: 0.25
+            };
+            
+            return {
+                components: [mockComponent],
+                dcComponent: mean,
+                startTime: data[0].x.getTime(),
+                samplingInterval: 60, // 1 minute
+                modelOrder: 2,
+                pencilParam: 10,
+                dataLength: n
+            };
+        }
+        
         // Matrix Pencil Method - Signal parameter estimation for non-periodic data
         // Estimates frequencies, damping, amplitudes, and phases from time series data
         function matrixPencilAnalysis(data, pencilParam = null) {
+            // TEMPORARY: Use simple fallback instead of full Matrix Pencil
+            console.log('Using simple tidal analysis fallback for testing');
+            return simpleTidalAnalysis(data);
+            
+            // Original Matrix Pencil code follows (commented out for now)
+            /*
             const n = data.length;
             if (n < 20) return null; // Need sufficient data for Matrix Pencil
             
-            const x = data.map(d => d.x.getTime());
-            const y = data.map(d => d.y);
+            // TEMPORARY: Limit data size to prevent browser hanging
+            const maxSamples = 200; // Much smaller for web browser
+            let sampledData = data;
+            let downsampleFactor = 1;
+            
+            if (n > maxSamples) {
+                downsampleFactor = Math.floor(n / maxSamples);
+                sampledData = [];
+                for (let i = 0; i < n; i += downsampleFactor) {
+                    sampledData.push(data[i]);
+                }
+            }
+            
+            const sn = sampledData.length;
+            const x = sampledData.map(d => d.x.getTime());
+            const y = sampledData.map(d => d.y);
+            
+            console.log(`Matrix Pencil: Processing ${sn} samples (downsampled from ${n})`);
             
             // Calculate sampling parameters (assume regular intervals)
             const timeSpanMs = x[x.length - 1] - x[0];
             const timeSpanSec = timeSpanMs / 1000;
-            const samplingInterval = timeSpanSec / (n - 1); // seconds between samples
+            const samplingInterval = (timeSpanSec / (sn - 1)) * downsampleFactor; // Adjust for downsampling
             const startTime = x[0];
             
             // Remove DC component
-            const mean = y.reduce((sum, val) => sum + val, 0) / n;
+            const mean = y.reduce((sum, val) => sum + val, 0) / sn;
             const yDetrended = y.map(val => val - mean);
             
-            // Set pencil parameter L (configurable, default to N/2)
-            const L = pencilParam || Math.floor(n / 2);
-            const M = n - L + 1;
+            // Set pencil parameter L (much smaller for web browser)
+            const L = Math.min(pencilParam || Math.floor(sn / 2), 20); // Limit to 20
+            const M = sn - L + 1;
+            
+            console.log(`Matrix Pencil: L=${L}, M=${M}`);
             
             // Construct Hankel data matrix Y0 (M x L)
             const Y0 = [];
@@ -430,7 +483,13 @@
             }
             
             // SVD of Y0 to determine signal subspace
+            console.log(`Matrix Pencil: Computing SVD of ${M}x${L} matrix`);
             const svd = computeSVD(Y0);
+            if (!svd || !svd.S || svd.S.length === 0) {
+                console.warn('SVD computation failed');
+                return null;
+            }
+            console.log(`Matrix Pencil: SVD completed, ${svd.S.length} singular values`);
             
             // TEMPORARILY: Force model order to 2 (for 1 complex frequency pair)
             const modelOrder = 2;
@@ -518,6 +577,7 @@
                 pencilParam: L,
                 dataLength: n
             };
+            */
         }
         
         // Matrix operations utilities
