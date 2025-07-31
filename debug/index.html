@@ -578,6 +578,14 @@
             // Sort by power (amplitude squared)
             signalComponents.sort((a, b) => b.power - a.power);
             
+            // Output results to console
+            console.log('Matrix Pencil Analysis Results:');
+            console.log(`Model Order: ${modelOrder}, Pencil Parameter L: ${L}, Data Length: ${n}`);
+            console.log(`Found ${signalComponents.length} signal components:`);
+            signalComponents.forEach((comp, index) => {
+                console.log(`Component ${index + 1}: Period=${comp.periodHours.toFixed(2)}h, Frequency=${comp.frequency.toFixed(6)} rad/s, Amplitude=${comp.amplitude.toFixed(4)}, Damping=${comp.damping.toFixed(6)}`);
+            });
+            
             return {
                 components: signalComponents,
                 dcComponent: mean,
