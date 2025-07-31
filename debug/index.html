@@ -486,9 +486,10 @@
                 const periodMs = periodSec * 1000;
                 const periodHours = periodMs / (60 * 60 * 1000);
                 
-                // Estimate amplitude and phase using least squares
-                const amplitude = 1.0; // Placeholder - would compute from residual fitting
-                const phase = 0.0;     // Placeholder - would compute from residual fitting
+                // Estimate amplitude and phase using least squares fitting
+                const amplitude = estimateAmplitudePhase(x, yDetrended, s_real, s_imag, startTime, samplingInterval);
+                const phase = amplitude.phase;
+                const amplitudeMag = amplitude.magnitude;
                 const dampingCoeff = s_real;
                 
                 signalComponents.push({
@@ -496,10 +497,10 @@
                     periodMs: periodMs,
                     periodHours: periodHours,
                     damping: dampingCoeff,        // damping coefficient (σ)
-                    amplitude: amplitude,         // complex amplitude magnitude
+                    amplitude: amplitudeMag,      // complex amplitude magnitude
                     phase: phase,                 // phase in radians
                     eigenvalue: lambda,           // original eigenvalue
-                    power: amplitude * amplitude  // power measure for sorting
+                    power: amplitudeMag * amplitudeMag  // power measure for sorting
                 });
             }
             
@@ -517,28 +518,346 @@
             };
         }
         
-        // Simplified generalized eigenvalue solver for Matrix Pencil
-        function solveGeneralizedEigenvalue(A, B) {
-            // Simplified approach: solve (A^T * A)^(-1) * (A^T * B)
-            // In practice, would use more robust QZ algorithm
+        // Matrix operations utilities
+        function matrixMultiply(A, B) {
+            const m = A.length;
+            const n = A[0].length;
+            const p = B[0].length;
             
-            if (!A || !B || A.length === 0 || B.length === 0) return [];
+            if (n !== B.length) {
+                throw new Error('Matrix dimensions incompatible for multiplication');
+            }
             
+            const result = [];
+            for (let i = 0; i < m; i++) {
+                result[i] = [];
+                for (let j = 0; j < p; j++) {
+                    let sum = 0;
+                    for (let k = 0; k < n; k++) {
+                        sum += A[i][k] * B[k][j];
+                    }
+                    result[i][j] = sum;
+                }
+            }
+            return result;
+        }
+        
+        function matrixTranspose(A) {
+            const m = A.length;
+            const n = A[0].length;
+            const result = [];
+            
+            for (let j = 0; j < n; j++) {
+                result[j] = [];
+                for (let i = 0; i < m; i++) {
+                    result[j][i] = A[i][j];
+                }
+            }
+            return result;
+        }
+        
+        function matrixInverse(A) {
+            const n = A.length;
+            
+            // Create augmented matrix [A | I]
+            const augmented = [];
+            for (let i = 0; i < n; i++) {
+                augmented[i] = [...A[i]];
+                for (let j = 0; j < n; j++) {
+                    augmented[i][n + j] = (i === j) ? 1 : 0;
+                }
+            }
+            
+            // Gaussian elimination with partial pivoting
+            for (let i = 0; i < n; i++) {
+                // Find pivot
+                let maxRow = i;
+                for (let k = i + 1; k < n; k++) {
+                    if (Math.abs(augmented[k][i]) > Math.abs(augmented[maxRow][i])) {
+                        maxRow = k;
+                    }
+                }
+                
+                // Swap rows
+                [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
+                
+                // Check for singular matrix
+                if (Math.abs(augmented[i][i]) < 1e-12) {
+                    console.warn('Matrix is singular or near-singular');
+                    return null;
+                }
+                
+                // Scale pivot row
+                const pivot = augmented[i][i];
+                for (let j = 0; j < 2 * n; j++) {
+                    augmented[i][j] /= pivot;
+                }
+                
+                // Eliminate column
+                for (let k = 0; k < n; k++) {
+                    if (k !== i) {
+                        const factor = augmented[k][i];
+                        for (let j = 0; j < 2 * n; j++) {
+                            augmented[k][j] -= factor * augmented[i][j];
+                        }
+                    }
+                }
+            }
+            
+            // Extract inverse matrix
+            const inverse = [];
+            for (let i = 0; i < n; i++) {
+                inverse[i] = augmented[i].slice(n);
+            }
+            
+            return inverse;
+        }
+        
+        // QR decomposition using Gram-Schmidt process
+        function qrDecomposition(A) {
             const m = A.length;
             const n = A[0].length;
             
-            // For now, return mock eigenvalues for testing
-            // In production, implement proper generalized eigenvalue solver
-            const mockEigenvalues = [];
-            for (let i = 0; i < Math.min(m, 10); i++) {
-                const angle = (2 * Math.PI * i) / m;
-                mockEigenvalues.push({
-                    real: 0.9 * Math.cos(angle),
-                    imag: 0.9 * Math.sin(angle)
-                });
+            const Q = [];
+            const R = [];
+            
+            // Initialize Q with zeros
+            for (let i = 0; i < m; i++) {
+                Q[i] = new Array(n).fill(0);
             }
             
-            return mockEigenvalues;
+            // Initialize R with zeros
+            for (let i = 0; i < n; i++) {
+                R[i] = new Array(n).fill(0);
+            }
+            
+            // Gram-Schmidt process
+            for (let j = 0; j < n; j++) {
+                // Get column j of A
+                const v = [];
+                for (let i = 0; i < m; i++) {
+                    v[i] = A[i][j];
+                }
+                
+                // Orthogonalize against previous columns
+                for (let k = 0; k < j; k++) {
+                    // Compute R[k][j] = Q_k^T * v
+                    let dot = 0;
+                    for (let i = 0; i < m; i++) {
+                        dot += Q[i][k] * v[i];
+                    }
+                    R[k][j] = dot;
+                    
+                    // v = v - R[k][j] * Q_k
+                    for (let i = 0; i < m; i++) {
+                        v[i] -= R[k][j] * Q[i][k];
+                    }
+                }
+                
+                // Compute R[j][j] = ||v||
+                let norm = 0;
+                for (let i = 0; i < m; i++) {
+                    norm += v[i] * v[i];
+                }
+                R[j][j] = Math.sqrt(norm);
+                
+                // Check for linear dependence
+                if (R[j][j] < 1e-12) {
+                    console.warn('Matrix is rank deficient');
+                    return null;
+                }
+                
+                // Q_j = v / ||v||
+                for (let i = 0; i < m; i++) {
+                    Q[i][j] = v[i] / R[j][j];
+                }
+            }
+            
+            return { Q, R };
+        }
+        
+        // Solve generalized eigenvalue problem for Matrix Pencil using QZ algorithm approximation
+        function solveGeneralizedEigenvalue(V1, V2) {
+            if (!V1 || !V2 || V1.length === 0 || V2.length === 0) return [];
+            
+            const m = V1.length;  // model order
+            const n = V1[0].length; // L - 1
+            
+            try {
+                // Convert to standard eigenvalue problem: solve V1^+ * V2
+                // where V1^+ is the Moore-Penrose pseudoinverse of V1
+                
+                // Compute V1^T
+                const V1T = matrixTranspose(V1);
+                
+                // Compute V1^T * V1
+                const V1TV1 = matrixMultiply(V1T, V1);
+                
+                // Compute (V1^T * V1)^(-1)
+                const V1TV1_inv = matrixInverse(V1TV1);
+                if (!V1TV1_inv) {
+                    console.warn('Failed to invert V1^T * V1 - matrix is singular');
+                    return [];
+                }
+                
+                // Compute V1^+ = (V1^T * V1)^(-1) * V1^T
+                const V1_pinv = matrixMultiply(V1TV1_inv, V1T);
+                
+                // Compute C = V1^+ * V2 (companion-like matrix)
+                const C = matrixMultiply(V1_pinv, V2);
+                
+                // Now solve eigenvalue problem for C using QR algorithm
+                const eigenvalues = solveEigenvalues(C);
+                
+                return eigenvalues;
+                
+            } catch (error) {
+                console.warn('Generalized eigenvalue computation failed:', error);
+                return [];
+            }
+        }
+        
+        // QR algorithm for eigenvalue computation
+        function solveEigenvalues(A) {
+            const n = A.length;
+            const maxIterations = 100;
+            const tolerance = 1e-10;
+            
+            // Make a copy of A
+            let Ak = A.map(row => [...row]);
+            
+            for (let iter = 0; iter < maxIterations; iter++) {
+                // QR decomposition
+                const qr = qrDecomposition(Ak);
+                if (!qr) break;
+                
+                // Ak+1 = R * Q
+                Ak = matrixMultiply(qr.R, qr.Q);
+                
+                // Check for convergence (off-diagonal elements should be small)
+                let offDiagNorm = 0;
+                for (let i = 0; i < n; i++) {
+                    for (let j = 0; j < n; j++) {
+                        if (i !== j) {
+                            offDiagNorm += Ak[i][j] * Ak[i][j];
+                        }
+                    }
+                }
+                
+                if (Math.sqrt(offDiagNorm) < tolerance) {
+                    break;
+                }
+            }
+            
+            // Extract eigenvalues from diagonal
+            const eigenvalues = [];
+            for (let i = 0; i < n; i++) {
+                // For real matrices, eigenvalues can be complex
+                // Check for 2x2 blocks on diagonal for complex eigenvalues
+                if (i < n - 1 && Math.abs(Ak[i + 1][i]) > tolerance) {
+                    // 2x2 block - complex eigenvalues
+                    const a = Ak[i][i];
+                    const b = Ak[i][i + 1];
+                    const c = Ak[i + 1][i];
+                    const d = Ak[i + 1][i + 1];
+                    
+                    const trace = a + d;
+                    const det = a * d - b * c;
+                    const discriminant = trace * trace - 4 * det;
+                    
+                    if (discriminant < 0) {
+                        // Complex eigenvalues
+                        const realPart = trace / 2;
+                        const imagPart = Math.sqrt(-discriminant) / 2;
+                        
+                        eigenvalues.push({
+                            real: realPart,
+                            imag: imagPart
+                        });
+                        eigenvalues.push({
+                            real: realPart,
+                            imag: -imagPart
+                        });
+                        
+                        i++; // Skip next diagonal element
+                    } else {
+                        // Real eigenvalue from this position
+                        eigenvalues.push({
+                            real: Ak[i][i],
+                            imag: 0
+                        });
+                    }
+                } else {
+                    // Real eigenvalue
+                    eigenvalues.push({
+                        real: Ak[i][i],
+                        imag: 0
+                    });
+                }
+            }
+            
+            return eigenvalues;
+        }
+        
+        // Estimate amplitude and phase for a given frequency component
+        function estimateAmplitudePhase(timeValues, dataValues, damping, frequency, startTime, samplingInterval) {
+            const n = dataValues.length;
+            
+            // Build design matrix for least squares: [cos(ωt)e^(σt), sin(ωt)e^(σt)]
+            const A = [];
+            const b = [];
+            
+            for (let i = 0; i < n; i++) {
+                const t = i * samplingInterval; // Time from start in seconds
+                const expDamping = Math.exp(damping * t);
+                const cosComponent = Math.cos(frequency * t) * expDamping;
+                const sinComponent = Math.sin(frequency * t) * expDamping;
+                
+                A.push([cosComponent, sinComponent]);
+                b.push(dataValues[i]);
+            }
+            
+            // Solve least squares: [a, b] = (A^T A)^(-1) A^T y
+            try {
+                const AT = matrixTranspose(A);
+                const ATA = matrixMultiply(AT, A);
+                const ATA_inv = matrixInverse(ATA);
+                
+                if (!ATA_inv) {
+                    return { magnitude: 0.1, phase: 0 }; // Fallback
+                }
+                
+                const ATb = [];
+                for (let i = 0; i < 2; i++) {
+                    let sum = 0;
+                    for (let j = 0; j < n; j++) {
+                        sum += AT[i][j] * b[j];
+                    }
+                    ATb.push(sum);
+                }
+                
+                const coeffs = [];
+                for (let i = 0; i < 2; i++) {
+                    let sum = 0;
+                    for (let j = 0; j < 2; j++) {
+                        sum += ATA_inv[i][j] * ATb[j];
+                    }
+                    coeffs.push(sum);
+                }
+                
+                const a = coeffs[0]; // Cosine coefficient
+                const b_coeff = coeffs[1]; // Sine coefficient
+                
+                // Convert to magnitude and phase: A*cos(ωt + φ) = a*cos(ωt) + b*sin(ωt)
+                const magnitude = Math.sqrt(a * a + b_coeff * b_coeff);
+                const phase = Math.atan2(-b_coeff, a); // Phase shift
+                
+                return { magnitude, phase };
+                
+            } catch (error) {
+                console.warn('Amplitude/phase estimation failed:', error);
+                return { magnitude: 0.1, phase: 0 }; // Fallback
+            }
         }
 
         
