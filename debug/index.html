@@ -418,17 +418,11 @@
         // Matrix Pencil Method - Signal parameter estimation for non-periodic data
         // Estimates frequencies, damping, amplitudes, and phases from time series data
         function matrixPencilAnalysis(data, pencilParam = null) {
-            // TEMPORARY: Use simple fallback instead of full Matrix Pencil
-            console.log('Using simple tidal analysis fallback for testing');
-            return simpleTidalAnalysis(data);
-            
-            // Original Matrix Pencil code follows (commented out for now)
-            /*
             const n = data.length;
             if (n < 20) return null; // Need sufficient data for Matrix Pencil
             
             // TEMPORARY: Limit data size to prevent browser hanging
-            const maxSamples = 200; // Much smaller for web browser
+            const maxSamples = 100; // Even smaller for web browser
             let sampledData = data;
             let downsampleFactor = 1;
             
@@ -457,7 +451,7 @@
             const yDetrended = y.map(val => val - mean);
             
             // Set pencil parameter L (much smaller for web browser)
-            const L = Math.min(pencilParam || Math.floor(sn / 2), 20); // Limit to 20
+            const L = Math.min(pencilParam || Math.floor(sn / 3), 10); // Limit to 10
             const M = sn - L + 1;
             
             console.log(`Matrix Pencil: L=${L}, M=${M}`);
@@ -484,12 +478,18 @@
             
             // SVD of Y0 to determine signal subspace
             console.log(`Matrix Pencil: Computing SVD of ${M}x${L} matrix`);
-            const svd = computeSVD(Y0);
-            if (!svd || !svd.S || svd.S.length === 0) {
-                console.warn('SVD computation failed');
-                return null;
+            let svd;
+            try {
+                svd = computeSVD(Y0);
+                if (!svd || !svd.S || svd.S.length === 0) {
+                    console.warn('SVD computation failed - using fallback');
+                    return simpleTidalAnalysis(data);
+                }
+                console.log(`Matrix Pencil: SVD completed, ${svd.S.length} singular values`);
+            } catch (error) {
+                console.warn('SVD computation error:', error);
+                return simpleTidalAnalysis(data);
             }
-            console.log(`Matrix Pencil: SVD completed, ${svd.S.length} singular values`);
             
             // TEMPORARILY: Force model order to 2 (for 1 complex frequency pair)
             const modelOrder = 2;
@@ -511,9 +511,19 @@
             
             // Solve generalized eigenvalue problem: V1 * z = λ * V2 * z
             // Simplified approach: use V1^† * V2 for eigenvalue computation
-            const eigenvalues = solveGeneralizedEigenvalue(V1, V2);
-            
-            if (!eigenvalues || eigenvalues.length === 0) return null;
+            console.log(`Matrix Pencil: Computing eigenvalues`);
+            let eigenvalues;
+            try {
+                eigenvalues = solveGeneralizedEigenvalue(V1, V2);
+                if (!eigenvalues || eigenvalues.length === 0) {
+                    console.warn('Eigenvalue computation failed - using fallback');
+                    return simpleTidalAnalysis(data);
+                }
+                console.log(`Matrix Pencil: Found ${eigenvalues.length} eigenvalues`);
+            } catch (error) {
+                console.warn('Eigenvalue computation error:', error);
+                return simpleTidalAnalysis(data);
+            }
             
             // Extract signal parameters from eigenvalues - TEMPORARILY limit to 1 component
             const signalComponents = [];
@@ -577,7 +587,6 @@
                 pencilParam: L,
                 dataLength: n
             };
-            */
         }
         
         // Matrix operations utilities
@@ -782,8 +791,8 @@
         // QR algorithm for eigenvalue computation
         function solveEigenvalues(A) {
             const n = A.length;
-            const maxIterations = 100;
-            const tolerance = 1e-10;
+            const maxIterations = 20; // Much fewer iterations
+            const tolerance = 1e-4; // Relaxed tolerance
             
             // Make a copy of A
             let Ak = A.map(row => [...row]);
