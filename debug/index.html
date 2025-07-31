@@ -539,9 +539,11 @@
                 }
                 
                 // Convert eigenvalue to continuous-time parameters
-                const logLambda = Math.log(Math.abs(lambda));
-                const s_real = logLambda / samplingInterval; // Damping (σ)
-                const s_imag = Math.atan2(lambda.imag || 0, lambda.real || Math.abs(lambda)) / samplingInterval; // Frequency (ω)
+                const lambdaMag = Math.sqrt((lambda.real || 0) * (lambda.real || 0) + (lambda.imag || 0) * (lambda.imag || 0));
+                const s_real = Math.log(lambdaMag) / samplingInterval; // Damping (σ)
+                const s_imag = Math.atan2(lambda.imag || 0, lambda.real || 0) / samplingInterval; // Frequency (ω)
+                
+                console.log(`Eigenvalue processing: lambdaMag=${lambdaMag}, s_real=${s_real}, s_imag=${s_imag}`);
                 
                 const frequency = Math.abs(s_imag);
                 if (frequency > 1e-6) {
