@@ -528,22 +528,15 @@
             // Extract signal parameters from eigenvalues - TEMPORARILY limit to 1 component
             const signalComponents = [];
             
-            // Find the eigenvalue with largest magnitude (dominant frequency)
-            let dominantEigenvalue = null;
-            let maxMagnitude = 0;
-            
+            // Process ALL eigenvalues to detect multiple tidal frequencies
             for (let k = 0; k < eigenvalues.length; k++) {
                 const lambda = eigenvalues[k];
                 const magnitude = Math.sqrt((lambda.real || 0) * (lambda.real || 0) + (lambda.imag || 0) * (lambda.imag || 0));
                 
-                if (magnitude > maxMagnitude && magnitude > 1e-6) {
-                    maxMagnitude = magnitude;
-                    dominantEigenvalue = lambda;
+                // Skip eigenvalues that are too small or exactly 1 (DC component)
+                if (magnitude < 1e-6 || Math.abs(magnitude - 1.0) < 1e-6) {
+                    continue;
                 }
-            }
-            
-            if (dominantEigenvalue) {
-                const lambda = dominantEigenvalue;
                 
                 // Convert eigenvalue to continuous-time parameters
                 const logLambda = Math.log(Math.abs(lambda));
@@ -558,9 +551,11 @@
                     
                     // Estimate amplitude and phase using least squares fitting
                     const amplitude = estimateAmplitudePhase(x, yDetrended, s_real, s_imag, startTime, samplingInterval);
-                    const phase = amplitude.phase;
-                    const amplitudeMag = amplitude.magnitude;
+                    const phase = amplitude ? amplitude.phase : 0;
+                    const amplitudeMag = amplitude ? amplitude.magnitude : 0;
                     const dampingCoeff = s_real;
+                    
+                    console.log(`Component analysis: frequency=${frequency.toFixed(6)}, s_real=${s_real.toFixed(6)}, s_imag=${s_imag.toFixed(6)}, amplitudeMag=${amplitudeMag}`);
                     
                     signalComponents.push({
                         frequency: frequency,         // rad/sec
@@ -907,6 +902,12 @@
         function estimateAmplitudePhase(timeValues, dataValues, damping, frequency, startTime, samplingInterval) {
             const n = dataValues.length;
             
+            // Check for valid inputs
+            if (!isFinite(damping) || !isFinite(frequency) || frequency === 0) {
+                console.log('Invalid parameters for amplitude estimation: damping=', damping, 'frequency=', frequency);
+                return null;
+            }
+            
             // Build design matrix for least squares: [cos(ωt)e^(σt), sin(ωt)e^(σt)]
             const A = [];
             const b = [];
@@ -914,6 +915,13 @@
             for (let i = 0; i < n; i++) {
                 const t = i * samplingInterval; // Time from start in seconds
                 const expDamping = Math.exp(damping * t);
+                
+                // Check for numerical issues
+                if (!isFinite(expDamping)) {
+                    console.log('Exponential damping overflow at t=', t, 'damping=', damping);
+                    return null;
+                }
+                
                 const cosComponent = Math.cos(frequency * t) * expDamping;
                 const sinComponent = Math.sin(frequency * t) * expDamping;
                 
