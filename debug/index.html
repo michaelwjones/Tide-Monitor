@@ -509,14 +509,23 @@
             const Us = svd.U.slice(0, modelOrder);
             const Vs = svd.Vt.slice(0, modelOrder);
             
-            // Form V1 (first L-1 rows) and V2 (last L-1 rows)
+            // Form V1 (first L-1 columns) and V2 (last L-1 columns) - transpose of Vs submatrices
             const V1 = [];
             const V2 = [];
             
-            for (let i = 0; i < modelOrder; i++) {
-                V1.push(Vs[i].slice(0, L - 1));
-                V2.push(Vs[i].slice(1, L));
+            // V1 and V2 should be (L-1) x modelOrder matrices
+            for (let i = 0; i < L - 1; i++) {
+                const v1Row = [];
+                const v2Row = [];
+                for (let j = 0; j < modelOrder; j++) {
+                    v1Row.push(Vs[j][i]);     // First L-1 elements
+                    v2Row.push(Vs[j][i + 1]); // Last L-1 elements (shifted by 1)
+                }
+                V1.push(v1Row);
+                V2.push(v2Row);
             }
+            
+            console.log(`Matrix Pencil: V1 size = ${V1.length} x ${V1[0].length}, V2 size = ${V2.length} x ${V2[0].length}`);
             
             // Solve generalized eigenvalue problem: V1 * z = λ * V2 * z
             // Simplified approach: use V1^† * V2 for eigenvalue computation
