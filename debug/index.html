@@ -485,10 +485,25 @@
             }
             console.log(`Matrix Pencil: SVD completed, ${svd.S.length} singular values`);
             
-            // TEMPORARILY: Force model order to 2 (for 1 complex frequency pair)
-            const modelOrder = 2;
+            // Determine model order using SVD threshold (keep components > 1% of max singular value)
+            const threshold = 0.01 * Math.max(...svd.S);
+            let modelOrder = 0;
+            for (let i = 0; i < svd.S.length; i++) {
+                if (svd.S[i] > threshold) {
+                    modelOrder++;
+                } else {
+                    break;
+                }
+            }
             
-            if (svd.S.length < modelOrder) return null;
+            // Ensure we have at least 2 components for complex eigenvalue, but not too many
+            modelOrder = Math.max(2, Math.min(modelOrder, 4));
+            console.log(`Matrix Pencil: Determined model order = ${modelOrder} from ${svd.S.length} singular values`);
+            console.log('Singular values:', svd.S);
+            
+            if (svd.S.length < modelOrder) {
+                throw new Error(`Insufficient singular values: need ${modelOrder}, have ${svd.S.length}`);
+            }
             
             // Extract signal subspace (first modelOrder columns of U and Vt)
             const Us = svd.U.slice(0, modelOrder);
@@ -751,8 +766,16 @@
                 // Compute V1^T * V1
                 const V1TV1 = matrixMultiply(V1T, V1);
                 
+                // Check condition number of V1TV1 before inversion
+                const condition = checkConditionNumber(V1TV1);
+                console.log('V1TV1 condition number:', condition);
+                console.log('V1TV1 matrix size:', V1TV1.length, 'x', V1TV1[0].length);
+                
+                if (condition > 1e12) {
+                    throw new Error(`V1TV1 matrix is too ill-conditioned: condition number = ${condition}`);
+                }
+                
                 // Compute (V1^T * V1)^(-1)
-                console.log('V1TV1 matrix:', V1TV1);
                 const V1TV1_inv = matrixInverse(V1TV1);
                 if (!V1TV1_inv) {
                     throw new Error('Failed to invert V1^T * V1 - matrix is singular');
@@ -855,6 +878,25 @@
             }
             
             return eigenvalues;
+        }
+        
+        // Check condition number of a matrix (rough estimate)
+        function checkConditionNumber(A) {
+            const n = A.length;
+            
+            // Simple condition number estimate: ||A|| * ||A^-1||
+            // For a rough check, we'll just look at the diagonal elements
+            let maxDiag = 0;
+            let minDiag = Infinity;
+            
+            for (let i = 0; i < n; i++) {
+                const diag = Math.abs(A[i][i]);
+                maxDiag = Math.max(maxDiag, diag);
+                minDiag = Math.min(minDiag, diag);
+            }
+            
+            if (minDiag === 0) return Infinity;
+            return maxDiag / minDiag;
         }
         
         // Estimate amplitude and phase for a given frequency component
