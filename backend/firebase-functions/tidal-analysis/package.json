@@ -1,0 +1,21 @@
+{
+  "name": "tidal-analysis",
+  "version": "1.0.0",
+  "description": "Matrix Pencil tidal analysis for Tide Monitor",
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "firebase-admin": "^11.8.0",
+    "firebase-functions": "^6.1.0"
+  },
+  "private": true
+}

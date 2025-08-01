@@ -20,7 +20,9 @@
       "Bash(npm:*)",
       "Bash(particle flash:*)",
       "Bash(git remote:*)",
-      "Bash(./deploy.bat)"
+      "Bash(./deploy.bat)",
+      "Bash(move tide-monitor/* tide-enrichment/)",
+      "Bash(mv:*)"
     ],
     "deny": []
   }
