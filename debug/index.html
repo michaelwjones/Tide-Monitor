@@ -485,7 +485,7 @@
             }
             
             // Ensure we have at least 2 components for complex eigenvalue, but not too many
-            modelOrder = Math.max(2, Math.min(modelOrder, 4));
+            modelOrder = Math.max(2, Math.min(modelOrder, 8));
             console.log(`Matrix Pencil: Determined model order = ${modelOrder} from ${svd.S.length} singular values`);
             console.log('Singular values:', svd.S);
             
