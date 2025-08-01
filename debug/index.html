@@ -126,7 +126,7 @@
         let trendLinesVisible = false;
         let currentReadings = [];
         let detectedTidalFrequencies = null;
-        let cachedMatrixPencilResults = null; // Cache Matrix Pencil analysis results
+        let cachedMatrixPencilResults = null; // Cache Matrix Pencil analysis results from Firebase
 
         // Prepare data for cubic spline interpolation with light smoothing (Wind/Wave category)
         function prepareWindWaveSplineData(data) {
@@ -1032,42 +1032,86 @@
             return x;
         }
 
-        // Compute signal components using Matrix Pencil analysis
-        function computeWaterLevelComponents(data, forceRecompute = false) {
-            const n = data.length;
-            if (n < 20) return null; // Need sufficient data for Matrix Pencil
-            
+        // Fetch Matrix Pencil tidal analysis results from Firebase Cloud Functions
+        async function fetchTidalAnalysisFromFirebase() {
+            try {
+                console.log('Fetching Matrix Pencil tidal analysis from Firebase...');
+                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/tidal-analysis.json');
+                
+                if (!response.ok) {
+                    throw new Error(`Firebase fetch failed: ${response.status} ${response.statusText}`);
+                }
+                
+                const analysisData = await response.json();
+                
+                if (!analysisData) {
+                    console.warn('No tidal analysis data available from Firebase');
+                    return null;
+                }
+                
+                // Check if this is an error result
+                if (analysisData.error) {
+                    console.error('Tidal analysis error from Firebase:', analysisData.error);
+                    return null;
+                }
+                
+                // Validate the analysis data structure
+                if (!analysisData.components || !Array.isArray(analysisData.components)) {
+                    console.warn('Invalid tidal analysis data structure from Firebase');
+                    return null;
+                }
+                
+                console.log(`Retrieved ${analysisData.components.length} tidal components from Firebase`);
+                console.log(`Analysis methodology: ${analysisData.methodology}`);
+                console.log(`Computed at: ${analysisData.timestamp}`);
+                console.log(`Computation time: ${analysisData.computationTimeMs}ms`);
+                console.log(`Data points: ${analysisData.dataPoints} over ${analysisData.timeSpanHours}h`);
+                
+                // Update table with retrieved components
+                detectedTidalFrequencies = analysisData.components;
+                updateTidalAnalysisTable(analysisData.components);
+                
+                // Format results for trend line reconstruction
+                const results = {
+                    dcComponent: analysisData.dcComponent,
+                    components: analysisData.components,
+                    startTime: Date.now() - (parseFloat(analysisData.timeSpanHours) * 60 * 60 * 1000), // Approximate start time
+                    samplingInterval: 60, // 1 minute intervals
+                    modelOrder: analysisData.modelOrder,
+                    pencilParam: analysisData.pencilParam,
+                    dataLength: analysisData.dataPoints,
+                    primaryPeriod: analysisData.components[0]?.periodMs || 24 * 60 * 60 * 1000,
+                    primaryPeriodHours: analysisData.components[0]?.periodHours || 24,
+                    primaryPower: analysisData.components[0]?.power || 0,
+                    methodology: analysisData.methodology,
+                    computationTimeMs: analysisData.computationTimeMs,
+                    timestamp: analysisData.timestamp
+                };
+                
+                return results;
+                
+            } catch (error) {
+                console.error('Failed to fetch tidal analysis from Firebase:', error);
+                return null;
+            }
+        }
+
+        // Compute signal components using Firebase Matrix Pencil analysis
+        async function computeWaterLevelComponents(data, forceRecompute = false) {
             // Use cached results if available and not forcing recompute
             if (cachedMatrixPencilResults && !forceRecompute) {
-                console.log('Using cached Matrix Pencil results');
+                console.log('Using cached Matrix Pencil results from Firebase');
                 return cachedMatrixPencilResults;
             }
             
-            // Perform Matrix Pencil analysis
-            console.log('Computing Matrix Pencil analysis...');
-            const pencilResult = matrixPencilAnalysis(data);
-            if (!pencilResult || !pencilResult.components || pencilResult.components.length === 0) {
-                console.warn('Matrix Pencil analysis failed to detect signal components - skipping trends');
+            // Fetch analysis results from Firebase
+            const results = await fetchTidalAnalysisFromFirebase();
+            
+            if (!results) {
+                console.warn('No Matrix Pencil analysis results available from Firebase - skipping trends');
+                updateTidalAnalysisTable(null);
                 return null;
             }
-            
-            // Store components for table display and update table immediately
-            detectedTidalFrequencies = pencilResult.components;
-            updateTidalAnalysisTable(pencilResult.components);
-            
-            // Cache and return Matrix Pencil results for trend line reconstruction
-            const results = {
-                dcComponent: pencilResult.dcComponent,
-                components: pencilResult.components,
-                startTime: pencilResult.startTime,
-                samplingInterval: pencilResult.samplingInterval,
-                modelOrder: pencilResult.modelOrder,
-                pencilParam: pencilResult.pencilParam,
-                dataLength: pencilResult.dataLength,
-                primaryPeriod: pencilResult.components[0]?.periodMs || 24 * 60 * 60 * 1000,
-                primaryPeriodHours: pencilResult.components[0]?.periodHours || 24,
-                primaryPower: pencilResult.components[0]?.power || 0
-            };
             
             // Cache the results for future use
             cachedMatrixPencilResults = results;
@@ -1102,11 +1146,11 @@
         }
         
         // Generate Matrix Pencil trend line data points for Water Level category
-        function generateWaterLevelTrendLine(displayData, analysisData) {
-            if (!analysisData || analysisData.length < 20) return [];
+        async function generateWaterLevelTrendLine(displayData, analysisData) {
+            if (!displayData || displayData.length < 4) return [];
             
-            // Compute Matrix Pencil components from analysis data
-            const pencilResult = computeWaterLevelComponents(analysisData);
+            // Fetch Matrix Pencil components from Firebase
+            const pencilResult = await computeWaterLevelComponents(analysisData);
             if (!pencilResult) return [];
             
             // Generate evaluation points for smooth curve over full chart display range
@@ -1180,8 +1224,8 @@
                 document.getElementById('content').classList.remove('hidden');
                 
                 // Run automatic tidal analysis for table (async, after chart is displayed)
-                setTimeout(() => {
-                    performTidalAnalysis(allReadings);
+                setTimeout(async () => {
+                    await performTidalAnalysis(allReadings);
                 }, 0);
             } catch (error) {
                 console.error('Error fetching debug data:', error);
@@ -1433,15 +1477,17 @@
             
             // Add trend lines if enabled
             if (trendLinesVisible) {
-                addTrendLines();
+                setTimeout(async () => {
+                    await addTrendLines();
+                }, 0);
             }
         }
 
-        // Add water level trend lines using harmonics
-        function addWaterLevelTrendLines() {
+        // Add water level trend lines using Matrix Pencil analysis from Firebase
+        async function addWaterLevelTrendLines() {
             if (!debugChartInstance || !currentReadings.length) return;
             
-            // Use full 72hr dataset for both FFT analysis and display
+            // Use full 72hr dataset for both analysis and display
             const allValidReadings = currentReadings.filter(r => r.rawTimestamp.getTime() > 0);
             
             // Use all data for display (full 72 hours)
@@ -1463,8 +1509,7 @@
             });
             
             // Define water level datasets for Matrix Pencil trend lines
-            // Use full 72hr data for Matrix Pencil analysis and reconstruction
-            // Only calculate trend lines for average water level data
+            // Only calculate trend lines for average water level data (from Firebase)
             const waterLevelConfigs = [
                 {
                     datasetIndex: 0,
@@ -1476,28 +1521,34 @@
                 }
             ];
             
-            // Calculate and add Matrix Pencil trend lines
-            waterLevelConfigs.forEach(config => {
-                if (config.analysisData.length >= 20) { // Need at least 20 points for Matrix Pencil analysis
-                    // Generate trend line using Matrix Pencil analysis
-                    const trendData = generateWaterLevelTrendLine(config.displayData, config.analysisData);
-                    
-                    if (trendData && trendData.length > 0) {
-                        debugChartInstance.data.datasets.push({
-                            label: config.label,
-                            data: trendData,
-                            borderColor: config.borderColor,
-                            backgroundColor: 'transparent',
-                            borderWidth: 3,
-                            pointRadius: 0,
-                            pointHoverRadius: 0,
-                            yAxisID: config.yAxisID,
-                            order: 200 + config.datasetIndex,
-                            borderDash: [15, 10]
-                        });
+            // Calculate and add Matrix Pencil trend lines asynchronously
+            for (const config of waterLevelConfigs) {
+                if (config.displayData.length >= 4) {
+                    try {
+                        // Generate trend line using Matrix Pencil analysis from Firebase
+                        const trendData = await generateWaterLevelTrendLine(config.displayData, config.analysisData);
+                        
+                        if (trendData && trendData.length > 0) {
+                            debugChartInstance.data.datasets.push({
+                                label: config.label,
+                                data: trendData,
+                                borderColor: config.borderColor,
+                                backgroundColor: 'transparent',
+                                borderWidth: 3,
+                                pointRadius: 0,
+                                pointHoverRadius: 0,
+                                yAxisID: config.yAxisID,
+                                order: 200 + config.datasetIndex,
+                                borderDash: [15, 10]
+                            });
+                        } else {
+                            console.warn(`No trend data available for ${config.label}`);
+                        }
+                    } catch (error) {
+                        console.error(`Error generating trend line for ${config.label}:`, error);
                     }
                 }
-            });
+            }
             
             debugChartInstance.update();
         }
@@ -1653,8 +1704,8 @@
         }
 
         // Add all trend lines (both categories using different methods)
-        function addTrendLines() {
-            addWaterLevelTrendLines();
+        async function addTrendLines() {
+            await addWaterLevelTrendLines();
             addWindWaveTrendLines();
         }
         
@@ -1665,14 +1716,14 @@
         }
         
         // Toggle trend lines visibility (unified interface)
-        function toggleTrendLines() {
+        async function toggleTrendLines() {
             trendLinesVisible = !trendLinesVisible;
             
             const button = document.getElementById('toggleTrendlines');
             if (trendLinesVisible) {
                 button.textContent = 'Hide Trend Lines';
                 button.classList.add('active');
-                addTrendLines();
+                await addTrendLines();
             } else {
                 button.textContent = 'Show Trend Lines';
                 button.classList.remove('active');
@@ -1680,33 +1731,24 @@
             }
         }
 
-        // Perform automatic tidal analysis for table display using Matrix Pencil
-        function performTidalAnalysis(readings) {
-            if (!readings || readings.length < 20) {
+        // Perform automatic tidal analysis for table display using Firebase Matrix Pencil
+        async function performTidalAnalysis(readings) {
+            if (!readings || readings.length < 4) {
                 updateTidalAnalysisTable(null);
                 return;
             }
             
-            // Use same data filtering as trend lines for consistency
-            const allValidReadings = readings.filter(r => r.rawTimestamp.getTime() > 0);
-            
-            // Use water level average data for analysis (same as trend lines)
-            const waterLevelData = allValidReadings.map(r => ({
-                x: r.rawTimestamp,
-                y: parseFloat(r.waterLevel)
-            })).filter(d => !isNaN(d.y));
-            
-            if (waterLevelData.length < 20) {
-                updateTidalAnalysisTable(null);
-                return;
-            }
-            
-            // Run Matrix Pencil analysis that happens in trend lines
-            // This will automatically update the table through computeWaterLevelComponents
-            const pencilResult = computeWaterLevelComponents(waterLevelData);
-            
-            // If Matrix Pencil analysis failed, show no results
-            if (!pencilResult) {
+            try {
+                // Fetch Matrix Pencil analysis from Firebase (data parameter not used)
+                const pencilResult = await computeWaterLevelComponents(null);
+                
+                // If Matrix Pencil analysis failed, show no results
+                if (!pencilResult) {
+                    updateTidalAnalysisTable(null);
+                }
+                // Table is automatically updated in computeWaterLevelComponents
+            } catch (error) {
+                console.error('Error performing tidal analysis:', error);
                 updateTidalAnalysisTable(null);
             }
         }

@@ -1,8 +1,19 @@
 {
   "functions": [
     {
-      "source": "tide-monitor",
-      "codebase": "default",
+      "source": "tide-enrichment",
+      "codebase": "tide-enrichment",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    },
+    {
+      "source": "tidal-analysis",
+      "codebase": "tidal-analysis",
       "ignore": [
         "node_modules",
         ".git",
@@ -11,5 +22,13 @@
         "*.local"
       ]
     }
-  ]
+  ],
+  "emulators": {
+    "functions": {
+      "port": 5001
+    },
+    "ui": {
+      "enabled": true
+    }
+  }
 }

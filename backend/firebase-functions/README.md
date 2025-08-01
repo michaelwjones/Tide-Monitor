@@ -1,10 +1,17 @@
 # Firebase Cloud Functions
 
-This directory contains Firebase Cloud Functions that automatically enrich tide monitoring data with environmental conditions from NOAA.
+This directory contains Firebase Cloud Functions for the Tide Monitor project:
+
+1. **Tide Enrichment** (`tide-enrichment/`) - Enriches sensor data with NOAA environmental conditions
+2. **Tidal Analysis** (`tidal-analysis/`) - Advanced harmonic analysis using Matrix Pencil v1 methodology
 
 ## Overview
 
+### Tide Enrichment Function
 The `enrichTideData` function automatically triggers when new readings are written to the Firebase `/readings/` path and enriches each entry with real-time wind and water level data from NOAA station 8656483 (Duke Marine Lab, Beaufort, NC).
+
+### Tidal Analysis Function  
+The `runTidalAnalysis` function runs every 5 minutes via Cloud Scheduler to perform advanced tidal harmonic analysis using the Matrix Pencil v1 method. Results are stored in `/tidal-analysis/` for use by the debug dashboard.
 
 ## Data Enrichment
 
@@ -80,20 +87,47 @@ These -999 values indicate validation failures or API errors, not actual measure
 
 ## Development
 
-### Deploy Functions
+### Deploy Both Functions
 ```bash
 cd backend/firebase-functions
 firebase deploy --only functions
 ```
 
+### Deploy Individual Functions
+```bash
+# Deploy only tide enrichment
+firebase deploy --only functions --source tide-enrichment
+
+# Deploy only tidal analysis (remember to enable first!)
+firebase functions:config:set tidal.analysis.enabled=true
+firebase deploy --only functions --source tidal-analysis
+```
+
 ### View Logs
 ```bash
+# All functions
 firebase functions:log
+
+# Specific function
+firebase functions:log --only enrichTideData
+firebase functions:log --only runTidalAnalysis
 ```
 
 ### Test Locally
 ```bash
 firebase emulators:start --only functions
+```
+
+### Tidal Analysis Management
+```bash
+# Enable tidal analysis (IMPORTANT: Disabled by default)
+firebase functions:config:set tidal.analysis.enabled=true
+
+# Disable to save costs
+firebase functions:config:set tidal.analysis.enabled=false
+
+# Check current config
+firebase functions:config:get
 ```
 
 ## Monitoring
