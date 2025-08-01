@@ -97,11 +97,11 @@
                 <thead>
                     <tr>
                         <th>Rank</th>
-                        <th>Period (hours)</th>
+                        <th>Period</th>
                         <th>Frequency (cycles/day)</th>
                         <th>Amplitude</th>
                         <th>Damping (1/s)</th>
-                        <th>Phase Offset (hours)</th>
+                        <th>Phase Offset</th>
                         <th>Component Type</th>
                     </tr>
                 </thead>
@@ -1739,11 +1739,15 @@
                     `+${component.damping.toExponential(2)}` : 
                     component.damping.toExponential(2);
                 
-                // Convert phase from radians to hours: phase (rad) * period (h) / (2π)
+                // Convert phase from radians to hours and minutes: phase (rad) * period (h) / (2π)
                 const phaseHours = (component.phase * component.periodHours) / (2 * Math.PI);
-                const phaseDisplay = phaseHours >= 0 ? 
-                    `+${phaseHours.toFixed(2)}h` : 
-                    `${phaseHours.toFixed(2)}h`;
+                const phaseMinutes = Math.round(Math.abs(phaseHours) * 60);
+                const phaseDisplayHours = Math.floor(phaseMinutes / 60);
+                const phaseDisplayMins = phaseMinutes % 60;
+                const phaseSign = phaseHours >= 0 ? '+' : '-';
+                const phaseDisplay = phaseDisplayMins === 0 ? 
+                    `${phaseSign}${phaseDisplayHours}h` : 
+                    `${phaseSign}${phaseDisplayHours}h ${phaseDisplayMins}m`;
                 
                 row.innerHTML = `
                     <td>${index + 1}</td>
