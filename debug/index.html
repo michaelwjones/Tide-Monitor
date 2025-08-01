@@ -92,7 +92,7 @@
         </div>
         
         <div style="margin-top: 20px;">
-            <h3>Dominant Signal Component (Matrix Pencil - Single Frequency Mode)</h3>
+            <h3>Detected Tidal Frequencies (Matrix Pencil Analysis)</h3>
             <table id="tidalAnalysisTable" class="tidal-analysis-table">
                 <thead>
                     <tr>
@@ -125,6 +125,7 @@
         let trendLinesVisible = false;
         let currentReadings = [];
         let detectedTidalFrequencies = null;
+        let cachedMatrixPencilResults = null; // Cache Matrix Pencil analysis results
 
         // Prepare data for cubic spline interpolation with light smoothing (Wind/Wave category)
         function prepareWindWaveSplineData(data) {
@@ -1031,11 +1032,18 @@
         }
 
         // Compute signal components using Matrix Pencil analysis
-        function computeWaterLevelComponents(data) {
+        function computeWaterLevelComponents(data, forceRecompute = false) {
             const n = data.length;
             if (n < 20) return null; // Need sufficient data for Matrix Pencil
             
-            // Use Matrix Pencil analysis instead of FFT
+            // Use cached results if available and not forcing recompute
+            if (cachedMatrixPencilResults && !forceRecompute) {
+                console.log('Using cached Matrix Pencil results');
+                return cachedMatrixPencilResults;
+            }
+            
+            // Perform Matrix Pencil analysis
+            console.log('Computing Matrix Pencil analysis...');
             const pencilResult = matrixPencilAnalysis(data);
             if (!pencilResult || !pencilResult.components || pencilResult.components.length === 0) {
                 console.warn('Matrix Pencil analysis failed to detect signal components - skipping trends');
@@ -1046,8 +1054,8 @@
             detectedTidalFrequencies = pencilResult.components;
             updateTidalAnalysisTable(pencilResult.components);
             
-            // Return Matrix Pencil results for trend line reconstruction
-            return {
+            // Cache and return Matrix Pencil results for trend line reconstruction
+            const results = {
                 dcComponent: pencilResult.dcComponent,
                 components: pencilResult.components,
                 startTime: pencilResult.startTime,
@@ -1059,6 +1067,11 @@
                 primaryPeriodHours: pencilResult.components[0]?.periodHours || 24,
                 primaryPower: pencilResult.components[0]?.power || 0
             };
+            
+            // Cache the results for future use
+            cachedMatrixPencilResults = results;
+            
+            return results;
         }
         
         // Evaluate Matrix Pencil signal reconstruction: Σ Aₖ e^(sₖt) where sₖ = σₖ + jωₖ
@@ -1115,6 +1128,9 @@
 
         async function fetchDebugData() {
             try {
+                // Clear cached Matrix Pencil results when fetching new data
+                cachedMatrixPencilResults = null;
+                
                 // Fetch full 72 hours of data for display and analysis
                 const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/.json?orderBy="$key"&limitToLast=4320');
                 const data = await response.json();
@@ -1447,6 +1463,7 @@
             
             // Define water level datasets for Matrix Pencil trend lines
             // Use full 72hr data for Matrix Pencil analysis and reconstruction
+            // Only calculate trend lines for average water level data
             const waterLevelConfigs = [
                 {
                     datasetIndex: 0,
@@ -1454,30 +1471,6 @@
                     analysisData: allValidReadings.map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevel)})),
                     displayData: displayReadings.map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevel)})),
                     borderColor: 'rgba(0, 0, 255, 0.9)',
-                    yAxisID: 'y'
-                },
-                {
-                    datasetIndex: 1,
-                    label: 'Water Level (Percentile) - Matrix Pencil',
-                    analysisData: allValidReadings.filter(r => r.waterLevelPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelPercentile)})),
-                    displayData: displayReadings.filter(r => r.waterLevelPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelPercentile)})),
-                    borderColor: 'rgba(0, 255, 255, 0.9)',
-                    yAxisID: 'y'
-                },
-                {
-                    datasetIndex: 2,
-                    label: 'Water Level (Envelope) - Matrix Pencil',
-                    analysisData: allValidReadings.filter(r => r.waterLevelEnvelope !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelEnvelope)})),
-                    displayData: displayReadings.filter(r => r.waterLevelEnvelope !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelEnvelope)})),
-                    borderColor: 'rgba(255, 0, 255, 0.9)',
-                    yAxisID: 'y'
-                },
-                {
-                    datasetIndex: 6,
-                    label: 'Duke Marine Lab Water Level - Matrix Pencil',
-                    analysisData: allValidReadings.filter(r => r.dukeWaterLevelRaw !== null).map(r => ({x: r.rawTimestamp, y: r.dukeWaterLevelRaw + 1.2})),
-                    displayData: displayReadings.filter(r => r.dukeWaterLevelRaw !== null).map(r => ({x: r.rawTimestamp, y: r.dukeWaterLevelRaw + 1.2})),
-                    borderColor: 'rgba(0, 0, 139, 0.9)',
                     yAxisID: 'y'
                 }
             ];
