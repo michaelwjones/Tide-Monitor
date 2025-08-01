@@ -54,11 +54,11 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Web Das
 - **Enhanced visualization** of wave calculation methods
 - **System diagnostics** with valid sample tracking
 - **Advanced trend line analysis** with dual methodologies:
-  - **Water Level Harmonics**: FFT-detected tidal pattern fitting with automatic period detection
+  - **Water Level Harmonics**: Matrix Pencil signal analysis for non-periodic tidal reconstruction
   - **Wind/Wave Splines**: 30-point smoothed cubic spline interpolation
 - **Automatic tidal frequency analysis** with comprehensive results table
   - **Immediate chart display**: Chart loads instantly when data arrives
-  - **Background analysis**: FFT analysis runs asynchronously for smooth user experience
+  - **Background analysis**: Matrix Pencil analysis runs once per data refresh with caching
   - **Auto-updating**: Analysis refreshes every 2 minutes with new data
 - **NOAA environmental data** integration (wind, water level)
 - **Wind range**: 0-40 knots for comprehensive weather tracking
@@ -129,14 +129,15 @@ The system collects readings every minute with the following data points:
 
 ### Advanced Trend Line Analysis
 
-#### Water Level Harmonics
-- **Mathematical Form**: `f(t) = a0 + a1*sin(a2*t + a3)`
-- **Coefficients**: 4 parameters (DC offset, amplitude, frequency, phase)
-- **FFT-Based Detection**: Automatic tidal period discovery from optimized 4096-sample FFT (from 72-hour dataset)
-- **Frequency Range**: 6-48 hour periods with 30-minute resolution
-- **Pattern Recognition**: Detects dominant tidal constituents automatically
-- **Least Squares Fitting**: Robust amplitude and phase calculation
-- **Tidal Classification**: Automatic identification of diurnal, semi-diurnal, and harmonic components
+#### Water Level Harmonics (Matrix Pencil Method)
+- **Mathematical Form**: `f(t) = Σ Aₖ e^(σₖ + jωₖ)t` (complex exponential decomposition)
+- **Signal Components**: Up to 8 components with automatic model order selection via SVD
+- **Matrix Pencil Analysis**: Advanced signal processing for non-periodic tidal data
+- **Frequency Detection**: Detects multiple tidal constituents simultaneously (M2 ~12.4h, S2 ~12.0h, K1 ~23.9h, O1 ~25.8h)
+- **Non-Periodic Capability**: Handles real-world tidal variations without periodicity assumptions
+- **SVD-Based Selection**: Automatic component selection using 1% singular value threshold
+- **Amplitude & Damping**: Estimates both oscillation amplitude and damping coefficients
+- **Full Chart Coverage**: Trend lines span entire display range with no edge artifacts
 
 #### Wind/Wave Cubic Splines
 - **Enhanced Smoothing**: Progressive 1-30 point moving averages (16 smoothing levels)
@@ -159,21 +160,21 @@ The system collects readings every minute with the following data points:
 
 ### Advanced Analytics
 - **Dual Methodology Trend Analysis**: Unified interface with specialized algorithms
-  - **Water Levels**: FFT-based harmonic analysis with automatic tidal detection
+  - **Water Levels**: Matrix Pencil signal analysis for non-periodic tidal reconstruction
   - **Wind/Wave Data**: Enhanced 30-point smoothed cubic splines
-- **Performance Optimized**: O(n) complexity using Thomas algorithm for fast rendering
-- **Edge-Safe**: Natural splines prevent oscillation artifacts at data boundaries
+- **Performance Optimized**: Cached Matrix Pencil results prevent duplicate computation
+- **Edge-Safe**: Matrix Pencil reconstruction covers full chart range without artifacts
 - **Toggle Control**: Single button controls both trend line methodologies
-- **Visual Distinction**: Harmonics use thick dashed lines, splines use standard dashing
+- **Visual Distinction**: Matrix Pencil uses thick dashed lines, splines use standard dashing
 
 ### Security & Performance
 - **Content Security Policy**: Protection against XSS attacks
 - **Optimized Rendering**: Chart animations disabled for performance
 - **Error Handling**: Graceful degradation when data is unavailable
 - **Responsive Design**: Works on desktop and mobile devices
-- **Fast Trend Lines**: Optimized 4096-sample FFT harmonic computation, cubic splines under 150ms for full dataset
-- **Automatic Tidal Analysis**: FFT-based period detection with comprehensive frequency table
-- **Extended Data Window**: 72-hour dataset with optimized FFT analysis provides 3+ tidal cycles for robust frequency detection
+- **Fast Trend Lines**: Cached Matrix Pencil analysis with full 4318-sample processing, cubic splines under 150ms
+- **Automatic Tidal Analysis**: Matrix Pencil multiple frequency detection with comprehensive results table
+- **Extended Data Window**: 72-hour dataset with Matrix Pencil analysis provides robust multi-component tidal detection
 
 ## 📱 Mobile Support
 
@@ -187,7 +188,7 @@ Both dashboards are optimized for mobile viewing with:
 
 - **Sensor readings**: Every minute
 - **Dashboard refresh**: Every 2 minutes
-- **Data retention**: 72 hours visible (4320 readings) with FFT optimized to 4096 samples
+- **Data retention**: 72 hours visible (4318 readings) with Matrix Pencil analysis on full dataset
 - **Timezone**: Eastern Time (America/New_York)
 
 ## 🤝 Contributing

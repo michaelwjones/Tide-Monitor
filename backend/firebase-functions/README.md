@@ -118,9 +118,9 @@ The enriched data is used by the web dashboards for:
   - **Extended visualization**: 72 hours of wind speed and gust data (0-40 knot range)
   - **Water level comparison**: Sensor vs NOAA measurements over 72-hour period
   - **Advanced trend analysis**: 
-    - **Water Level Harmonics**: FFT-based automatic tidal period detection
+    - **Water Level Harmonics**: Matrix Pencil signal analysis for non-periodic tidal reconstruction
     - **Wind/Wave Splines**: 30-point smoothed cubic interpolation
-  - **Automatic tidal analysis**: Real-time frequency table with constituent identification
+  - **Automatic tidal analysis**: Matrix Pencil multiple frequency detection with comprehensive results table
   - **Auto-refresh**: Analysis updates every 2 minutes with new data
   - **Environmental context**: Integrated NOAA wind and water level data
 
@@ -133,8 +133,9 @@ If enrichment is not working:
 4. Look for -999 error values indicating API failures
 5. Check debug dashboard for comprehensive analysis features:
    - 72-hour data visualization for extended pattern analysis
-   - FFT-based tidal frequency detection with automatic constituent identification
-   - Water level harmonic analysis with data-driven period detection
+   - Matrix Pencil tidal frequency detection with up to 8 signal components
+   - Water level harmonic analysis with non-periodic signal processing
    - Wind/wave cubic spline smoothing (30-point averaging)
-   - Automatic tidal analysis table showing detected frequencies and classifications
+   - Automatic tidal analysis table showing detected frequencies (M2, S2, K1, O1, etc.)
    - Unified toggle control for both trend line methodologies
+   - Cached Matrix Pencil results for improved performance
