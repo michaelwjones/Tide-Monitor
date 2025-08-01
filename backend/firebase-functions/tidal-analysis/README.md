@@ -22,9 +22,17 @@ firebase functions:config:set tidal.analysis.enabled=true
 **Note**: You control when analysis runs by setting this variable. This prevents unnecessary computation costs.
 
 ### 3. Deploy Function
+
+**Option A: Using Batch File (Recommended)**
+```batch
+# Interactive deployment with cost control
+deploy-tidal-analysis.bat
+```
+
+**Option B: Command Line**
 ```bash
 # From the firebase-functions directory
-firebase deploy --only functions:runTidalAnalysis,functions:triggerTidalAnalysis --project your-project-id
+firebase deploy --only functions --source tidal-analysis
 ```
 
 ### 4. Set up Cloud Scheduler
@@ -33,15 +41,31 @@ The function automatically runs every 5 minutes when enabled. Cloud Scheduler wi
 ## Usage
 
 ### Enable Analysis
+
+**Option A: Using Batch File**
+```batch
+# Run interactive deployment and choose "Deploy with analysis ENABLED"
+deploy-tidal-analysis.bat
+```
+
+**Option B: Command Line**
 ```bash
 firebase functions:config:set tidal.analysis.enabled=true
-firebase deploy --only functions
+firebase deploy --only functions --source tidal-analysis
 ```
 
 ### Disable Analysis
+
+**Option A: Using Batch File**
+```batch  
+# Run interactive deployment and choose "Deploy with analysis DISABLED"
+deploy-tidal-analysis.bat
+```
+
+**Option B: Command Line**
 ```bash
 firebase functions:config:set tidal.analysis.enabled=false
-firebase deploy --only functions
+firebase deploy --only functions --source tidal-analysis
 ```
 
 ### Monitor Logs

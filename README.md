@@ -80,6 +80,11 @@ Simply visit the live dashboard links above - no installation required!
 2. Navigate to `backend/boron404x/`
 3. Run `flash.bat` to deploy to your Particle Boron device
 
+### Deploy Cloud Functions (Advanced)
+1. Navigate to `backend/firebase-functions/`
+2. Run `deploy.bat` for interactive deployment menu
+3. Or use `deploy-enrichment.bat` / `deploy-tidal-analysis.bat` for specific functions
+
 ## 📊 Data Format
 
 The system collects readings every minute with the following data points:

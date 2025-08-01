@@ -87,13 +87,19 @@ These -999 values indicate validation failures or API errors, not actual measure
 
 ## Development
 
-### Deploy Both Functions
-```bash
-cd backend/firebase-functions
-firebase deploy --only functions
+### Deploy Using Batch Files (Recommended)
+```batch
+# Interactive menu with all options
+deploy.bat
+
+# Deploy enrichment only (always safe, no costs)
+deploy-enrichment.bat
+
+# Deploy tidal analysis with cost control menu
+deploy-tidal-analysis.bat
 ```
 
-### Deploy Individual Functions
+### Deploy Individual Functions (Command Line)
 ```bash
 # Deploy only tide enrichment
 firebase deploy --only functions --source tide-enrichment
@@ -101,6 +107,12 @@ firebase deploy --only functions --source tide-enrichment
 # Deploy only tidal analysis (remember to enable first!)
 firebase functions:config:set tidal.analysis.enabled=true
 firebase deploy --only functions --source tidal-analysis
+```
+
+### Deploy Both Functions (Command Line)
+```bash
+cd backend/firebase-functions
+firebase deploy --only functions
 ```
 
 ### View Logs
