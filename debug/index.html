@@ -614,6 +614,16 @@
                         yAxisID: 'y3',
                         order: 10,
                         borderDash: [3, 3]
+                    }, {
+                        label: 'Analysis Error',
+                        data: [], // Will be populated after Matrix Pencil analysis is available
+                        borderColor: 'rgba(255, 100, 100, 1)',
+                        backgroundColor: 'rgba(255, 100, 100, 0.1)',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        yAxisID: 'y',
+                        order: 11
                     }]
                 },
                 options: {
@@ -733,7 +743,8 @@
                     { label: 'Wave Height (Envelope)', color: 'orange' },
                     { label: 'Wind Speed', color: 'green' },
                     { label: 'Gust Speed', color: 'darkgreen', dot: true },
-                    { label: 'Valid Samples', color: 'gray' }
+                    { label: 'Valid Samples', color: 'gray' },
+                    { label: 'Analysis Error', color: 'rgb(255, 100, 100)' }
                 ];
                 
                 legendContainer.innerHTML = legendItems.map(item => `
@@ -1014,11 +1025,62 @@
                 // If Matrix Pencil analysis failed, show no results
                 if (!pencilResult) {
                     updateTidalAnalysisTable(null);
+                } else {
+                    // Calculate and add analysis error after Matrix Pencil results are available
+                    await addAnalysisError(readings, pencilResult);
                 }
                 // Table is automatically updated in computeWaterLevelComponents
             } catch (error) {
                 console.error('Error performing tidal analysis:', error);
                 updateTidalAnalysisTable(null);
+            }
+        }
+        
+        // Calculate and display analysis error: measured - reconstructed + 1
+        async function addAnalysisError(readings, pencilResult) {
+            if (!debugChartInstance || !readings || !pencilResult) {
+                console.warn('Cannot add analysis error: missing chart, readings, or pencil results');
+                return;
+            }
+            
+            try {
+                console.log('Calculating analysis error...');
+                
+                // Filter valid readings
+                const validReadings = readings.filter(r => r.rawTimestamp.getTime() > 0);
+                
+                // Calculate error for each data point: measured - reconstructed + 1
+                const errorData = validReadings.map(reading => {
+                    const timePoint = reading.rawTimestamp;
+                    const measuredLevel = parseFloat(reading.waterLevel);
+                    
+                    // Get reconstructed value at this time point
+                    const reconstructed = evaluateMatrixPencilReconstruction(pencilResult, [timePoint]);
+                    const reconstructedValue = reconstructed[0]?.y || 0;
+                    
+                    // Calculate error: measured - reconstructed + 1 (offset to keep negatives visible)
+                    const error = measuredLevel - reconstructedValue + 1;
+                    
+                    return {x: timePoint, y: error};
+                });
+                
+                // Find the Analysis Error dataset (should be the last one)
+                const analysisErrorIndex = debugChartInstance.data.datasets.findIndex(
+                    dataset => dataset.label === 'Analysis Error'
+                );
+                
+                if (analysisErrorIndex !== -1) {
+                    // Update the Analysis Error dataset with calculated data
+                    debugChartInstance.data.datasets[analysisErrorIndex].data = errorData;
+                    debugChartInstance.update();
+                    
+                    console.log(`Added analysis error data with ${errorData.length} points`);
+                } else {
+                    console.warn('Analysis Error dataset not found in chart');
+                }
+                
+            } catch (error) {
+                console.error('Error calculating analysis error:', error);
             }
         }
         
