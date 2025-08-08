@@ -25,14 +25,16 @@ This is a **Tide Monitor** project that measures water levels and wave heights u
    - System status monitoring
    - Same clean layout as main dashboard for consistency
 
-4. **Firebase Cloud Functions** (`backend/firebase-functions/`) - Serverless functions that:
-   - Automatically trigger when new readings arrive
+4. **Firebase Cloud Functions** (`backend/firebase-functions/`) - Two separate serverless functions:
+   - **Data Enrichment** (`tide-enrichment/`): Automatically triggers when new readings arrive
+   - **Tidal Analysis** (`tidal-analysis/`): Scheduled Matrix Pencil analysis every 5 minutes (optional, costs money)
    - Fetch real-time wind and water level data from NOAA station 8656483 (Duke Marine Lab)
    - Enrich each reading with environmental conditions
    - Perform strict data validation requiring at least 1 data point (uses last element)
    - Validate all expected fields are present (wind: s,d,g; water: v,t)
    - Handle variable API response sizes (NOAA occasionally returns full day data)
    - Handle API failures gracefully with error codes and detailed logging
+   - Use `.env` files for configuration (modern approach, replaces deprecated `functions:config`)
 
 ## Data Flow Architecture
 
@@ -121,8 +123,12 @@ This project uses minimal build tools. Development involves:
 1. **Firmware development**: Use Particle Workbench or Web IDE for the Arduino code
    - **Flash to device**: Run `flash.bat` in `backend/boron404x/` directory to deploy firmware to Particle Boron
 2. **Web dashboard**: Open `index.html` directly in browser or serve with local HTTP server
-3. **Firebase Functions**: Deploy Cloud Functions for data enrichment
-   - **Deploy**: `cd backend/firebase-functions && firebase deploy --only functions`
+3. **Firebase Functions**: Deploy Cloud Functions for data enrichment and tidal analysis
+   - **Interactive deployment**: Run `deploy.bat` in `backend/firebase-functions/` for menu-driven deployment
+   - **Enrichment only**: `deploy-enrichment.bat` (NOAA data enrichment, always safe)
+   - **Tidal analysis**: `deploy-tidal-analysis.bat` (Matrix Pencil analysis with cost control)
+   - **Manual CLI**: `firebase deploy --only functions:tide-enrichment` or `functions:tidal-analysis`
+   - **Prerequisites**: Run `npm install` in each function directory before first deployment
    - **Logs**: `firebase functions:log`
    - **Test locally**: `firebase emulators:start --only functions`
 4. **Testing**: Manual testing with live sensor data or Firebase data inspection
@@ -138,11 +144,19 @@ Tide-Monitor/
     ├── boron404x/
     │   └── tide-monitor-analog.ino      # Particle Boron firmware
     ├── firebase-functions/
-    │   ├── README.md                    # Cloud Functions documentation
-    │   ├── firebase.json                # Firebase configuration
-    │   └── tide-monitor/
-    │       ├── index.js                 # NOAA data enrichment function
-    │       └── package.json             # Node.js dependencies
+    │   ├── README.md                    # Cloud Functions documentation  
+    │   ├── firebase.json                # Multi-codebase Firebase configuration
+    │   ├── deploy.bat                   # Interactive deployment menu
+    │   ├── deploy-enrichment.bat        # NOAA enrichment deployment
+    │   ├── deploy-tidal-analysis.bat    # Tidal analysis deployment with cost control
+    │   ├── MATRIX_PENCIL_V1.md          # Matrix Pencil methodology documentation
+    │   ├── tide-enrichment/             # NOAA data enrichment function
+    │   │   ├── index.js
+    │   │   └── package.json
+    │   └── tidal-analysis/              # Matrix Pencil tidal analysis function
+    │       ├── README.md                # Analysis deployment guide
+    │       ├── index.js                 # Matrix Pencil v1 implementation
+    │       └── package.json
     └── particle.io/
         └── firebase integration.txt     # Webhook configuration
 ```

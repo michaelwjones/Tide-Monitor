@@ -126,7 +126,7 @@
         let trendLinesVisible = false;
         let currentReadings = [];
         let detectedTidalFrequencies = null;
-        let cachedMatrixPencilResults = null; // Cache Matrix Pencil analysis results
+        let cachedMatrixPencilResults = null; // Cache Matrix Pencil analysis results from Firebase
 
         // Prepare data for cubic spline interpolation with light smoothing (Wind/Wave category)
         function prepareWindWaveSplineData(data) {
@@ -300,774 +300,87 @@
             return evaluateWindWaveCubicSpline(spline, evalPoints);
         }
 
-        // Matrix Pencil Method for signal parameter estimation
-        // Decomposes signal into complex exponentials: y(t) = Σ Aₖ e^(sₖt) where sₖ = σₖ + jωₖ
-        
-        // SVD computation for Matrix Pencil
-        function computeSVD(matrix) {
-            const m = matrix.length;
-            const n = matrix[0].length;
-            
-            // Simple power iteration SVD for our use case
-            // For production, would use more robust algorithm
-            const tolerance = 1e-6; // Relaxed tolerance for speed
-            const maxIterations = 50; // Much fewer iterations for web browser
-            
-            const U = [];
-            const S = [];
-            const Vt = [];
-            
-            // Create copy of matrix for decomposition
-            let A = matrix.map(row => [...row]);
-            
-            const rank = Math.min(m, n, 5); // Limit to first 5 singular values for speed
-            
-            for (let k = 0; k < rank; k++) {
-                // Power iteration to find dominant singular value/vector
-                let v = new Array(n).fill(0).map(() => Math.random() - 0.5);
-                let prevSigma = 0;
-                
-                for (let iter = 0; iter < maxIterations; iter++) {
-                    // v = A^T * A * v
-                    const Av = new Array(m).fill(0);
-                    for (let i = 0; i < m; i++) {
-                        for (let j = 0; j < n; j++) {
-                            Av[i] += A[i][j] * v[j];
-                        }
-                    }
-                    
-                    const AtAv = new Array(n).fill(0);
-                    for (let j = 0; j < n; j++) {
-                        for (let i = 0; i < m; i++) {
-                            AtAv[j] += A[i][j] * Av[i];
-                        }
-                    }
-                    
-                    // Normalize
-                    const norm = Math.sqrt(AtAv.reduce((sum, val) => sum + val * val, 0));
-                    if (norm < tolerance) break;
-                    
-                    for (let j = 0; j < n; j++) {
-                        v[j] = AtAv[j] / norm;
-                    }
-                    
-                    // Calculate singular value
-                    const sigma = Math.sqrt(norm);
-                    
-                    if (Math.abs(sigma - prevSigma) < tolerance) break;
-                    prevSigma = sigma;
-                }
-                
-                // Calculate u = A * v / sigma
-                const Av = new Array(m).fill(0);
-                for (let i = 0; i < m; i++) {
-                    for (let j = 0; j < n; j++) {
-                        Av[i] += A[i][j] * v[j];
-                    }
-                }
-                
-                const sigma = Math.sqrt(Av.reduce((sum, val) => sum + val * val, 0));
-                if (sigma < tolerance) break;
-                
-                const u = Av.map(val => val / sigma);
-                
-                // Store singular vectors and value
-                U.push(u);
-                S.push(sigma);
-                Vt.push([...v]);
-                
-                // Deflate matrix: A = A - σ * u * v^T
-                for (let i = 0; i < m; i++) {
-                    for (let j = 0; j < n; j++) {
-                        A[i][j] -= sigma * u[i] * v[j];
-                    }
-                }
-            }
-            
-            return { U, S, Vt };
-        }
 
-
-        // TEMPORARY: Simple fallback for testing - just return a mock tidal frequency
-        function simpleTidalAnalysis(data) {
-            const n = data.length;
-            const y = data.map(d => d.y);
-            const mean = y.reduce((sum, val) => sum + val, 0) / n;
-            
-            // Mock M2 tidal component (12.42 hours)
-            const mockComponent = {
-                frequency: 2 * Math.PI / (12.42 * 3600), // rad/sec
-                periodMs: 12.42 * 60 * 60 * 1000,
-                periodHours: 12.42,
-                damping: -1e-6, // Slight decay
-                amplitude: 0.5, // 0.5 feet amplitude
-                phase: 0.0,
-                eigenvalue: { real: 0.99, imag: 0.1 },
-                power: 0.25
-            };
-            
-            return {
-                components: [mockComponent],
-                dcComponent: mean,
-                startTime: data[0].x.getTime(),
-                samplingInterval: 60, // 1 minute
-                modelOrder: 2,
-                pencilParam: 10,
-                dataLength: n
-            };
-        }
-        
-        // Matrix Pencil Method - Signal parameter estimation for non-periodic data
-        // Estimates frequencies, damping, amplitudes, and phases from time series data
-        function matrixPencilAnalysis(data, pencilParam = null) {
-            const n = data.length;
-            if (n < 20) return null; // Need sufficient data for Matrix Pencil
-            
-            const sn = data.length;
-            const x = data.map(d => d.x.getTime());
-            const y = data.map(d => d.y);
-            
-            console.log(`Matrix Pencil: Processing ${sn} samples`);
-            
-            // Calculate sampling parameters (assume regular intervals)
-            const timeSpanMs = x[x.length - 1] - x[0];
-            const timeSpanSec = timeSpanMs / 1000;
-            const samplingInterval = timeSpanSec / (sn - 1);
-            const startTime = x[0];
-            
-            // Remove DC component
-            const mean = y.reduce((sum, val) => sum + val, 0) / sn;
-            const yDetrended = y.map(val => val - mean);
-            
-            // Set pencil parameter L for proper tidal frequency resolution
-            const L = Math.min(pencilParam || Math.floor(sn / 3), Math.floor(sn / 2)); // Use up to half the samples
-            const M = sn - L + 1;
-            
-            console.log(`Matrix Pencil: L=${L}, M=${M}`);
-            
-            // Construct Hankel data matrix Y0 (M x L)
-            const Y0 = [];
-            for (let i = 0; i < M; i++) {
-                const row = [];
-                for (let j = 0; j < L; j++) {
-                    row.push(yDetrended[i + j]);
-                }
-                Y0.push(row);
-            }
-            
-            // Construct shifted Hankel matrix Y1 (M x L)
-            const Y1 = [];
-            for (let i = 0; i < M - 1; i++) {
-                const row = [];
-                for (let j = 0; j < L; j++) {
-                    row.push(yDetrended[i + j + 1]);
-                }
-                Y1.push(row);
-            }
-            
-            // SVD of Y0 to determine signal subspace
-            console.log(`Matrix Pencil: Computing SVD of ${M}x${L} matrix`);
-            let svd;
-            svd = computeSVD(Y0);
-            if (!svd || !svd.S || svd.S.length === 0) {
-                throw new Error('SVD computation failed - no singular values returned');
-            }
-            console.log(`Matrix Pencil: SVD completed, ${svd.S.length} singular values`);
-            
-            // Determine model order using SVD threshold (keep components > 1% of max singular value)
-            const threshold = 0.01 * Math.max(...svd.S);
-            let modelOrder = 0;
-            for (let i = 0; i < svd.S.length; i++) {
-                if (svd.S[i] > threshold) {
-                    modelOrder++;
-                } else {
-                    break;
-                }
-            }
-            
-            // Ensure we have at least 2 components for complex eigenvalue, but not too many
-            modelOrder = Math.max(2, Math.min(modelOrder, 8));
-            console.log(`Matrix Pencil: Determined model order = ${modelOrder} from ${svd.S.length} singular values`);
-            console.log('Singular values:', svd.S);
-            
-            if (svd.S.length < modelOrder) {
-                throw new Error(`Insufficient singular values: need ${modelOrder}, have ${svd.S.length}`);
-            }
-            
-            // Extract signal subspace (first modelOrder columns of U and Vt)
-            const Us = svd.U.slice(0, modelOrder);
-            const Vs = svd.Vt.slice(0, modelOrder);
-            
-            // Form V1 (first L-1 columns) and V2 (last L-1 columns) - transpose of Vs submatrices
-            const V1 = [];
-            const V2 = [];
-            
-            // V1 and V2 should be (L-1) x modelOrder matrices
-            for (let i = 0; i < L - 1; i++) {
-                const v1Row = [];
-                const v2Row = [];
-                for (let j = 0; j < modelOrder; j++) {
-                    v1Row.push(Vs[j][i]);     // First L-1 elements
-                    v2Row.push(Vs[j][i + 1]); // Last L-1 elements (shifted by 1)
-                }
-                V1.push(v1Row);
-                V2.push(v2Row);
-            }
-            
-            console.log(`Matrix Pencil: V1 size = ${V1.length} x ${V1[0].length}, V2 size = ${V2.length} x ${V2[0].length}`);
-            
-            // Solve generalized eigenvalue problem: V1 * z = λ * V2 * z
-            // Simplified approach: use V1^† * V2 for eigenvalue computation
-            console.log(`Matrix Pencil: Computing eigenvalues`);
-            let eigenvalues;
-            eigenvalues = solveGeneralizedEigenvalue(V1, V2);
-            if (!eigenvalues || eigenvalues.length === 0) {
-                throw new Error('Eigenvalue computation failed - no eigenvalues returned');
-            }
-            console.log(`Matrix Pencil: Found ${eigenvalues.length} eigenvalues`);
-            console.log('Eigenvalues:', eigenvalues);
-            
-            // Extract signal parameters from eigenvalues - TEMPORARILY limit to 1 component
-            const signalComponents = [];
-            
-            // Process eigenvalues to detect tidal frequencies, keeping only positive frequencies
-            for (let k = 0; k < eigenvalues.length; k++) {
-                const lambda = eigenvalues[k];
-                const magnitude = Math.sqrt((lambda.real || 0) * (lambda.real || 0) + (lambda.imag || 0) * (lambda.imag || 0));
-                
-                // Skip eigenvalues that are too small or exactly 1 (DC component)
-                if (magnitude < 1e-6 || Math.abs(magnitude - 1.0) < 1e-6) {
-                    continue;
-                }
-                
-                // Only process eigenvalues with positive imaginary part to avoid conjugate duplicates
-                if ((lambda.imag || 0) <= 0) {
-                    continue;
-                }
-                
-                // Convert eigenvalue to continuous-time parameters
-                const lambdaMag = Math.sqrt((lambda.real || 0) * (lambda.real || 0) + (lambda.imag || 0) * (lambda.imag || 0));
-                const s_real = Math.log(lambdaMag) / samplingInterval; // Damping (σ)
-                const s_imag = Math.atan2(lambda.imag || 0, lambda.real || 0) / samplingInterval; // Frequency (ω)
-                
-                console.log(`Eigenvalue processing: lambdaMag=${lambdaMag}, s_real=${s_real}, s_imag=${s_imag}`);
-                
-                const frequency = Math.abs(s_imag);
-                if (frequency > 1e-6) {
-                    const periodSec = (2 * Math.PI) / frequency;
-                    const periodMs = periodSec * 1000;
-                    const periodHours = periodMs / (60 * 60 * 1000);
-                    
-                    // Estimate amplitude and phase using least squares fitting
-                    const amplitude = estimateAmplitudePhase(x, yDetrended, s_real, s_imag, startTime, samplingInterval);
-                    const phase = amplitude ? amplitude.phase : 0;
-                    const amplitudeMag = amplitude ? amplitude.magnitude : 0;
-                    const dampingCoeff = s_real;
-                    
-                    console.log(`Component analysis: frequency=${frequency.toFixed(6)}, s_real=${s_real.toFixed(6)}, s_imag=${s_imag.toFixed(6)}, amplitudeMag=${amplitudeMag}`);
-                    
-                    signalComponents.push({
-                        frequency: frequency,         // rad/sec
-                        periodMs: periodMs,
-                        periodHours: periodHours,
-                        damping: dampingCoeff,        // damping coefficient (σ)
-                        amplitude: amplitudeMag,      // complex amplitude magnitude
-                        phase: phase,                 // phase in radians
-                        eigenvalue: lambda,           // original eigenvalue
-                        power: amplitudeMag * amplitudeMag  // power measure for sorting
-                    });
-                }
-            }
-            
-            // Sort by power (amplitude squared)
-            signalComponents.sort((a, b) => b.power - a.power);
-            
-            // Output results to console
-            console.log('Matrix Pencil Analysis Results:');
-            console.log(`Model Order: ${modelOrder}, Pencil Parameter L: ${L}, Data Length: ${n}`);
-            console.log(`Found ${signalComponents.length} signal components:`);
-            signalComponents.forEach((comp, index) => {
-                console.log(`Component ${index + 1}: Period=${comp.periodHours.toFixed(2)}h, Frequency=${comp.frequency.toFixed(6)} rad/s, Amplitude=${comp.amplitude.toFixed(4)}, Damping=${comp.damping.toFixed(6)}, Phase=${comp.phase.toFixed(4)} rad`);
-            });
-            
-            return {
-                components: signalComponents,
-                dcComponent: mean,
-                startTime: startTime,
-                samplingInterval: samplingInterval,
-                modelOrder: modelOrder,
-                pencilParam: L,
-                dataLength: n
-            };
-        }
-        
-        // Matrix operations utilities
-        function matrixMultiply(A, B) {
-            const m = A.length;
-            const n = A[0].length;
-            const p = B[0].length;
-            
-            if (n !== B.length) {
-                throw new Error('Matrix dimensions incompatible for multiplication');
-            }
-            
-            const result = [];
-            for (let i = 0; i < m; i++) {
-                result[i] = [];
-                for (let j = 0; j < p; j++) {
-                    let sum = 0;
-                    for (let k = 0; k < n; k++) {
-                        sum += A[i][k] * B[k][j];
-                    }
-                    result[i][j] = sum;
-                }
-            }
-            return result;
-        }
-        
-        function matrixTranspose(A) {
-            const m = A.length;
-            const n = A[0].length;
-            const result = [];
-            
-            for (let j = 0; j < n; j++) {
-                result[j] = [];
-                for (let i = 0; i < m; i++) {
-                    result[j][i] = A[i][j];
-                }
-            }
-            return result;
-        }
-        
-        function matrixInverse(A) {
-            const n = A.length;
-            
-            // Create augmented matrix [A | I]
-            const augmented = [];
-            for (let i = 0; i < n; i++) {
-                augmented[i] = [...A[i]];
-                for (let j = 0; j < n; j++) {
-                    augmented[i][n + j] = (i === j) ? 1 : 0;
-                }
-            }
-            
-            // Gaussian elimination with partial pivoting
-            for (let i = 0; i < n; i++) {
-                // Find pivot
-                let maxRow = i;
-                for (let k = i + 1; k < n; k++) {
-                    if (Math.abs(augmented[k][i]) > Math.abs(augmented[maxRow][i])) {
-                        maxRow = k;
-                    }
-                }
-                
-                // Swap rows
-                [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
-                
-                // Check for singular matrix
-                if (Math.abs(augmented[i][i]) < 1e-12) {
-                    throw new Error(`Matrix is singular or near-singular at row ${i}`);
-                }
-                
-                // Scale pivot row
-                const pivot = augmented[i][i];
-                for (let j = 0; j < 2 * n; j++) {
-                    augmented[i][j] /= pivot;
-                }
-                
-                // Eliminate column
-                for (let k = 0; k < n; k++) {
-                    if (k !== i) {
-                        const factor = augmented[k][i];
-                        for (let j = 0; j < 2 * n; j++) {
-                            augmented[k][j] -= factor * augmented[i][j];
-                        }
-                    }
-                }
-            }
-            
-            // Extract inverse matrix
-            const inverse = [];
-            for (let i = 0; i < n; i++) {
-                inverse[i] = augmented[i].slice(n);
-            }
-            
-            return inverse;
-        }
-        
-        // QR decomposition using Gram-Schmidt process
-        function qrDecomposition(A) {
-            const m = A.length;
-            const n = A[0].length;
-            
-            const Q = [];
-            const R = [];
-            
-            // Initialize Q with zeros
-            for (let i = 0; i < m; i++) {
-                Q[i] = new Array(n).fill(0);
-            }
-            
-            // Initialize R with zeros
-            for (let i = 0; i < n; i++) {
-                R[i] = new Array(n).fill(0);
-            }
-            
-            // Gram-Schmidt process
-            for (let j = 0; j < n; j++) {
-                // Get column j of A
-                const v = [];
-                for (let i = 0; i < m; i++) {
-                    v[i] = A[i][j];
-                }
-                
-                // Orthogonalize against previous columns
-                for (let k = 0; k < j; k++) {
-                    // Compute R[k][j] = Q_k^T * v
-                    let dot = 0;
-                    for (let i = 0; i < m; i++) {
-                        dot += Q[i][k] * v[i];
-                    }
-                    R[k][j] = dot;
-                    
-                    // v = v - R[k][j] * Q_k
-                    for (let i = 0; i < m; i++) {
-                        v[i] -= R[k][j] * Q[i][k];
-                    }
-                }
-                
-                // Compute R[j][j] = ||v||
-                let norm = 0;
-                for (let i = 0; i < m; i++) {
-                    norm += v[i] * v[i];
-                }
-                R[j][j] = Math.sqrt(norm);
-                
-                // Check for linear dependence
-                if (R[j][j] < 1e-12) {
-                    throw new Error(`Matrix is rank deficient at column ${j}`);
-                }
-                
-                // Q_j = v / ||v||
-                for (let i = 0; i < m; i++) {
-                    Q[i][j] = v[i] / R[j][j];
-                }
-            }
-            
-            return { Q, R };
-        }
-        
-        // Solve generalized eigenvalue problem for Matrix Pencil using QZ algorithm approximation
-        function solveGeneralizedEigenvalue(V1, V2) {
-            if (!V1 || !V2 || V1.length === 0 || V2.length === 0) return [];
-            
-            const m = V1.length;  // model order
-            const n = V1[0].length; // L - 1
-            
+        // Fetch Matrix Pencil tidal analysis results from Firebase Cloud Functions
+        async function fetchTidalAnalysisFromFirebase() {
             try {
-                // Convert to standard eigenvalue problem: solve V1^+ * V2
-                // where V1^+ is the Moore-Penrose pseudoinverse of V1
+                console.log('Fetching Matrix Pencil tidal analysis from Firebase...');
+                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/tidal-analysis.json');
                 
-                // Compute V1^T
-                const V1T = matrixTranspose(V1);
-                
-                // Compute V1^T * V1
-                const V1TV1 = matrixMultiply(V1T, V1);
-                
-                // Check condition number of V1TV1 before inversion
-                const condition = checkConditionNumber(V1TV1);
-                console.log('V1TV1 condition number:', condition);
-                console.log('V1TV1 matrix size:', V1TV1.length, 'x', V1TV1[0].length);
-                
-                if (condition > 1e12) {
-                    throw new Error(`V1TV1 matrix is too ill-conditioned: condition number = ${condition}`);
+                if (!response.ok) {
+                    throw new Error(`Firebase fetch failed: ${response.status} ${response.statusText}`);
                 }
                 
-                // Compute (V1^T * V1)^(-1)
-                const V1TV1_inv = matrixInverse(V1TV1);
-                if (!V1TV1_inv) {
-                    throw new Error('Failed to invert V1^T * V1 - matrix is singular');
+                const analysisData = await response.json();
+                
+                if (!analysisData) {
+                    console.warn('No tidal analysis data available from Firebase');
+                    return null;
                 }
-                console.log('V1TV1_inv successful');
                 
-                // Compute V1^+ = (V1^T * V1)^(-1) * V1^T
-                const V1_pinv = matrixMultiply(V1TV1_inv, V1T);
+                // Check if this is an error result
+                if (analysisData.error) {
+                    console.error('Tidal analysis error from Firebase:', analysisData.error);
+                    return null;
+                }
                 
-                // Compute C = V1^+ * V2 (companion-like matrix)
-                const C = matrixMultiply(V1_pinv, V2);
+                // Validate the analysis data structure
+                if (!analysisData.components || !Array.isArray(analysisData.components)) {
+                    console.warn('Invalid tidal analysis data structure from Firebase');
+                    return null;
+                }
                 
-                // Now solve eigenvalue problem for C using QR algorithm
-                const eigenvalues = solveEigenvalues(C);
+                console.log(`Retrieved ${analysisData.components.length} tidal components from Firebase`);
+                console.log(`Analysis methodology: ${analysisData.methodology}`);
+                console.log(`Computed at: ${analysisData.timestamp}`);
+                console.log(`Computation time: ${analysisData.computationTimeMs}ms`);
+                console.log(`Data points: ${analysisData.dataPoints} over ${analysisData.timeSpanHours}h`);
                 
-                return eigenvalues;
+                // Update table with retrieved components
+                detectedTidalFrequencies = analysisData.components;
+                updateTidalAnalysisTable(analysisData.components);
+                
+                // Format results for trend line reconstruction
+                const results = {
+                    dcComponent: analysisData.dcComponent,
+                    components: analysisData.components,
+                    startTime: Date.now() - (parseFloat(analysisData.timeSpanHours) * 60 * 60 * 1000), // Approximate start time
+                    samplingInterval: 60, // 1 minute intervals
+                    modelOrder: analysisData.modelOrder,
+                    pencilParam: analysisData.pencilParam,
+                    dataLength: analysisData.dataPoints,
+                    primaryPeriod: analysisData.components[0]?.periodMs || 24 * 60 * 60 * 1000,
+                    primaryPeriodHours: analysisData.components[0]?.periodHours || 24,
+                    primaryPower: analysisData.components[0]?.power || 0,
+                    methodology: analysisData.methodology,
+                    computationTimeMs: analysisData.computationTimeMs,
+                    timestamp: analysisData.timestamp
+                };
+                
+                return results;
                 
             } catch (error) {
-                throw new Error(`Generalized eigenvalue computation failed: ${error.message}`);
-            }
-        }
-        
-        // QR algorithm for eigenvalue computation
-        function solveEigenvalues(A) {
-            const n = A.length;
-            const maxIterations = 20; // Much fewer iterations
-            const tolerance = 1e-4; // Relaxed tolerance
-            
-            // Make a copy of A
-            let Ak = A.map(row => [...row]);
-            
-            for (let iter = 0; iter < maxIterations; iter++) {
-                // QR decomposition
-                const qr = qrDecomposition(Ak);
-                if (!qr) break;
-                
-                // Ak+1 = R * Q
-                Ak = matrixMultiply(qr.R, qr.Q);
-                
-                // Check for convergence (off-diagonal elements should be small)
-                let offDiagNorm = 0;
-                for (let i = 0; i < n; i++) {
-                    for (let j = 0; j < n; j++) {
-                        if (i !== j) {
-                            offDiagNorm += Ak[i][j] * Ak[i][j];
-                        }
-                    }
-                }
-                
-                if (Math.sqrt(offDiagNorm) < tolerance) {
-                    break;
-                }
-            }
-            
-            // Extract eigenvalues from diagonal
-            const eigenvalues = [];
-            for (let i = 0; i < n; i++) {
-                // For real matrices, eigenvalues can be complex
-                // Check for 2x2 blocks on diagonal for complex eigenvalues
-                if (i < n - 1 && Math.abs(Ak[i + 1][i]) > tolerance) {
-                    // 2x2 block - complex eigenvalues
-                    const a = Ak[i][i];
-                    const b = Ak[i][i + 1];
-                    const c = Ak[i + 1][i];
-                    const d = Ak[i + 1][i + 1];
-                    
-                    const trace = a + d;
-                    const det = a * d - b * c;
-                    const discriminant = trace * trace - 4 * det;
-                    
-                    if (discriminant < 0) {
-                        // Complex eigenvalues
-                        const realPart = trace / 2;
-                        const imagPart = Math.sqrt(-discriminant) / 2;
-                        
-                        eigenvalues.push({
-                            real: realPart,
-                            imag: imagPart
-                        });
-                        eigenvalues.push({
-                            real: realPart,
-                            imag: -imagPart
-                        });
-                        
-                        i++; // Skip next diagonal element
-                    } else {
-                        // Real eigenvalue from this position
-                        eigenvalues.push({
-                            real: Ak[i][i],
-                            imag: 0
-                        });
-                    }
-                } else {
-                    // Real eigenvalue
-                    eigenvalues.push({
-                        real: Ak[i][i],
-                        imag: 0
-                    });
-                }
-            }
-            
-            return eigenvalues;
-        }
-        
-        // Check condition number of a matrix (rough estimate)
-        function checkConditionNumber(A) {
-            const n = A.length;
-            
-            // Simple condition number estimate: ||A|| * ||A^-1||
-            // For a rough check, we'll just look at the diagonal elements
-            let maxDiag = 0;
-            let minDiag = Infinity;
-            
-            for (let i = 0; i < n; i++) {
-                const diag = Math.abs(A[i][i]);
-                maxDiag = Math.max(maxDiag, diag);
-                minDiag = Math.min(minDiag, diag);
-            }
-            
-            if (minDiag === 0) return Infinity;
-            return maxDiag / minDiag;
-        }
-        
-        // Estimate amplitude and phase for a given frequency component
-        function estimateAmplitudePhase(timeValues, dataValues, damping, frequency, startTime, samplingInterval) {
-            const n = dataValues.length;
-            
-            // Check for valid inputs
-            if (!isFinite(damping) || !isFinite(frequency) || frequency === 0) {
-                console.log('Invalid parameters for amplitude estimation: damping=', damping, 'frequency=', frequency);
+                console.error('Failed to fetch tidal analysis from Firebase:', error);
                 return null;
             }
-            
-            // Build design matrix for least squares: [cos(ωt)e^(σt), sin(ωt)e^(σt)]
-            const A = [];
-            const b = [];
-            
-            for (let i = 0; i < n; i++) {
-                const t = i * samplingInterval; // Time from start in seconds
-                const expDamping = Math.exp(damping * t);
-                
-                // Check for numerical issues
-                if (!isFinite(expDamping)) {
-                    console.log('Exponential damping overflow at t=', t, 'damping=', damping);
-                    return null;
-                }
-                
-                const cosComponent = Math.cos(frequency * t) * expDamping;
-                const sinComponent = Math.sin(frequency * t) * expDamping;
-                
-                A.push([cosComponent, sinComponent]);
-                b.push(dataValues[i]);
-            }
-            
-            // Solve least squares: [a, b] = (A^T A)^(-1) A^T y
-            try {
-                const AT = matrixTranspose(A);
-                const ATA = matrixMultiply(AT, A);
-                const ATA_inv = matrixInverse(ATA);
-                
-                if (!ATA_inv) {
-                    throw new Error('Matrix inversion failed in amplitude estimation');
-                }
-                
-                const ATb = [];
-                for (let i = 0; i < 2; i++) {
-                    let sum = 0;
-                    for (let j = 0; j < n; j++) {
-                        sum += AT[i][j] * b[j];
-                    }
-                    ATb.push(sum);
-                }
-                
-                const coeffs = [];
-                for (let i = 0; i < 2; i++) {
-                    let sum = 0;
-                    for (let j = 0; j < 2; j++) {
-                        sum += ATA_inv[i][j] * ATb[j];
-                    }
-                    coeffs.push(sum);
-                }
-                
-                const a = coeffs[0]; // Cosine coefficient
-                const b_coeff = coeffs[1]; // Sine coefficient
-                
-                // Convert to magnitude and phase: A*cos(ωt + φ) = a*cos(ωt) + b*sin(ωt)
-                const magnitude = Math.sqrt(a * a + b_coeff * b_coeff);
-                const phase = Math.atan2(-b_coeff, a); // Phase shift
-                
-                return { magnitude, phase };
-                
-            } catch (error) {
-                throw new Error(`Amplitude/phase estimation failed: ${error.message}`);
-            }
         }
 
-        
-        // Solve linear system Ax = b using Gaussian elimination with partial pivoting
-        function solveLinearSystem(A, b) {
-            const n = A.length;
-            const augmented = [];
-            
-            // Create augmented matrix
-            for (let i = 0; i < n; i++) {
-                augmented[i] = [...A[i], b[i]];
-            }
-            
-            // Forward elimination with partial pivoting
-            for (let i = 0; i < n; i++) {
-                // Find pivot
-                let maxRow = i;
-                for (let k = i + 1; k < n; k++) {
-                    if (Math.abs(augmented[k][i]) > Math.abs(augmented[maxRow][i])) {
-                        maxRow = k;
-                    }
-                }
-                
-                // Swap rows
-                [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
-                
-                // Check for singular matrix
-                if (Math.abs(augmented[i][i]) < 1e-12) {
-                    console.warn('Singular or near-singular matrix detected in harmonic fitting');
-                    return null;
-                }
-                
-                // Eliminate column
-                for (let k = i + 1; k < n; k++) {
-                    const factor = augmented[k][i] / augmented[i][i];
-                    for (let j = i; j <= n; j++) {
-                        augmented[k][j] -= factor * augmented[i][j];
-                    }
-                }
-            }
-            
-            // Back substitution
-            const x = new Array(n);
-            for (let i = n - 1; i >= 0; i--) {
-                x[i] = augmented[i][n];
-                for (let j = i + 1; j < n; j++) {
-                    x[i] -= augmented[i][j] * x[j];
-                }
-                x[i] /= augmented[i][i];
-            }
-            
-            return x;
-        }
-
-        // Compute signal components using Matrix Pencil analysis
-        function computeWaterLevelComponents(data, forceRecompute = false) {
-            const n = data.length;
-            if (n < 20) return null; // Need sufficient data for Matrix Pencil
-            
+        // Compute signal components using Firebase Matrix Pencil analysis
+        async function computeWaterLevelComponents(data, forceRecompute = false) {
             // Use cached results if available and not forcing recompute
             if (cachedMatrixPencilResults && !forceRecompute) {
-                console.log('Using cached Matrix Pencil results');
+                console.log('Using cached Matrix Pencil results from Firebase');
                 return cachedMatrixPencilResults;
             }
             
-            // Perform Matrix Pencil analysis
-            console.log('Computing Matrix Pencil analysis...');
-            const pencilResult = matrixPencilAnalysis(data);
-            if (!pencilResult || !pencilResult.components || pencilResult.components.length === 0) {
-                console.warn('Matrix Pencil analysis failed to detect signal components - skipping trends');
+            // Fetch analysis results from Firebase
+            const results = await fetchTidalAnalysisFromFirebase();
+            
+            if (!results) {
+                console.warn('No Matrix Pencil analysis results available from Firebase - skipping trends');
+                updateTidalAnalysisTable(null);
                 return null;
             }
-            
-            // Store components for table display and update table immediately
-            detectedTidalFrequencies = pencilResult.components;
-            updateTidalAnalysisTable(pencilResult.components);
-            
-            // Cache and return Matrix Pencil results for trend line reconstruction
-            const results = {
-                dcComponent: pencilResult.dcComponent,
-                components: pencilResult.components,
-                startTime: pencilResult.startTime,
-                samplingInterval: pencilResult.samplingInterval,
-                modelOrder: pencilResult.modelOrder,
-                pencilParam: pencilResult.pencilParam,
-                dataLength: pencilResult.dataLength,
-                primaryPeriod: pencilResult.components[0]?.periodMs || 24 * 60 * 60 * 1000,
-                primaryPeriodHours: pencilResult.components[0]?.periodHours || 24,
-                primaryPower: pencilResult.components[0]?.power || 0
-            };
             
             // Cache the results for future use
             cachedMatrixPencilResults = results;
@@ -1102,11 +415,11 @@
         }
         
         // Generate Matrix Pencil trend line data points for Water Level category
-        function generateWaterLevelTrendLine(displayData, analysisData) {
-            if (!analysisData || analysisData.length < 20) return [];
+        async function generateWaterLevelTrendLine(displayData, analysisData) {
+            if (!displayData || displayData.length < 4) return [];
             
-            // Compute Matrix Pencil components from analysis data
-            const pencilResult = computeWaterLevelComponents(analysisData);
+            // Fetch Matrix Pencil components from Firebase
+            const pencilResult = await computeWaterLevelComponents(analysisData);
             if (!pencilResult) return [];
             
             // Generate evaluation points for smooth curve over full chart display range
@@ -1180,8 +493,8 @@
                 document.getElementById('content').classList.remove('hidden');
                 
                 // Run automatic tidal analysis for table (async, after chart is displayed)
-                setTimeout(() => {
-                    performTidalAnalysis(allReadings);
+                setTimeout(async () => {
+                    await performTidalAnalysis(allReadings);
                 }, 0);
             } catch (error) {
                 console.error('Error fetching debug data:', error);
@@ -1433,15 +746,17 @@
             
             // Add trend lines if enabled
             if (trendLinesVisible) {
-                addTrendLines();
+                setTimeout(async () => {
+                    await addTrendLines();
+                }, 0);
             }
         }
 
-        // Add water level trend lines using harmonics
-        function addWaterLevelTrendLines() {
+        // Add water level trend lines using Matrix Pencil analysis from Firebase
+        async function addWaterLevelTrendLines() {
             if (!debugChartInstance || !currentReadings.length) return;
             
-            // Use full 72hr dataset for both FFT analysis and display
+            // Use full 72hr dataset for both analysis and display
             const allValidReadings = currentReadings.filter(r => r.rawTimestamp.getTime() > 0);
             
             // Use all data for display (full 72 hours)
@@ -1463,8 +778,7 @@
             });
             
             // Define water level datasets for Matrix Pencil trend lines
-            // Use full 72hr data for Matrix Pencil analysis and reconstruction
-            // Only calculate trend lines for average water level data
+            // Only calculate trend lines for average water level data (from Firebase)
             const waterLevelConfigs = [
                 {
                     datasetIndex: 0,
@@ -1476,28 +790,34 @@
                 }
             ];
             
-            // Calculate and add Matrix Pencil trend lines
-            waterLevelConfigs.forEach(config => {
-                if (config.analysisData.length >= 20) { // Need at least 20 points for Matrix Pencil analysis
-                    // Generate trend line using Matrix Pencil analysis
-                    const trendData = generateWaterLevelTrendLine(config.displayData, config.analysisData);
-                    
-                    if (trendData && trendData.length > 0) {
-                        debugChartInstance.data.datasets.push({
-                            label: config.label,
-                            data: trendData,
-                            borderColor: config.borderColor,
-                            backgroundColor: 'transparent',
-                            borderWidth: 3,
-                            pointRadius: 0,
-                            pointHoverRadius: 0,
-                            yAxisID: config.yAxisID,
-                            order: 200 + config.datasetIndex,
-                            borderDash: [15, 10]
-                        });
+            // Calculate and add Matrix Pencil trend lines asynchronously
+            for (const config of waterLevelConfigs) {
+                if (config.displayData.length >= 4) {
+                    try {
+                        // Generate trend line using Matrix Pencil analysis from Firebase
+                        const trendData = await generateWaterLevelTrendLine(config.displayData, config.analysisData);
+                        
+                        if (trendData && trendData.length > 0) {
+                            debugChartInstance.data.datasets.push({
+                                label: config.label,
+                                data: trendData,
+                                borderColor: config.borderColor,
+                                backgroundColor: 'transparent',
+                                borderWidth: 3,
+                                pointRadius: 0,
+                                pointHoverRadius: 0,
+                                yAxisID: config.yAxisID,
+                                order: 200 + config.datasetIndex,
+                                borderDash: [15, 10]
+                            });
+                        } else {
+                            console.warn(`No trend data available for ${config.label}`);
+                        }
+                    } catch (error) {
+                        console.error(`Error generating trend line for ${config.label}:`, error);
                     }
                 }
-            });
+            }
             
             debugChartInstance.update();
         }
@@ -1653,8 +973,8 @@
         }
 
         // Add all trend lines (both categories using different methods)
-        function addTrendLines() {
-            addWaterLevelTrendLines();
+        async function addTrendLines() {
+            await addWaterLevelTrendLines();
             addWindWaveTrendLines();
         }
         
@@ -1665,14 +985,14 @@
         }
         
         // Toggle trend lines visibility (unified interface)
-        function toggleTrendLines() {
+        async function toggleTrendLines() {
             trendLinesVisible = !trendLinesVisible;
             
             const button = document.getElementById('toggleTrendlines');
             if (trendLinesVisible) {
                 button.textContent = 'Hide Trend Lines';
                 button.classList.add('active');
-                addTrendLines();
+                await addTrendLines();
             } else {
                 button.textContent = 'Show Trend Lines';
                 button.classList.remove('active');
@@ -1680,33 +1000,24 @@
             }
         }
 
-        // Perform automatic tidal analysis for table display using Matrix Pencil
-        function performTidalAnalysis(readings) {
-            if (!readings || readings.length < 20) {
+        // Perform automatic tidal analysis for table display using Firebase Matrix Pencil
+        async function performTidalAnalysis(readings) {
+            if (!readings || readings.length < 4) {
                 updateTidalAnalysisTable(null);
                 return;
             }
             
-            // Use same data filtering as trend lines for consistency
-            const allValidReadings = readings.filter(r => r.rawTimestamp.getTime() > 0);
-            
-            // Use water level average data for analysis (same as trend lines)
-            const waterLevelData = allValidReadings.map(r => ({
-                x: r.rawTimestamp,
-                y: parseFloat(r.waterLevel)
-            })).filter(d => !isNaN(d.y));
-            
-            if (waterLevelData.length < 20) {
-                updateTidalAnalysisTable(null);
-                return;
-            }
-            
-            // Run Matrix Pencil analysis that happens in trend lines
-            // This will automatically update the table through computeWaterLevelComponents
-            const pencilResult = computeWaterLevelComponents(waterLevelData);
-            
-            // If Matrix Pencil analysis failed, show no results
-            if (!pencilResult) {
+            try {
+                // Fetch Matrix Pencil analysis from Firebase (data parameter not used)
+                const pencilResult = await computeWaterLevelComponents(null);
+                
+                // If Matrix Pencil analysis failed, show no results
+                if (!pencilResult) {
+                    updateTidalAnalysisTable(null);
+                }
+                // Table is automatically updated in computeWaterLevelComponents
+            } catch (error) {
+                console.error('Error performing tidal analysis:', error);
                 updateTidalAnalysisTable(null);
             }
         }
