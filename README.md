@@ -60,6 +60,11 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Web Das
   - **Immediate chart display**: Chart loads instantly when data arrives
   - **Background analysis**: Matrix Pencil analysis runs once per data refresh with caching
   - **Auto-updating**: Analysis refreshes every 2 minutes with new data
+- **Analysis Error Visualization**: Shows model accuracy by plotting measured minus predicted values plus 1 offset
+  - **Perfect fit indicator**: Values around 1.0 indicate excellent model accuracy
+  - **Overestimate detection**: Values < 1.0 show where model predicts higher than measured
+  - **Underestimate detection**: Values > 1.0 show where model predicts lower than measured
+  - **Residual analysis**: Helps validate Matrix Pencil reconstruction quality
 - **NOAA environmental data** integration (wind, water level)
 - **Wind range**: 0-40 knots for comprehensive weather tracking
 - **Real-time tidal constituent identification** (M2, S2, O1, K1, etc.)
@@ -167,6 +172,10 @@ The system collects readings every minute with the following data points:
 - **Dual Methodology Trend Analysis**: Unified interface with specialized algorithms
   - **Water Levels**: Matrix Pencil signal analysis for non-periodic tidal reconstruction
   - **Wind/Wave Data**: Enhanced 30-point smoothed cubic splines
+- **Model Validation**: Analysis Error plot shows residuals (measured - predicted + 1 offset)
+  - **Quality Assessment**: Visual feedback on Matrix Pencil reconstruction accuracy
+  - **Error Distribution**: Reveals systematic biases or random errors in tidal modeling
+  - **Real-time Validation**: Updates automatically with each analysis refresh
 - **Performance Optimized**: Cached Matrix Pencil results prevent duplicate computation
 - **Edge-Safe**: Matrix Pencil reconstruction covers full chart range without artifacts
 - **Toggle Control**: Single button controls both trend line methodologies
@@ -194,6 +203,7 @@ Both dashboards are optimized for mobile viewing with:
 - **Sensor readings**: Every minute
 - **Dashboard refresh**: Every 2 minutes
 - **Data retention**: 72 hours visible (4318 readings) with Matrix Pencil analysis on full dataset
+- **Model validation**: Analysis Error plot shows reconstruction accuracy in real-time
 - **Timezone**: Eastern Time (America/New_York)
 
 ## 🤝 Contributing

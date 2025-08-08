@@ -169,6 +169,10 @@ The enriched data is used by the web dashboards for:
   - **Automatic tidal analysis**: Matrix Pencil multiple frequency detection with comprehensive results table
   - **Auto-refresh**: Analysis updates every 2 minutes with new data
   - **Environmental context**: Integrated NOAA wind and water level data
+  - **Analysis Error Visualization**: Real-time model validation showing measured vs predicted residuals
+    - **Accuracy Assessment**: Values around 1.0 indicate perfect Matrix Pencil reconstruction
+    - **Systematic Error Detection**: Identifies consistent over/under-prediction patterns
+    - **Quality Control**: Visual feedback on tidal harmonic analysis performance
 
 ### Troubleshooting
 
