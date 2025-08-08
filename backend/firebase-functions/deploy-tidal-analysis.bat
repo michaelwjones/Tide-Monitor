@@ -1,13 +1,19 @@
 @echo off
+cd /d "%~dp0"
 echo Deploying Tidal Analysis Function (Matrix Pencil v1)...
 echo This function performs advanced tidal harmonic analysis every 5 minutes.
 echo.
-echo ⚠️  COST WARNING: This function costs ~$5-15/month when enabled
-echo ⚠️  The analysis is DISABLED by default to prevent unexpected charges
+echo WARNING: This function costs ~$5-15/month when enabled
+echo WARNING: The analysis is DISABLED by default to prevent unexpected charges
 echo.
 
 echo Checking current configuration...
-firebase functions:config:get tidal.analysis.enabled 2>nul
+if exist "tidal-analysis\.env" (
+    echo Found .env file:
+    type "tidal-analysis\.env"
+) else (
+    echo No .env file found - analysis will be disabled by default
+)
 
 echo.
 echo Current options:
@@ -21,37 +27,38 @@ set /p choice="Enter your choice (1-4): "
 
 if "%choice%"=="1" (
     echo.
-    echo ⚠️  ENABLING tidal analysis - this will start costing money!
-    firebase functions:config:set tidal.analysis.enabled=true
+    echo WARNING: ENABLING tidal analysis - this will start costing money!
+    echo TIDAL_ANALYSIS_ENABLED=true > "tidal-analysis\.env"
+    echo [OK] Analysis enabled. Deploying function...
+    call firebase deploy --only functions:tidal-analysis
     if %ERRORLEVEL% EQU 0 (
-        echo ✅ Analysis enabled. Deploying function...
-        firebase deploy --only functions --source tidal-analysis
-        if %ERRORLEVEL% EQU 0 (
-            echo.
-            echo ✅ Tidal analysis deployed and ENABLED!
-            echo 💰 Function will run every 5 minutes and incur costs
-            echo 📊 Check Firebase Console for execution logs
-            echo 🛑 To disable: firebase functions:config:set tidal.analysis.enabled=false
-        )
+        echo.
+        echo [OK] Tidal analysis deployed and ENABLED!
+        echo NOTE: Function will run every 5 minutes and incur costs
+        echo INFO: Check Firebase Console for execution logs
+        echo DISABLE: Set TIDAL_ANALYSIS_ENABLED=false in tidal-analysis\.env
     )
 ) else if "%choice%"=="2" (
     echo.
     echo Ensuring analysis is disabled...
-    firebase functions:config:set tidal.analysis.enabled=false
+    echo TIDAL_ANALYSIS_ENABLED=false > "tidal-analysis\.env"
+    echo [OK] Analysis disabled. Deploying function...
+    call firebase deploy --only functions:tidal-analysis
     if %ERRORLEVEL% EQU 0 (
-        echo ✅ Analysis disabled. Deploying function...
-        firebase deploy --only functions --source tidal-analysis
-        if %ERRORLEVEL% EQU 0 (
-            echo.
-            echo ✅ Tidal analysis deployed but DISABLED!
-            echo 💰 No charges will occur until you enable it
-            echo 🚀 To enable: firebase functions:config:set tidal.analysis.enabled=true
-        )
+        echo.
+        echo [OK] Tidal analysis deployed but DISABLED!
+        echo NOTE: No charges will occur until you enable it
+        echo ENABLE: Set TIDAL_ANALYSIS_ENABLED=true in tidal-analysis\.env
     )
 ) else if "%choice%"=="3" (
     echo.
     echo Current configuration status:
-    firebase functions:config:get
+    if exist "tidal-analysis\.env" (
+        echo .env file contents:
+        type "tidal-analysis\.env"
+    ) else (
+        echo No .env file exists - analysis disabled by default
+    )
     echo.
 ) else if "%choice%"=="4" (
     echo.

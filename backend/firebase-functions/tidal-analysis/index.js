@@ -15,8 +15,8 @@
  * Last Updated: 2025-08-01
  */
 
-const { onRequest, onSchedule } = require('firebase-functions/v2/https');
 const { onCall } = require('firebase-functions/v2/https');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 
 // Initialize Firebase Admin

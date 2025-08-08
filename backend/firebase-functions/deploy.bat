@@ -22,14 +22,14 @@ if "%choice%"=="1" (
     echo Deploying BOTH functions...
     echo.
     echo 1/2: Deploying Tide Enrichment...
-    firebase deploy --only functions --source tide-enrichment
+    call firebase deploy --only functions:tide-enrichment
     if %ERRORLEVEL% EQU 0 (
-        echo ✅ Tide enrichment deployed successfully!
+        echo [OK] Tide enrichment deployed successfully!
         echo.
         echo 2/2: Starting Tidal Analysis deployment...
         call deploy-tidal-analysis.bat
     ) else (
-        echo ❌ Tide enrichment deployment failed. Stopping.
+        echo [ERROR] Tide enrichment deployment failed. Stopping.
         pause
         exit /b 1
     )
