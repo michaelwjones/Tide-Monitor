@@ -3,15 +3,20 @@
 This directory contains Firebase Cloud Functions for the Tide Monitor project:
 
 1. **Tide Enrichment** (`tide-enrichment/`) - Enriches sensor data with NOAA environmental conditions
-2. **Tidal Analysis** (`tidal-analysis/`) - Advanced harmonic analysis using Matrix Pencil v1 methodology
+2. **Tidal Analysis Functions** (`tidal-analysis/functions/`) - Multiple analysis methods for advanced tidal signal processing
 
 ## Overview
 
 ### Tide Enrichment Function
 The `enrichTideData` function automatically triggers when new readings are written to the Firebase `/readings/` path and enriches each entry with real-time wind and water level data from NOAA station 8656483 (Duke Marine Lab, Beaufort, NC).
 
-### Tidal Analysis Function  
+### Tidal Analysis Functions
+Analysis functions are organized in `tidal-analysis/functions/` by method and version:
+
+#### Matrix Pencil v1 (`matrix-pencil/v1/`)
 The `runTidalAnalysis` function runs every 5 minutes via Cloud Scheduler to perform advanced tidal harmonic analysis using the Matrix Pencil v1 method. Results are stored in `/tidal-analysis/` for use by the debug dashboard.
+
+See `analysis-functions.csv` for a complete list of available analysis methods, versions, and deployment history.
 
 ## Data Enrichment
 
@@ -89,13 +94,13 @@ These -999 values indicate validation failures or API errors, not actual measure
 
 ### Deploy Using Batch Files (Recommended)
 ```batch
-# Interactive menu with all options
-deploy.bat
-
 # Deploy enrichment only (always safe, no costs)
 deploy-enrichment.bat
 
-# Deploy tidal analysis with cost control menu
+# Deploy Matrix Pencil v1 with cost control menu
+deploy-matrix-pencil-v1.bat
+
+# Original tidal analysis deployment (legacy, still works)
 deploy-tidal-analysis.bat
 ```
 
@@ -104,9 +109,8 @@ deploy-tidal-analysis.bat
 # Deploy only tide enrichment
 firebase deploy --only functions --source tide-enrichment
 
-# Deploy only tidal analysis (remember to enable first!)
-firebase functions:config:set tidal.analysis.enabled=true
-firebase deploy --only functions --source tidal-analysis
+# Deploy Matrix Pencil v1 analysis (remember to enable first!)
+firebase deploy --only functions --source tidal-analysis/functions/matrix-pencil/v1
 ```
 
 ### Deploy Both Functions (Command Line)
@@ -130,16 +134,20 @@ firebase functions:log --only runTidalAnalysis
 firebase emulators:start --only functions
 ```
 
-### Tidal Analysis Management
+### Analysis Function Management
+```batch
+# Quick enable/disable Matrix Pencil v1 (use batch files)
+toggle-matrix-pencil-v1.bat
+
+# Legacy toggle script (still works)
+toggle-analysis.bat
+```
+
+Analysis functions use `.env` files instead of Firebase config:
 ```bash
-# Enable tidal analysis (IMPORTANT: Disabled by default)
-firebase functions:config:set tidal.analysis.enabled=true
-
-# Disable to save costs
-firebase functions:config:set tidal.analysis.enabled=false
-
-# Check current config
-firebase functions:config:get
+# Matrix Pencil v1 configuration
+echo TIDAL_ANALYSIS_ENABLED=true > tidal-analysis/functions/matrix-pencil/v1/.env
+echo TIDAL_ANALYSIS_ENABLED=false > tidal-analysis/functions/matrix-pencil/v1/.env
 ```
 
 ## Monitoring

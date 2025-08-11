@@ -27,7 +27,7 @@ This is a **Tide Monitor** project that measures water levels and wave heights u
 
 4. **Firebase Cloud Functions** (`backend/firebase-functions/`) - Two separate serverless functions:
    - **Data Enrichment** (`tide-enrichment/`): Automatically triggers when new readings arrive
-   - **Tidal Analysis** (`tidal-analysis/`): Scheduled Matrix Pencil analysis every 5 minutes (optional, costs money)
+   - **Tidal Analysis Functions** (`tidal-analysis/functions/`): Multiple analysis methods for advanced signal processing
    - Fetch real-time wind and water level data from NOAA station 8656483 (Duke Marine Lab)
    - Enrich each reading with environmental conditions
    - Perform strict data validation requiring at least 1 data point (uses last element)
@@ -124,10 +124,10 @@ This project uses minimal build tools. Development involves:
    - **Flash to device**: Run `flash.bat` in `backend/boron404x/` directory to deploy firmware to Particle Boron
 2. **Web dashboard**: Open `index.html` directly in browser or serve with local HTTP server
 3. **Firebase Functions**: Deploy Cloud Functions for data enrichment and tidal analysis
-   - **Interactive deployment**: Run `deploy.bat` in `backend/firebase-functions/` for menu-driven deployment
    - **Enrichment only**: `deploy-enrichment.bat` (NOAA data enrichment, always safe)
-   - **Tidal analysis**: `deploy-tidal-analysis.bat` (Matrix Pencil analysis with cost control)
-   - **Manual CLI**: `firebase deploy --only functions:tide-enrichment` or `functions:tidal-analysis`
+   - **Matrix Pencil v1**: `deploy-matrix-pencil-v1.bat` (tidal analysis with cost control)
+   - **Legacy tidal analysis**: `deploy-tidal-analysis.bat` (still works with new structure)
+   - **Manual CLI**: `firebase deploy --only functions --source tide-enrichment` or `--source tidal-analysis/functions/matrix-pencil/v1`
    - **Prerequisites**: Run `npm install` in each function directory before first deployment
    - **Logs**: `firebase functions:log`
    - **Test locally**: `firebase emulators:start --only functions`
@@ -146,17 +146,23 @@ Tide-Monitor/
     ├── firebase-functions/
     │   ├── README.md                    # Cloud Functions documentation  
     │   ├── firebase.json                # Multi-codebase Firebase configuration
-    │   ├── deploy.bat                   # Interactive deployment menu
     │   ├── deploy-enrichment.bat        # NOAA enrichment deployment
-    │   ├── deploy-tidal-analysis.bat    # Tidal analysis deployment with cost control
+    │   ├── deploy-matrix-pencil-v1.bat  # Matrix Pencil v1 deployment with cost control
+    │   ├── deploy-tidal-analysis.bat    # Legacy tidal analysis deployment
+    │   ├── toggle-matrix-pencil-v1.bat  # Matrix Pencil v1 enable/disable toggle
+    │   ├── toggle-analysis.bat          # Legacy analysis toggle
     │   ├── MATRIX_PENCIL_V1.md          # Matrix Pencil methodology documentation
     │   ├── tide-enrichment/             # NOAA data enrichment function
     │   │   ├── index.js
     │   │   └── package.json
-    │   └── tidal-analysis/              # Matrix Pencil tidal analysis function
-    │       ├── README.md                # Analysis deployment guide
-    │       ├── index.js                 # Matrix Pencil v1 implementation
-    │       └── package.json
+    │   └── tidal-analysis/              # Analysis functions container
+    │       ├── analysis-functions.csv   # Function tracking spreadsheet
+    │       └── functions/               # Organized analysis functions
+    │           └── matrix-pencil/       # Matrix Pencil analysis method
+    │               └── v1/              # Matrix Pencil version 1
+    │                   ├── README.md    # Analysis deployment guide
+    │                   ├── index.js     # Matrix Pencil v1 implementation
+    │                   └── package.json
     └── particle.io/
         └── firebase integration.txt     # Webhook configuration
 ```

@@ -1,38 +1,38 @@
-# Tidal Analysis Firebase Functions
+# Matrix Pencil v1 - Tidal Analysis Function
 
-This directory contains Firebase Cloud Functions for advanced tidal harmonic analysis using the Matrix Pencil v1 methodology.
+This directory contains the Matrix Pencil v1 Firebase Cloud Function for advanced tidal harmonic analysis. This is part of the modular analysis functions system located in `tidal-analysis/functions/`.
 
 ## Quick Setup
 
 ### 1. Install Dependencies
 ```bash
-cd tidal-analysis
+cd tidal-analysis/functions/matrix-pencil/v1
 npm install
 ```
 
 ### 2. Enable Analysis (Important!)
 The analysis is **disabled by default**. To enable:
 
-Set the environment variable:
+Create a `.env` file in this directory:
 ```bash
-# From the firebase-functions directory
-firebase functions:config:set tidal.analysis.enabled=true
+# In tidal-analysis/functions/matrix-pencil/v1/
+echo TIDAL_ANALYSIS_ENABLED=true > .env
 ```
 
-**Note**: You control when analysis runs by setting this variable. This prevents unnecessary computation costs.
+**Note**: You control when analysis runs by setting this environment variable. This prevents unnecessary computation costs.
 
 ### 3. Deploy Function
 
 **Option A: Using Batch File (Recommended)**
 ```batch
-# Interactive deployment with cost control
-deploy-tidal-analysis.bat
+# From the firebase-functions directory
+deploy-matrix-pencil-v1.bat
 ```
 
 **Option B: Command Line**
 ```bash
 # From the firebase-functions directory
-firebase deploy --only functions --source tidal-analysis
+firebase deploy --only functions --source tidal-analysis/functions/matrix-pencil/v1
 ```
 
 ### 4. Set up Cloud Scheduler
@@ -44,28 +44,28 @@ The function automatically runs every 5 minutes when enabled. Cloud Scheduler wi
 
 **Option A: Using Batch File**
 ```batch
-# Run interactive deployment and choose "Deploy with analysis ENABLED"
-deploy-tidal-analysis.bat
+# From the firebase-functions directory
+toggle-matrix-pencil-v1.bat
 ```
 
 **Option B: Command Line**
 ```bash
-firebase functions:config:set tidal.analysis.enabled=true
-firebase deploy --only functions --source tidal-analysis
+echo TIDAL_ANALYSIS_ENABLED=true > tidal-analysis/functions/matrix-pencil/v1/.env
+firebase deploy --only functions --source tidal-analysis/functions/matrix-pencil/v1
 ```
 
 ### Disable Analysis
 
 **Option A: Using Batch File**
 ```batch  
-# Run interactive deployment and choose "Deploy with analysis DISABLED"
-deploy-tidal-analysis.bat
+# From the firebase-functions directory
+toggle-matrix-pencil-v1.bat
 ```
 
 **Option B: Command Line**
 ```bash
-firebase functions:config:set tidal.analysis.enabled=false
-firebase deploy --only functions --source tidal-analysis
+echo TIDAL_ANALYSIS_ENABLED=false > tidal-analysis/functions/matrix-pencil/v1/.env
+firebase deploy --only functions --source tidal-analysis/functions/matrix-pencil/v1
 ```
 
 ### Monitor Logs
@@ -150,9 +150,9 @@ Results are stored in Firebase at `/tidal-analysis/` with structure:
 ## Troubleshooting
 
 ### Function Not Running
-1. Check if analysis is enabled: `firebase functions:config:get`
+1. Check if analysis is enabled: `cat tidal-analysis/functions/matrix-pencil/v1/.env`
 2. Verify Cloud Scheduler job exists in Google Cloud Console
-3. Check function logs: `firebase functions:log`
+3. Check function logs: `firebase functions:log --only runTidalAnalysis`
 
 ### Analysis Failures
 1. Check `/tidal-analysis-error/` in Firebase database

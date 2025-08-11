@@ -22,7 +22,8 @@
       "Bash(git remote:*)",
       "Bash(./deploy.bat)",
       "Bash(move tide-monitor/* tide-enrichment/)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(cp:*)"
     ],
     "deny": []
   }
