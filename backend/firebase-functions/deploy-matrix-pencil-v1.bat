@@ -30,7 +30,9 @@ if "%choice%"=="1" (
     echo WARNING: ENABLING tidal analysis - this will start costing money!
     echo TIDAL_ANALYSIS_ENABLED=true > "tidal-analysis\functions\matrix-pencil\v1\.env"
     echo [OK] Analysis enabled. Deploying function...
-    call firebase deploy --only functions:tidal-analysis --source tidal-analysis/functions/matrix-pencil/v1
+    cd tidal-analysis
+    call firebase deploy --only functions
+    cd ..
     if %ERRORLEVEL% EQU 0 (
         echo.
         echo [OK] Tidal analysis deployed and ENABLED!
@@ -43,7 +45,9 @@ if "%choice%"=="1" (
     echo Ensuring analysis is disabled...
     echo TIDAL_ANALYSIS_ENABLED=false > "tidal-analysis\functions\matrix-pencil\v1\.env"
     echo [OK] Analysis disabled. Deploying function...
-    call firebase deploy --only functions:tidal-analysis --source tidal-analysis/functions/matrix-pencil/v1
+    cd tidal-analysis
+    call firebase deploy --only functions
+    cd ..
     if %ERRORLEVEL% EQU 0 (
         echo.
         echo [OK] Tidal analysis deployed but DISABLED!

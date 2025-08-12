@@ -715,8 +715,8 @@ exports.runTidalAnalysis = onSchedule('*/5 * * * *', async (event) => {
             pencilParam: analysisResult.pencilParam
         };
 
-        // Store results in Firebase
-        await db.ref('tidal-analysis').set(results);
+        // Store results in Firebase under matrix-pencil-v1 specific location
+        await db.ref('tidal-analysis/matrix-pencil-v1').set(results);
 
         console.log(`Matrix Pencil analysis completed in ${results.computationTimeMs}ms`);
         console.log(`Found ${results.components.length} tidal components`);
@@ -729,7 +729,7 @@ exports.runTidalAnalysis = onSchedule('*/5 * * * *', async (event) => {
         console.error('Stack trace:', error.stack);
 
         // Clear old results on failure to indicate problem
-        await db.ref('tidal-analysis').remove();
+        await db.ref('tidal-analysis/matrix-pencil-v1').remove();
 
         // Store error information
         await db.ref('tidal-analysis-error').set({

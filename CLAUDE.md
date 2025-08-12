@@ -126,7 +126,6 @@ This project uses minimal build tools. Development involves:
 3. **Firebase Functions**: Deploy Cloud Functions for data enrichment and tidal analysis
    - **Enrichment only**: `deploy-enrichment.bat` (NOAA data enrichment, always safe)
    - **Matrix Pencil v1**: `deploy-matrix-pencil-v1.bat` (tidal analysis with cost control)
-   - **Legacy tidal analysis**: `deploy-tidal-analysis.bat` (still works with new structure)
    - **Manual CLI**: `firebase deploy --only functions --source tide-enrichment` or `--source tidal-analysis/functions/matrix-pencil/v1`
    - **Prerequisites**: Run `npm install` in each function directory before first deployment
    - **Logs**: `firebase functions:log`
@@ -148,9 +147,7 @@ Tide-Monitor/
     │   ├── firebase.json                # Multi-codebase Firebase configuration
     │   ├── deploy-enrichment.bat        # NOAA enrichment deployment
     │   ├── deploy-matrix-pencil-v1.bat  # Matrix Pencil v1 deployment with cost control
-    │   ├── deploy-tidal-analysis.bat    # Legacy tidal analysis deployment
     │   ├── toggle-matrix-pencil-v1.bat  # Matrix Pencil v1 enable/disable toggle
-    │   ├── toggle-analysis.bat          # Legacy analysis toggle
     │   ├── MATRIX_PENCIL_V1.md          # Matrix Pencil methodology documentation
     │   ├── tide-enrichment/             # NOAA data enrichment function
     │   │   ├── index.js

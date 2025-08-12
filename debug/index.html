@@ -305,7 +305,7 @@
         async function fetchTidalAnalysisFromFirebase() {
             try {
                 console.log('Fetching Matrix Pencil tidal analysis from Firebase...');
-                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/tidal-analysis.json');
+                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/tidal-analysis/matrix-pencil-v1.json');
                 
                 if (!response.ok) {
                     throw new Error(`Firebase fetch failed: ${response.status} ${response.statusText}`);

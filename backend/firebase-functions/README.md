@@ -100,8 +100,6 @@ deploy-enrichment.bat
 # Deploy Matrix Pencil v1 with cost control menu
 deploy-matrix-pencil-v1.bat
 
-# Original tidal analysis deployment (legacy, still works)
-deploy-tidal-analysis.bat
 ```
 
 ### Deploy Individual Functions (Command Line)
@@ -139,8 +137,6 @@ firebase emulators:start --only functions
 # Quick enable/disable Matrix Pencil v1 (use batch files)
 toggle-matrix-pencil-v1.bat
 
-# Legacy toggle script (still works)
-toggle-analysis.bat
 ```
 
 Analysis functions use `.env` files instead of Firebase config:

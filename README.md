@@ -88,7 +88,7 @@ Simply visit the live dashboard links above - no installation required!
 ### Deploy Cloud Functions (Advanced)
 1. Navigate to `backend/firebase-functions/`
 2. Run `deploy.bat` for interactive deployment menu
-3. Or use `deploy-enrichment.bat` / `deploy-tidal-analysis.bat` for specific functions
+3. Or use `deploy-enrichment.bat` / `deploy-matrix-pencil-v1.bat` for specific functions
 
 ## 📊 Data Format
 
