@@ -76,6 +76,6 @@ if "%choice%"=="1" (
 echo.
 echo Note: This only changes the .env configuration file.
 echo The function must be redeployed for changes to take effect.
-echo Use deploy-tidal-analysis.bat to deploy with the new configuration.
+echo Use deploy-matrix-pencil-v1.bat to deploy with the new configuration.
 echo.
 pause
