@@ -49,6 +49,28 @@
         .toggle-trendlines.active:hover {
             background: #218838;
         }
+        .toggle-prediction {
+            background: #17a2b8;
+            color: white;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            transition: background-color 0.2s;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .toggle-prediction:hover {
+            background: #138496;
+        }
+        .toggle-prediction.active {
+            background: #fd7e14;
+        }
+        .toggle-prediction.active:hover {
+            background: #e8650f;
+        }
         .tidal-analysis-table {
             margin-top: 20px;
             border-collapse: collapse;
@@ -85,6 +107,7 @@
             <div style="display: flex; align-items: center;">
                 <a href="../index.html" class="main-link">← Main Dashboard</a>
                 <button id="toggleTrendlines" class="toggle-trendlines">Show Trend Lines</button>
+                <button id="togglePrediction" class="toggle-prediction">Show 24h Prediction</button>
                 <button id="show24Hours" class="toggle-trendlines" style="background: #007bff; margin-left: 10px;">24 Hours</button>
                 <button id="show72Hours" class="toggle-trendlines" style="background: #6c757d; margin-left: 5px;">72 Hours</button>
             </div>
@@ -124,6 +147,7 @@
 
         let debugChartInstance = null;
         let trendLinesVisible = false;
+        let predictionVisible = false;
         let currentReadings = [];
         let detectedTidalFrequencies = null;
         let cachedMatrixPencilResults = null; // Cache Matrix Pencil analysis results from Firebase
@@ -415,7 +439,7 @@
         }
         
         // Generate Matrix Pencil trend line data points for Water Level category
-        // Extended to show 24 hours into the future for tidal prediction
+        // Extended to show 24 hours into the future for tidal prediction if enabled
         // Returns object with historical and prediction datasets for visual distinction
         async function generateWaterLevelTrendLine(displayData, analysisData) {
             if (!displayData || displayData.length < 4) return { historical: [], prediction: [] };
@@ -424,10 +448,9 @@
             const pencilResult = await computeWaterLevelComponents(analysisData);
             if (!pencilResult) return { historical: [], prediction: [] };
             
-            // Generate evaluation points for smooth curve over current display range PLUS 24 hours future
+            // Generate evaluation points for smooth curve over current display range
             const firstTime = displayData[0].x.getTime();
             const lastTime = displayData[displayData.length - 1].x.getTime();
-            const futureTime = lastTime + (24 * 60 * 60 * 1000); // Add 24 hours for prediction
             const currentTime = new Date().getTime(); // Current time for splitting historical/prediction
             
             // Historical data points (first time to current time)
@@ -439,18 +462,26 @@
                 historicalPoints.push(new Date(timePoint));
             }
             
-            // Prediction data points (current time to future time)
-            const predictionPoints = [];
-            const predictionNumPoints = 100;
-            for (let i = 0; i <= predictionNumPoints; i++) {
-                const t = i / predictionNumPoints;
-                const timePoint = currentTime + t * (futureTime - currentTime);
-                predictionPoints.push(new Date(timePoint));
-            }
-            
-            // Evaluate Matrix Pencil reconstruction at these points
+            // Evaluate Matrix Pencil reconstruction for historical data
             const historicalData = evaluateMatrixPencilReconstruction(pencilResult, historicalPoints);
-            const predictionData = evaluateMatrixPencilReconstruction(pencilResult, predictionPoints);
+            
+            // Only generate prediction data if prediction is enabled
+            let predictionData = [];
+            if (predictionVisible) {
+                const futureTime = currentTime + (24 * 60 * 60 * 1000); // Add 24 hours for prediction
+                
+                // Prediction data points (current time to future time)
+                const predictionPoints = [];
+                const predictionNumPoints = 100;
+                for (let i = 0; i <= predictionNumPoints; i++) {
+                    const t = i / predictionNumPoints;
+                    const timePoint = currentTime + t * (futureTime - currentTime);
+                    predictionPoints.push(new Date(timePoint));
+                }
+                
+                // Evaluate Matrix Pencil reconstruction for prediction data
+                predictionData = evaluateMatrixPencilReconstruction(pencilResult, predictionPoints);
+            }
             
             return {
                 historical: historicalData,
@@ -868,21 +899,23 @@
                 }
             }
             
-            // Add vertical line to indicate current time / start of prediction
-            const now = new Date();
-            const yAxisRange = [0, 6]; // Water level range
-            debugChartInstance.data.datasets.push({
-                label: 'Current Time (Prediction Start)',
-                data: [{x: now, y: yAxisRange[0]}, {x: now, y: yAxisRange[1]}],
-                borderColor: 'rgba(255, 0, 0, 0.6)',
-                backgroundColor: 'transparent',
-                borderWidth: 1,
-                pointRadius: 0,
-                pointHoverRadius: 0,
-                yAxisID: 'y',
-                order: 300,
-                borderDash: [2, 2]
-            });
+            // Add vertical line to indicate current time / start of prediction (only if prediction is visible)
+            if (predictionVisible) {
+                const now = new Date();
+                const yAxisRange = [0, 6]; // Water level range
+                debugChartInstance.data.datasets.push({
+                    label: 'Current Time (Prediction Start)',
+                    data: [{x: now, y: yAxisRange[0]}, {x: now, y: yAxisRange[1]}],
+                    borderColor: 'rgba(255, 0, 0, 0.6)',
+                    backgroundColor: 'transparent',
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                    yAxisID: 'y',
+                    order: 300,
+                    borderDash: [2, 2]
+                });
+            }
             
             debugChartInstance.update();
         }
@@ -976,8 +1009,9 @@
             if (!debugChartInstance) return;
             
             // Remove water level trend line datasets (those with "Matrix Pencil" in their label)
+            // Also remove current time vertical line
             debugChartInstance.data.datasets = debugChartInstance.data.datasets.filter(dataset => 
-                !dataset.label.includes('Matrix Pencil')
+                !dataset.label.includes('Matrix Pencil') && !dataset.label.includes('Current Time')
             );
             
             // Restore original opacity for water level datasets
@@ -1058,6 +1092,21 @@
                 button.textContent = 'Hide Trend Lines';
                 button.classList.add('active');
                 await addTrendLines();
+            } else {
+                button.textContent = 'Show Trend Lines';
+                button.classList.remove('active');
+                removeTrendLines();
+            }
+        }
+
+        // Toggle 24-hour prediction visibility
+        async function togglePrediction() {
+            predictionVisible = !predictionVisible;
+            
+            const button = document.getElementById('togglePrediction');
+            if (predictionVisible) {
+                button.textContent = 'Hide 24h Prediction';
+                button.classList.add('active');
                 
                 // Extend chart x-axis to show 24 hours into future for prediction
                 if (debugChartInstance) {
@@ -1069,10 +1118,14 @@
                     debugChartInstance.options.plugins.zoom.limits.x.max = extendedMax;
                     debugChartInstance.update('none'); // Update without animation for smooth transition
                 }
+                
+                // If trend lines are visible, update them to include prediction
+                if (trendLinesVisible) {
+                    await addTrendLines();
+                }
             } else {
-                button.textContent = 'Show Trend Lines';
+                button.textContent = 'Show 24h Prediction';
                 button.classList.remove('active');
-                removeTrendLines();
                 
                 // Reset chart x-axis to current time (remove future prediction view)
                 if (debugChartInstance) {
@@ -1082,6 +1135,11 @@
                     // Reset zoom limits to current time
                     debugChartInstance.options.plugins.zoom.limits.x.max = now;
                     debugChartInstance.update('none'); // Update without animation for smooth transition
+                }
+                
+                // If trend lines are visible, update them to remove prediction
+                if (trendLinesVisible) {
+                    await addTrendLines();
                 }
             }
         }
@@ -1228,14 +1286,15 @@
         // Initialize toggle button event listener
         window.addEventListener('load', function() {
             document.getElementById('toggleTrendlines').addEventListener('click', toggleTrendLines);
+            document.getElementById('togglePrediction').addEventListener('click', togglePrediction);
             document.getElementById('show24Hours').addEventListener('click', function() {
                 if (debugChartInstance) {
                     const now = new Date();
                     const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
                     debugChartInstance.options.scales.x.min = twentyFourHoursAgo;
                     
-                    // If trend lines are visible, extend max to show 24 hours of prediction
-                    if (trendLinesVisible) {
+                    // If prediction is visible, extend max to show 24 hours of prediction
+                    if (predictionVisible) {
                         const extendedMax = new Date(now.getTime() + (24 * 60 * 60 * 1000));
                         debugChartInstance.options.scales.x.max = extendedMax;
                         debugChartInstance.options.plugins.zoom.limits.x.max = extendedMax;
@@ -1252,8 +1311,8 @@
                     const now = new Date();
                     const seventyTwoHoursAgo = new Date(now.getTime() - (72 * 60 * 60 * 1000));
                     
-                    // If trend lines are visible, extend max to show 24 hours of prediction
-                    if (trendLinesVisible) {
+                    // If prediction is visible, extend max to show 24 hours of prediction
+                    if (predictionVisible) {
                         const extendedMax = new Date(now.getTime() + (24 * 60 * 60 * 1000));
                         debugChartInstance.zoomScale('x', {min: seventyTwoHoursAgo, max: extendedMax});
                         debugChartInstance.options.plugins.zoom.limits.x.max = extendedMax;
