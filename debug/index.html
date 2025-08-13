@@ -349,6 +349,8 @@
                     console.log(`Analysis ${methodName}: timestamp=${methodData.timestamp}, isRecent=${isRecent}, age=${((now - analysisTime) / 60000).toFixed(1)}min`);
                     
                     if (isRecent && methodData.components && Array.isArray(methodData.components)) {
+                        console.log(`Processing recent analysis ${methodName} with ${methodData.components.length} components`);
+                        
                         // Process the analysis data
                         const processedData = {
                             methodName: methodName,
@@ -371,11 +373,17 @@
                         
                         // Determine best analysis (most components)
                         if (methodData.components.length > maxComponents) {
+                            console.log(`New best analysis: ${methodName} with ${methodData.components.length} components (previous max: ${maxComponents})`);
                             maxComponents = methodData.components.length;
                             bestAnalysis = processedData;
                         }
+                    } else {
+                        console.log(`Skipping ${methodName}: isRecent=${isRecent}, hasComponents=${methodData.components ? true : false}, isArray=${Array.isArray(methodData.components)}`);
                     }
                 }
+                
+                console.log(`Found ${Object.keys(activeAnalyses).length} active analyses:`, Object.keys(activeAnalyses));
+                console.log(`Best analysis selection: maxComponents=${maxComponents}, bestAnalysis=${bestAnalysis ? bestAnalysis.displayName : 'null'}`);
                 
                 // Update the analysis tables display
                 updateAnalysisTables(activeAnalyses);
@@ -384,6 +392,8 @@
                 if (bestAnalysis) {
                     detectedTidalFrequencies = bestAnalysis.components;
                     console.log(`Using ${bestAnalysis.displayName} as best analysis (${maxComponents} components)`);
+                } else {
+                    console.warn('No best analysis found despite having active analyses');
                 }
                 
                 return bestAnalysis;
