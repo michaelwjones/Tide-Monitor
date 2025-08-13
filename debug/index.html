@@ -114,27 +114,11 @@
             <div id="chartLegend" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; font-size: 14px; flex: 1;"></div>
         </div>
         
-        <div style="margin-top: 20px;">
-            <h3>Detected Tidal Frequencies (Matrix Pencil Analysis)</h3>
-            <table id="tidalAnalysisTable" class="tidal-analysis-table">
-                <thead>
-                    <tr>
-                        <th>Version</th>
-                        <th>Rank</th>
-                        <th>Period</th>
-                        <th>Frequency (cycles/day)</th>
-                        <th>Amplitude</th>
-                        <th>Damping (1/s)</th>
-                        <th>Phase Offset</th>
-                        <th>Component Type</th>
-                    </tr>
-                </thead>
-                <tbody id="tidalAnalysisBody">
-                    <tr>
-                        <td colspan="8" style="text-align: center; color: #666;">Loading signal analysis...</td>
-                    </tr>
-                </tbody>
-            </table>
+        <div id="tidalAnalysisContainer" style="margin-top: 20px;">
+            <h3>Detected Tidal Frequencies</h3>
+            <div id="analysisTablesContainer">
+                <div style="text-align: center; color: #666; padding: 20px;">Loading tidal analysis results...</div>
+            </div>
         </div>
     </div>
 
@@ -326,68 +310,101 @@
         }
 
 
-        // Fetch Matrix Pencil tidal analysis results from Firebase Cloud Functions
+        // Fetch all tidal analysis results from Firebase dynamically
         async function fetchTidalAnalysisFromFirebase() {
             try {
-                console.log('Fetching Matrix Pencil tidal analysis from Firebase...');
-                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/tidal-analysis/matrix-pencil-v1.json');
+                console.log('Fetching all tidal analysis methods from Firebase...');
                 
+                // Fetch the entire tidal-analysis node to get all analysis methods
+                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/tidal-analysis.json');
                 if (!response.ok) {
                     throw new Error(`Firebase fetch failed: ${response.status} ${response.statusText}`);
                 }
                 
-                const analysisData = await response.json();
-                
-                if (!analysisData) {
+                const allAnalysisData = await response.json();
+                if (!allAnalysisData) {
                     console.warn('No tidal analysis data available from Firebase');
+                    updateAnalysisTables({});
                     return null;
                 }
                 
-                // Check if this is an error result
-                if (analysisData.error) {
-                    console.error('Tidal analysis error from Firebase:', analysisData.error);
-                    return null;
+                console.log('Available analysis methods:', Object.keys(allAnalysisData));
+                
+                // Filter analyses that have been updated in the last 10 minutes
+                const now = Date.now();
+                const tenMinutesAgo = now - (10 * 60 * 1000);
+                const activeAnalyses = {};
+                let bestAnalysis = null;
+                let maxComponents = 0;
+                
+                for (const [methodName, methodData] of Object.entries(allAnalysisData)) {
+                    // Skip error entries
+                    if (methodName.includes('error') || !methodData || !methodData.timestamp) {
+                        continue;
+                    }
+                    
+                    const analysisTime = new Date(methodData.timestamp).getTime();
+                    const isRecent = analysisTime > tenMinutesAgo;
+                    
+                    console.log(`Analysis ${methodName}: timestamp=${methodData.timestamp}, isRecent=${isRecent}, age=${((now - analysisTime) / 60000).toFixed(1)}min`);
+                    
+                    if (isRecent && methodData.components && Array.isArray(methodData.components)) {
+                        // Process the analysis data
+                        const processedData = {
+                            methodName: methodName,
+                            displayName: formatAnalysisName(methodName),
+                            dcComponent: methodData.dcComponent,
+                            components: methodData.components,
+                            startTime: now - (parseFloat(methodData.timeSpanHours || 24) * 60 * 60 * 1000),
+                            samplingInterval: 60,
+                            modelOrder: methodData.modelOrder,
+                            pencilParam: methodData.pencilParam,
+                            dataLength: methodData.dataPoints,
+                            methodology: methodData.methodology,
+                            computationTimeMs: methodData.computationTimeMs,
+                            timestamp: methodData.timestamp,
+                            timeSpanHours: methodData.timeSpanHours
+                        };
+                        
+                        activeAnalyses[methodName] = processedData;
+                        console.log(`${methodName}: ${methodData.components.length} components, ${methodData.computationTimeMs}ms`);
+                        
+                        // Determine best analysis (most components)
+                        if (methodData.components.length > maxComponents) {
+                            maxComponents = methodData.components.length;
+                            bestAnalysis = processedData;
+                        }
+                    }
                 }
                 
-                // Validate the analysis data structure
-                if (!analysisData.components || !Array.isArray(analysisData.components)) {
-                    console.warn('Invalid tidal analysis data structure from Firebase');
-                    return null;
+                // Update the analysis tables display
+                updateAnalysisTables(activeAnalyses);
+                
+                // Store detected frequencies from best analysis for global variable
+                if (bestAnalysis) {
+                    detectedTidalFrequencies = bestAnalysis.components;
+                    console.log(`Using ${bestAnalysis.displayName} as best analysis (${maxComponents} components)`);
                 }
                 
-                console.log(`Retrieved ${analysisData.components.length} tidal components from Firebase`);
-                console.log(`Analysis methodology: ${analysisData.methodology}`);
-                console.log(`Computed at: ${analysisData.timestamp}`);
-                console.log(`Computation time: ${analysisData.computationTimeMs}ms`);
-                console.log(`Data points: ${analysisData.dataPoints} over ${analysisData.timeSpanHours}h`);
-                
-                // Update table with retrieved components
-                detectedTidalFrequencies = analysisData.components;
-                updateTidalAnalysisTable(analysisData.components);
-                
-                // Format results for trend line reconstruction
-                const results = {
-                    dcComponent: analysisData.dcComponent,
-                    components: analysisData.components,
-                    startTime: Date.now() - (parseFloat(analysisData.timeSpanHours) * 60 * 60 * 1000), // Approximate start time
-                    samplingInterval: 60, // 1 minute intervals
-                    modelOrder: analysisData.modelOrder,
-                    pencilParam: analysisData.pencilParam,
-                    dataLength: analysisData.dataPoints,
-                    primaryPeriod: analysisData.components[0]?.periodMs || 24 * 60 * 60 * 1000,
-                    primaryPeriodHours: analysisData.components[0]?.periodHours || 24,
-                    primaryPower: analysisData.components[0]?.power || 0,
-                    methodology: analysisData.methodology,
-                    computationTimeMs: analysisData.computationTimeMs,
-                    timestamp: analysisData.timestamp
-                };
-                
-                return results;
+                return bestAnalysis;
                 
             } catch (error) {
                 console.error('Failed to fetch tidal analysis from Firebase:', error);
+                updateAnalysisTables({});
                 return null;
             }
+        }
+        
+        // Format analysis method name for display
+        function formatAnalysisName(methodName) {
+            // Convert method names to readable format
+            const formatMap = {
+                'matrix-pencil-v1': 'Matrix Pencil v1',
+                'matrix-pencil-v2': 'Matrix Pencil v2 (Enhanced)',
+                'matrix-pencil': 'Matrix Pencil',
+            };
+            
+            return formatMap[methodName] || methodName.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         }
 
         // Compute signal components using Firebase Matrix Pencil analysis
@@ -402,8 +419,8 @@
             const results = await fetchTidalAnalysisFromFirebase();
             
             if (!results) {
-                console.warn('No Matrix Pencil analysis results available from Firebase - skipping trends');
-                updateTidalAnalysisTable(null, null, null);
+                console.warn('No tidal analysis results available from Firebase - skipping trends');
+                updateAnalysisTables({});
                 return null;
             }
             
@@ -1148,7 +1165,7 @@
         // Perform automatic tidal analysis for table display using Firebase Matrix Pencil
         async function performTidalAnalysis(readings) {
             if (!readings || readings.length < 4) {
-                updateTidalAnalysisTable(null, null, null);
+                updateAnalysisTables({});
                 return;
             }
             
@@ -1158,7 +1175,7 @@
                 
                 // If Matrix Pencil analysis failed, show no results
                 if (!pencilResult) {
-                    updateTidalAnalysisTable(null, null, null);
+                    updateAnalysisTables({});
                 } else {
                     // Calculate and add analysis error after Matrix Pencil results are available
                     await addAnalysisError(readings, pencilResult);
@@ -1166,7 +1183,7 @@
                 // Table is automatically updated in computeWaterLevelComponents
             } catch (error) {
                 console.error('Error performing tidal analysis:', error);
-                updateTidalAnalysisTable(null, null, null);
+                updateAnalysisTables({});
             }
         }
         
@@ -1218,55 +1235,105 @@
             }
         }
         
-        // Update the signal analysis table with Matrix Pencil results
-        function updateTidalAnalysisTable(components) {
-            const tableBody = document.getElementById('tidalAnalysisBody');
+        // Update analysis tables with dynamic method display
+        function updateAnalysisTables(activeAnalyses) {
+            const container = document.getElementById('analysisTablesContainer');
             
-            if (!components || components.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #999;">No signal components detected</td></tr>';
+            if (!activeAnalyses || Object.keys(activeAnalyses).length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">No recent tidal analysis results (last 10 minutes)</div>';
                 return;
             }
             
-            // Clear existing rows
-            tableBody.innerHTML = '';
+            // Clear existing content
+            container.innerHTML = '';
             
-            // Add rows for each detected component
-            components.forEach((component, index) => {
-                const cyclesPerDay = 24 / component.periodHours;
-                const tidalType = getTidalType(component.periodHours);
+            // Create a table for each active analysis method
+            for (const [methodName, analysisData] of Object.entries(activeAnalyses)) {
+                const methodDiv = document.createElement('div');
+                methodDiv.style.marginBottom = '30px';
                 
-                const row = document.createElement('tr');
-                const periodMinutes = Math.round(component.periodHours * 60);
-                const displayHours = Math.floor(periodMinutes / 60);
-                const displayMins = periodMinutes % 60;
-                const periodDisplay = displayMins === 0 ? `${displayHours}h` : `${displayHours}h ${displayMins}m`;
+                // Calculate time since analysis
+                const analysisTime = new Date(analysisData.timestamp);
+                const now = new Date();
+                const minutesAgo = Math.round((now - analysisTime) / 60000);
                 
-                // Format damping coefficient (positive = growing, negative = decaying)
-                const dampingDisplay = component.damping >= 0 ? 
-                    `+${component.damping.toExponential(2)}` : 
-                    component.damping.toExponential(2);
-                
-                // Convert phase from radians to hours and minutes: phase (rad) * period (h) / (2π)
-                const phaseHours = (component.phase * component.periodHours) / (2 * Math.PI);
-                const phaseMinutes = Math.round(Math.abs(phaseHours) * 60);
-                const phaseDisplayHours = Math.floor(phaseMinutes / 60);
-                const phaseDisplayMins = phaseMinutes % 60;
-                const phaseSign = phaseHours >= 0 ? '+' : '-';
-                const phaseDisplay = phaseDisplayMins === 0 ? 
-                    `${phaseSign}${phaseDisplayHours}h` : 
-                    `${phaseSign}${phaseDisplayHours}h ${phaseDisplayMins}m`;
-                
-                row.innerHTML = `
-                    <td>${index + 1}</td>
-                    <td>${periodDisplay}</td>
-                    <td>${cyclesPerDay.toFixed(3)}</td>
-                    <td>${component.amplitude.toFixed(4)}</td>
-                    <td>${dampingDisplay}</td>
-                    <td>${phaseDisplay}</td>
-                    <td>${tidalType}</td>
+                // Method header with status info
+                const header = document.createElement('h4');
+                header.style.color = '#333';
+                header.style.marginBottom = '10px';
+                header.innerHTML = `
+                    ${analysisData.displayName} 
+                    <span style="font-size: 14px; color: #666; font-weight: normal;">
+                        (${analysisData.components.length} components, ${analysisData.computationTimeMs}ms, ${minutesAgo}min ago)
+                    </span>
                 `;
-                tableBody.appendChild(row);
-            });
+                methodDiv.appendChild(header);
+                
+                // Create table for this method
+                const table = document.createElement('table');
+                table.className = 'tidal-analysis-table';
+                table.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Period</th>
+                            <th>Frequency (cycles/day)</th>
+                            <th>Amplitude</th>
+                            <th>Damping (1/s)</th>
+                            <th>Phase Offset</th>
+                            <th>Component Type</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                `;
+                
+                const tbody = table.querySelector('tbody');
+                
+                // Add components for this method
+                if (analysisData.components.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #999;">No signal components detected</td></tr>';
+                } else {
+                    analysisData.components.forEach((component, index) => {
+                        const cyclesPerDay = 24 / component.periodHours;
+                        const tidalType = getTidalType(component.periodHours);
+                        
+                        const row = document.createElement('tr');
+                        const periodMinutes = Math.round(component.periodHours * 60);
+                        const displayHours = Math.floor(periodMinutes / 60);
+                        const displayMins = periodMinutes % 60;
+                        const periodDisplay = displayMins === 0 ? `${displayHours}h` : `${displayHours}h ${displayMins}m`;
+                        
+                        // Format damping coefficient (positive = growing, negative = decaying)
+                        const dampingDisplay = component.damping >= 0 ? 
+                            `+${component.damping.toExponential(2)}` : 
+                            component.damping.toExponential(2);
+                        
+                        // Convert phase from radians to hours and minutes: phase (rad) * period (h) / (2π)
+                        const phaseHours = (component.phase * component.periodHours) / (2 * Math.PI);
+                        const phaseMinutes = Math.round(Math.abs(phaseHours) * 60);
+                        const phaseDisplayHours = Math.floor(phaseMinutes / 60);
+                        const phaseDisplayMins = phaseMinutes % 60;
+                        const phaseSign = phaseHours >= 0 ? '+' : '-';
+                        const phaseDisplay = phaseDisplayMins === 0 ? 
+                            `${phaseSign}${phaseDisplayHours}h` : 
+                            `${phaseSign}${phaseDisplayHours}h ${phaseDisplayMins}m`;
+                        
+                        row.innerHTML = `
+                            <td>${index + 1}</td>
+                            <td>${periodDisplay}</td>
+                            <td>${cyclesPerDay.toFixed(3)}</td>
+                            <td>${component.amplitude.toFixed(4)}</td>
+                            <td>${dampingDisplay}</td>
+                            <td>${phaseDisplay}</td>
+                            <td>${tidalType}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                }
+                
+                methodDiv.appendChild(table);
+                container.appendChild(methodDiv);
+            }
         }
         
         // Classify tidal type based on period
