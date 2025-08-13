@@ -14,7 +14,7 @@ The `enrichTideData` function automatically triggers when new readings are writt
 Analysis functions are organized in `tidal-analysis/functions/` by method and version:
 
 #### Matrix Pencil v1 (`matrix-pencil/v1/`)
-The `runTidalAnalysis` function runs every 5 minutes via Cloud Scheduler to perform advanced tidal harmonic analysis using the Matrix Pencil v1 method. Results are stored in `/tidal-analysis/` for use by the debug dashboard.
+The `runTidalAnalysis` function runs every 5 minutes via Cloud Scheduler to perform advanced tidal harmonic analysis using the Matrix Pencil v1 method. Results are stored in `/tidal-analysis/matrix-pencil-v1/` for use by the debug dashboard.
 
 See `analysis-functions.csv` for a complete list of available analysis methods, versions, and deployment history.
 
@@ -99,7 +99,6 @@ deploy-enrichment.bat
 
 # Deploy Matrix Pencil v1 with cost control menu
 deploy-matrix-pencil-v1.bat
-
 ```
 
 ### Deploy Individual Functions (Command Line)
@@ -139,9 +138,9 @@ toggle-matrix-pencil-v1.bat
 
 ```
 
-Analysis functions use `.env` files instead of Firebase config:
+Analysis functions use `.env` files for configuration:
 ```bash
-# Matrix Pencil v1 configuration
+# Matrix Pencil v1 configuration  
 echo TIDAL_ANALYSIS_ENABLED=true > tidal-analysis/functions/matrix-pencil/v1/.env
 echo TIDAL_ANALYSIS_ENABLED=false > tidal-analysis/functions/matrix-pencil/v1/.env
 ```
