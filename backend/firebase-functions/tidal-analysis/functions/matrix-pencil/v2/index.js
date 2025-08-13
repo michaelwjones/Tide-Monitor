@@ -1,20 +1,20 @@
 /**
  * Matrix Pencil Tidal Analysis v2 for Tide Monitor
  * 
- * Enhanced version with improved accuracy and frequency resolution.
+ * Balanced enhanced version with improved accuracy and reliability.
  * Key improvements over v1:
- * - Larger pencil parameter L (2/3 of data length vs 1/3)
- * - Higher SVD rank limit (20 vs 5) for better model order selection
- * - More sensitive threshold (0.1% vs 1%) for component detection
- * - Support for up to 16 signal components (vs 8)
- * - Enhanced precision in SVD computation
+ * - Moderately larger pencil parameter L (1/2 of data length vs 1/3)
+ * - Higher SVD rank limit (10 vs 5) for better model order selection
+ * - More sensitive threshold (0.5% vs 1%) for component detection
+ * - Support for up to 12 signal components (vs 8)
+ * - Balanced precision improvements for better performance
  * 
  * The Matrix Pencil method decomposes signals into complex exponentials: f(t) = Σ Aₖ e^(σₖ + jωₖ)t
  * 
  * Features:
  * - Non-periodic signal analysis (handles real-world tidal variations)
- * - Enhanced automatic model order selection via SVD with 0.1% threshold
- * - Up to 16 signal components with conjugate pair filtering
+ * - Enhanced automatic model order selection via SVD with 0.5% threshold
+ * - Up to 12 signal components with conjugate pair filtering
  * - Improved frequency resolution for closely spaced tidal constituents
  * - Comprehensive frequency, amplitude, damping, and phase estimation
  * - Scheduled execution every 5 minutes via Cloud Scheduler
@@ -62,8 +62,8 @@ function matrixPencilAnalysis(data, pencilParam = null) {
     const mean = y.reduce((sum, val) => sum + val, 0) / sn;
     const yDetrended = y.map(val => val - mean);
     
-    // Enhanced pencil parameter L - use 2/3 of data for better frequency resolution
-    const L = Math.min(pencilParam || Math.floor(2 * sn / 3), Math.floor(3 * sn / 4)); // Much larger L
+    // Moderately enhanced pencil parameter L - use 1/2 of data for better frequency resolution  
+    const L = Math.min(pencilParam || Math.floor(sn / 2), Math.floor(2 * sn / 3)); // Balanced L increase
     const M = sn - L + 1;
     
     console.log(`Matrix Pencil v2: L=${L} (enhanced from ~${Math.floor(sn/3)} in v1), M=${M}`);
@@ -97,8 +97,8 @@ function matrixPencilAnalysis(data, pencilParam = null) {
     }
     console.log(`Matrix Pencil v2: Enhanced SVD completed, ${svd.S.length} singular values`);
     
-    // More sensitive model order selection using 0.1% threshold (vs 1% in v1)
-    const threshold = 0.001 * Math.max(...svd.S); // 0.1% instead of 1%
+    // Moderately more sensitive model order selection using 0.5% threshold (vs 1% in v1) 
+    const threshold = 0.005 * Math.max(...svd.S); // 0.5% - balanced sensitivity
     let modelOrder = 0;
     for (let i = 0; i < svd.S.length; i++) {
         if (svd.S[i] > threshold) {
@@ -108,8 +108,8 @@ function matrixPencilAnalysis(data, pencilParam = null) {
         }
     }
     
-    // Allow more components for better frequency resolution (up to 16 vs 8 in v1)
-    modelOrder = Math.max(2, Math.min(modelOrder, 16));
+    // Allow moderately more components for better frequency resolution (up to 12 vs 8 in v1)
+    modelOrder = Math.max(2, Math.min(modelOrder, 12));
     console.log(`Matrix Pencil v2: Enhanced model order = ${modelOrder} from ${svd.S.length} singular values (threshold: ${threshold.toFixed(8)})`);
     console.log('Singular values (first 10):', svd.S.slice(0, 10));
     
@@ -232,9 +232,9 @@ function computeEnhancedSVD(matrix) {
     const m = matrix.length;
     const n = matrix[0].length;
     
-    // Enhanced precision and iteration parameters
-    const tolerance = 1e-8; // Higher precision (vs 1e-6 in v1)
-    const maxIterations = 100; // More iterations for convergence
+    // Moderately enhanced precision and iteration parameters
+    const tolerance = 1e-7; // Balanced precision (vs 1e-6 in v1)
+    const maxIterations = 75; // Moderate increase in iterations
     
     const U = [];
     const S = [];
@@ -243,7 +243,7 @@ function computeEnhancedSVD(matrix) {
     // Create copy of matrix for decomposition
     let A = matrix.map(row => [...row]);
     
-    const rank = Math.min(m, n, 20); // Enhanced rank limit (20 vs 5 in v1)
+    const rank = Math.min(m, n, 10); // Balanced rank limit (10 vs 5 in v1)
     
     for (let k = 0; k < rank; k++) {
         // Enhanced power iteration with better initialization
@@ -351,7 +351,7 @@ function computeEnhancedPseudoinverse(matrix) {
     
     // Enhanced SVD for pseudoinverse
     const svd = computeEnhancedSVD(matrix);
-    const tolerance = 1e-10; // Enhanced tolerance for pseudoinverse
+    const tolerance = 1e-8; // Balanced tolerance for pseudoinverse
     
     // Enhanced pseudoinverse: V * Σ⁺ * Uᵀ
     const pinv = [];
@@ -376,9 +376,9 @@ function computeEnhancedPseudoinverse(matrix) {
 function computeEnhancedEigenvalues(matrix) {
     const n = matrix.length;
     const eigenvalues = [];
-    const maxEigenvalues = Math.min(n, 16); // Enhanced limit
-    const tolerance = 1e-10; // Enhanced tolerance
-    const maxIterations = 200; // More iterations
+    const maxEigenvalues = Math.min(n, 12); // Balanced limit
+    const tolerance = 1e-8; // Balanced tolerance  
+    const maxIterations = 100; // Moderate iterations
     
     let A = matrix.map(row => [...row]);
     
