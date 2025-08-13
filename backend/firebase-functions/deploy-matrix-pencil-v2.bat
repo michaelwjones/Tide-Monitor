@@ -31,7 +31,9 @@ if "%choice%"=="1" (
     echo ⚠️  ENABLING Matrix Pencil v2 analysis - this will start costing MORE money than v1!
     echo TIDAL_ANALYSIS_ENABLED=true > "tidal-analysis\functions\matrix-pencil\v2\.env"
     echo ✅ Analysis enabled. Deploying enhanced function...
-    firebase deploy --only functions --source tidal-analysis/functions/matrix-pencil/v2
+    cd tidal-analysis\functions\matrix-pencil\v2
+    call firebase deploy --only functions
+    cd ..\..\..
     if %ERRORLEVEL% EQU 0 (
         echo.
         echo ✅ Matrix Pencil v2 analysis deployed and ENABLED!
@@ -45,7 +47,9 @@ if "%choice%"=="1" (
     echo Ensuring analysis is disabled...
     echo TIDAL_ANALYSIS_ENABLED=false > "tidal-analysis\functions\matrix-pencil\v2\.env"
     echo ✅ Analysis disabled. Deploying enhanced function...
-    firebase deploy --only functions --source tidal-analysis/functions/matrix-pencil/v2
+    cd tidal-analysis\functions\matrix-pencil\v2
+    call firebase deploy --only functions
+    cd ..\..\..
     if %ERRORLEVEL% EQU 0 (
         echo.
         echo ✅ Matrix Pencil v2 analysis deployed but DISABLED!
