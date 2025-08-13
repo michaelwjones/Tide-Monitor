@@ -44,6 +44,7 @@ if "%choice%"=="1" (
     echo.
     echo IMPORTANT: You must redeploy for changes to take effect:
     echo    Run: firebase deploy --only functions --source tidal-analysis/functions/matrix-pencil/v1
+    goto :end
 ) else if "%choice%"=="2" (
     echo.
     echo DISABLING tidal analysis...
@@ -54,6 +55,7 @@ if "%choice%"=="1" (
     echo.
     echo IMPORTANT: You must redeploy for changes to take effect:
     echo    Run: firebase deploy --only functions --source tidal-analysis/functions/matrix-pencil/v1
+    goto :end
 ) else if "%choice%"=="3" (
     echo.
     echo Current configuration:
@@ -65,14 +67,18 @@ if "%choice%"=="1" (
     )
     echo.
     echo Note: Changes take effect after redeployment
+    goto :end
 ) else if "%choice%"=="4" (
     echo.
     echo Operation cancelled.
+    goto :end
 ) else (
     echo.
     echo Invalid choice. Operation cancelled.
+    goto :end
 )
 
+:end
 echo.
 echo Note: This only changes the .env configuration file.
 echo The function must be redeployed for changes to take effect.

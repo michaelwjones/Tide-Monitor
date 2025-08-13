@@ -45,6 +45,7 @@ if "%choice%"=="1" (
         echo 🔧 Check Firebase Console for execution logs
         echo 🛑 DISABLE: Set TIDAL_ANALYSIS_ENABLED=false in tidal-analysis\functions\matrix-pencil\v2\.env
     )
+    goto :end
 ) else if "%choice%"=="2" (
     echo.
     echo Ensuring analysis is disabled...
@@ -63,6 +64,7 @@ if "%choice%"=="1" (
         echo 🚀 ENABLE: Set TIDAL_ANALYSIS_ENABLED=true in tidal-analysis\functions\matrix-pencil\v2\.env
         echo 📈 Enhanced features: 2/3 data length, 0.1%% threshold, up to 16 components
     )
+    goto :end
 ) else if "%choice%"=="3" (
     echo.
     echo Current Matrix Pencil v2 configuration status:
@@ -79,13 +81,17 @@ if "%choice%"=="1" (
     echo - Threshold: 0.1%% sensitivity (vs 1%% in v1)
     echo - Max Components: 16 (vs 8 in v1)
     echo - Expected Cost: ~$10-25/month when enabled
+    goto :end
 ) else if "%choice%"=="4" (
     echo.
     echo Deployment cancelled.
+    goto :end
 ) else (
     echo.
     echo Invalid choice. Deployment cancelled.
+    goto :end
 )
 
+:end
 echo.
 pause

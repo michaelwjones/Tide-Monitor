@@ -43,6 +43,7 @@ if "%choice%"=="1" (
         echo INFO: Check Firebase Console for execution logs
         echo DISABLE: Set TIDAL_ANALYSIS_ENABLED=false in tidal-analysis\functions\matrix-pencil\v1\.env
     )
+    goto :end
 ) else if "%choice%"=="2" (
     echo.
     echo Ensuring analysis is disabled...
@@ -60,6 +61,7 @@ if "%choice%"=="1" (
         echo NOTE: No charges will occur until you enable it
         echo ENABLE: Set TIDAL_ANALYSIS_ENABLED=true in tidal-analysis\functions\matrix-pencil\v1\.env
     )
+    goto :end
 ) else if "%choice%"=="3" (
     echo.
     echo Current configuration status:
@@ -70,13 +72,17 @@ if "%choice%"=="1" (
         echo No .env file exists - analysis disabled by default
     )
     echo.
+    goto :end
 ) else if "%choice%"=="4" (
     echo.
     echo Deployment cancelled.
+    goto :end
 ) else (
     echo.
     echo Invalid choice. Deployment cancelled.
+    goto :end
 )
 
+:end
 echo.
 pause

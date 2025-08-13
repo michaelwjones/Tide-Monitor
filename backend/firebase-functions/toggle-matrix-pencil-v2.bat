@@ -47,6 +47,7 @@ if "%choice%"=="1" (
     echo 📈 Monitor Firebase Console for improved results
     echo.
     echo 🛑 To disable: run this script again and choose option 2
+    goto :end
 ) else if "%choice%"=="2" (
     echo.
     echo Disabling Matrix Pencil v2 analysis...
@@ -59,6 +60,7 @@ if "%choice%"=="1" (
     echo - Better frequency resolution
     echo - More tidal components detected
     echo - Improved accuracy for closely spaced constituents
+    goto :end
 ) else if "%choice%"=="3" (
     echo.
     echo Current Matrix Pencil v2 configuration status:
@@ -77,13 +79,17 @@ if "%choice%"=="1" (
     echo - Precision: 1e-8 tolerance (enhanced from 1e-6 in v1)
     echo - Expected Cost: ~$10-25/month when enabled
     echo.
+    goto :end
 ) else if "%choice%"=="4" (
     echo.
     echo Operation cancelled.
+    goto :end
 ) else (
     echo.
     echo Invalid choice. Operation cancelled.
+    goto :end
 )
 
+:end
 echo.
 pause
