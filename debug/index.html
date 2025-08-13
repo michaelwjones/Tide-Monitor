@@ -119,6 +119,7 @@
             <table id="tidalAnalysisTable" class="tidal-analysis-table">
                 <thead>
                     <tr>
+                        <th>Version</th>
                         <th>Rank</th>
                         <th>Period</th>
                         <th>Frequency (cycles/day)</th>
@@ -130,7 +131,7 @@
                 </thead>
                 <tbody id="tidalAnalysisBody">
                     <tr>
-                        <td colspan="7" style="text-align: center; color: #666;">Loading signal analysis...</td>
+                        <td colspan="8" style="text-align: center; color: #666;">Loading signal analysis...</td>
                     </tr>
                 </tbody>
             </table>
@@ -402,7 +403,7 @@
             
             if (!results) {
                 console.warn('No Matrix Pencil analysis results available from Firebase - skipping trends');
-                updateTidalAnalysisTable(null);
+                updateTidalAnalysisTable(null, null, null);
                 return null;
             }
             
@@ -1147,7 +1148,7 @@
         // Perform automatic tidal analysis for table display using Firebase Matrix Pencil
         async function performTidalAnalysis(readings) {
             if (!readings || readings.length < 4) {
-                updateTidalAnalysisTable(null);
+                updateTidalAnalysisTable(null, null, null);
                 return;
             }
             
@@ -1157,7 +1158,7 @@
                 
                 // If Matrix Pencil analysis failed, show no results
                 if (!pencilResult) {
-                    updateTidalAnalysisTable(null);
+                    updateTidalAnalysisTable(null, null, null);
                 } else {
                     // Calculate and add analysis error after Matrix Pencil results are available
                     await addAnalysisError(readings, pencilResult);
@@ -1165,7 +1166,7 @@
                 // Table is automatically updated in computeWaterLevelComponents
             } catch (error) {
                 console.error('Error performing tidal analysis:', error);
-                updateTidalAnalysisTable(null);
+                updateTidalAnalysisTable(null, null, null);
             }
         }
         

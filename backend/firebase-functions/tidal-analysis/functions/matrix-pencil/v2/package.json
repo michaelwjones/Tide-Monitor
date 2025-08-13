@@ -1,0 +1,23 @@
+{
+  "name": "tide-monitor-matrix-pencil-v2",
+  "version": "2.0.0",
+  "description": "Enhanced Matrix Pencil v2 tidal analysis for Tide Monitor with improved accuracy and frequency resolution",
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.1.0"
+  },
+  "keywords": [
+    "tidal-analysis",
+    "matrix-pencil",
+    "signal-processing",
+    "tide-monitor",
+    "harmonic-analysis",
+    "enhanced-accuracy"
+  ],
+  "author": "Michael Jones",
+  "license": "MIT"
+}
