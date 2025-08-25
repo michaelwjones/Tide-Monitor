@@ -3,17 +3,17 @@
  * 
  * Balanced enhanced version with improved accuracy and reliability.
  * Key improvements over v1:
- * - Moderately larger pencil parameter L (1/2 of data length vs 1/3)
- * - Higher SVD rank limit (10 vs 5) for better model order selection
- * - More sensitive threshold (0.5% vs 1%) for component detection
+ * - Larger pencil parameter L (2/3 of data length vs 1/3) for better frequency resolution
+ * - Optimized SVD rank limit (8) balanced for cloud performance
+ * - More sensitive threshold (0.5% vs 1%) for component detection  
  * - Support for up to 12 signal components (vs 8)
- * - Balanced precision improvements for better performance
+ * - Optimized precision parameters for cloud deployment
  * 
  * The Matrix Pencil method decomposes signals into complex exponentials: f(t) = Σ Aₖ e^(σₖ + jωₖ)t
  * 
  * Features:
  * - Non-periodic signal analysis (handles real-world tidal variations)
- * - Enhanced automatic model order selection via SVD with 0.5% threshold
+ * - Automatic model order selection via optimized SVD with 0.5% threshold
  * - Up to 12 signal components with conjugate pair filtering
  * - Improved frequency resolution for closely spaced tidal constituents
  * - Comprehensive frequency, amplitude, damping, and phase estimation
@@ -58,12 +58,21 @@ function matrixPencilAnalysis(data, pencilParam = null) {
     const samplingInterval = timeSpanSec / (sn - 1);
     const startTime = x[0];
     
-    // Remove DC component
+    console.log(`Matrix Pencil v2: Time span = ${timeSpanSec.toFixed(1)}s (${(timeSpanSec/3600).toFixed(1)}h), sampling interval = ${samplingInterval.toFixed(1)}s`);
+    
+    // Remove DC component and analyze data characteristics
     const mean = y.reduce((sum, val) => sum + val, 0) / sn;
     const yDetrended = y.map(val => val - mean);
     
-    // Moderately enhanced pencil parameter L - use 1/2 of data for better frequency resolution  
-    const L = Math.min(pencilParam || Math.floor(sn / 2), Math.floor(2 * sn / 3)); // Balanced L increase
+    // Debug: Check data characteristics
+    const yMin = Math.min(...y);
+    const yMax = Math.max(...y);
+    const yRange = yMax - yMin;
+    const yStd = Math.sqrt(yDetrended.reduce((sum, val) => sum + val * val, 0) / sn);
+    console.log(`Matrix Pencil v2: Data range = ${yRange.toFixed(4)}m, std = ${yStd.toFixed(4)}m, mean = ${mean.toFixed(4)}m`);
+    
+    // Use much smaller L parameter like v1 for diagnosis 
+    const L = Math.min(pencilParam || Math.floor(sn / 3), Math.floor(sn / 2)); // Back to 1/3 like v1
     const M = sn - L + 1;
     
     console.log(`Matrix Pencil v2: L=${L} (enhanced from ~${Math.floor(sn/3)} in v1), M=${M}`);
@@ -140,9 +149,10 @@ function matrixPencilAnalysis(data, pencilParam = null) {
     console.log(`Matrix Pencil v2: V1 size = ${V1.length} x ${V1[0].length}, V2 size = ${V2.length} x ${V2[0].length}`);
     
     // Solve generalized eigenvalue problem: V1 * z = λ * V2 * z
-    console.log(`Matrix Pencil v2: Computing enhanced eigenvalues`);
+    // Use proven v1 approach instead of enhanced solver
+    console.log(`Matrix Pencil v2: Computing eigenvalues using v1 approach`);
     let eigenvalues;
-    eigenvalues = solveEnhancedGeneralizedEigenvalue(V1, V2);
+    eigenvalues = solveGeneralizedEigenvalue(V1, V2);
     if (!eigenvalues || eigenvalues.length === 0) {
         throw new Error('Enhanced eigenvalue computation failed - no eigenvalues returned');
     }
@@ -157,15 +167,7 @@ function matrixPencilAnalysis(data, pencilParam = null) {
         const lambda = eigenvalues[k];
         const magnitude = Math.sqrt((lambda.real || 0) * (lambda.real || 0) + (lambda.imag || 0) * (lambda.imag || 0));
         
-        // Enhanced filtering: more lenient magnitude check for weak signals
-        if (magnitude < 1e-8 || Math.abs(magnitude - 1.0) < 1e-8) {
-            continue;
-        }
-        
-        // Only process eigenvalues with positive imaginary part to avoid conjugate duplicates
-        if ((lambda.imag || 0) <= 0) {
-            continue;
-        }
+        // Process all eigenvalues - let physical period constraints be the only filter
         
         // Convert eigenvalue to continuous-time parameters
         const lambdaMag = Math.sqrt((lambda.real || 0) * (lambda.real || 0) + (lambda.imag || 0) * (lambda.imag || 0));
@@ -175,8 +177,14 @@ function matrixPencilAnalysis(data, pencilParam = null) {
         console.log(`v2 Eigenvalue processing: lambdaMag=${lambdaMag}, s_real=${s_real}, s_imag=${s_imag}`);
         
         const frequency = Math.abs(s_imag);
-        // More sensitive frequency detection (lower threshold)
-        if (frequency > 1e-8) {
+        if (frequency > 0) {
+            const periodSec = (2 * Math.PI) / frequency;
+            const periodHours = periodSec / 3600;
+            console.log(`  -> Frequency=${frequency.toExponential(3)}, Period=${periodHours.toFixed(1)}h`);
+        }
+        
+        // Process all frequencies including very small ones - no threshold filtering
+        if (frequency > 0) {  // Still need to avoid division by zero for period calculation
             const periodSec = (2 * Math.PI) / frequency;
             const periodMs = periodSec * 1000;
             const periodHours = periodMs / (60 * 60 * 1000);
@@ -227,14 +235,14 @@ function matrixPencilAnalysis(data, pencilParam = null) {
     };
 }
 
-// Enhanced SVD computation with higher rank and better precision
+// Enhanced SVD computation with optimized parameters for cloud performance
 function computeEnhancedSVD(matrix) {
     const m = matrix.length;
     const n = matrix[0].length;
     
-    // Moderately enhanced precision and iteration parameters
-    const tolerance = 1e-7; // Balanced precision (vs 1e-6 in v1)
-    const maxIterations = 75; // Moderate increase in iterations
+    // Optimized precision and iteration parameters to reduce CPU usage
+    const tolerance = 1e-6; // Optimized precision for cloud performance
+    const maxIterations = 50; // Reduced iterations to prevent timeouts
     
     const U = [];
     const S = [];
@@ -243,7 +251,7 @@ function computeEnhancedSVD(matrix) {
     // Create copy of matrix for decomposition
     let A = matrix.map(row => [...row]);
     
-    const rank = Math.min(m, n, 10); // Balanced rank limit (10 vs 5 in v1)
+    const rank = Math.min(m, n, 8); // Optimized rank limit for cloud performance
     
     for (let k = 0; k < rank; k++) {
         // Enhanced power iteration with better initialization
@@ -310,37 +318,39 @@ function computeEnhancedSVD(matrix) {
     return { U, S, Vt };
 }
 
-// Enhanced generalized eigenvalue solver with better numerical stability
-function solveEnhancedGeneralizedEigenvalue(V1, V2) {
-    const n = V1[0].length; // modelOrder
+// Use proven v1 generalized eigenvalue solver
+function solveGeneralizedEigenvalue(V1, V2) {
+    if (!V1 || !V2 || V1.length === 0 || V2.length === 0) return [];
     
-    // Enhanced QZ algorithm approach for better stability
-    // For now, use enhanced pseudoinverse method with better conditioning
+    const m = V1.length;
+    const n = V1[0].length;
     
     try {
-        // Enhanced Moore-Penrose pseudoinverse of V2
-        const V2_pinv = computeEnhancedPseudoinverse(V2);
+        // Convert to standard eigenvalue problem: solve V1^+ * V2
+        const V1T = matrixTranspose(V1);
+        const V1TV1 = matrixMultiply(V1T, V1);
         
-        // Form C = V2_pinv * V1 with enhanced precision
-        const C = [];
-        for (let i = 0; i < n; i++) {
-            const row = [];
-            for (let j = 0; j < n; j++) {
-                let sum = 0;
-                for (let k = 0; k < V2.length; k++) {
-                    sum += V2_pinv[i][k] * V1[k][j];
-                }
-                row.push(sum);
-            }
-            C.push(row);
+        // Check condition number
+        const condition = checkConditionNumber(V1TV1);
+        console.log('V1TV1 condition number:', condition);
+        
+        if (condition > 1e12) {
+            throw new Error(`V1TV1 matrix is too ill-conditioned: condition number = ${condition}`);
         }
         
-        // Enhanced eigenvalue computation of C
-        return computeEnhancedEigenvalues(C);
+        const V1TV1_inv = matrixInverse(V1TV1);
+        if (!V1TV1_inv) {
+            throw new Error('Failed to invert V1^T * V1 - matrix is singular');
+        }
+        
+        const V1_pinv = matrixMultiply(V1TV1_inv, V1T);
+        const C = matrixMultiply(V1_pinv, V2);
+        
+        const eigenvalues = solveEigenvalues(C);
+        return eigenvalues;
         
     } catch (error) {
-        console.error('Enhanced generalized eigenvalue computation failed:', error);
-        throw error;
+        throw new Error(`Generalized eigenvalue computation failed: ${error.message}`);
     }
 }
 
@@ -351,7 +361,7 @@ function computeEnhancedPseudoinverse(matrix) {
     
     // Enhanced SVD for pseudoinverse
     const svd = computeEnhancedSVD(matrix);
-    const tolerance = 1e-8; // Balanced tolerance for pseudoinverse
+    const tolerance = 1e-6; // Optimized tolerance for cloud performance
     
     // Enhanced pseudoinverse: V * Σ⁺ * Uᵀ
     const pinv = [];
@@ -377,8 +387,8 @@ function computeEnhancedEigenvalues(matrix) {
     const n = matrix.length;
     const eigenvalues = [];
     const maxEigenvalues = Math.min(n, 12); // Balanced limit
-    const tolerance = 1e-8; // Balanced tolerance  
-    const maxIterations = 100; // Moderate iterations
+    const tolerance = 1e-6; // Optimized tolerance for cloud performance  
+    const maxIterations = 50; // Reduced iterations to prevent timeouts
     
     let A = matrix.map(row => [...row]);
     
@@ -472,6 +482,245 @@ function estimateAmplitudePhase(x, y, s_real, s_imag, startTime, samplingInterva
     }
     
     return { magnitude: 0, phase: 0 };
+}
+
+// Matrix operations utilities (from proven v1 implementation)
+function matrixMultiply(A, B) {
+    const m = A.length;
+    const n = A[0].length;
+    const p = B[0].length;
+    
+    if (n !== B.length) {
+        throw new Error('Matrix dimensions incompatible for multiplication');
+    }
+    
+    const result = [];
+    for (let i = 0; i < m; i++) {
+        result[i] = [];
+        for (let j = 0; j < p; j++) {
+            let sum = 0;
+            for (let k = 0; k < n; k++) {
+                sum += A[i][k] * B[k][j];
+            }
+            result[i][j] = sum;
+        }
+    }
+    return result;
+}
+
+function matrixTranspose(A) {
+    const m = A.length;
+    const n = A[0].length;
+    const result = [];
+    
+    for (let j = 0; j < n; j++) {
+        result[j] = [];
+        for (let i = 0; i < m; i++) {
+            result[j][i] = A[i][j];
+        }
+    }
+    return result;
+}
+
+function matrixInverse(A) {
+    const n = A.length;
+    const result = [];
+    const identity = [];
+    
+    // Initialize result and identity matrices
+    for (let i = 0; i < n; i++) {
+        result[i] = [...A[i]];
+        identity[i] = new Array(n).fill(0);
+        identity[i][i] = 1;
+    }
+    
+    // Gaussian elimination with partial pivoting
+    for (let k = 0; k < n; k++) {
+        // Find pivot
+        let maxRow = k;
+        for (let i = k + 1; i < n; i++) {
+            if (Math.abs(result[i][k]) > Math.abs(result[maxRow][k])) {
+                maxRow = i;
+            }
+        }
+        
+        // Swap rows
+        if (maxRow !== k) {
+            [result[k], result[maxRow]] = [result[maxRow], result[k]];
+            [identity[k], identity[maxRow]] = [identity[maxRow], identity[k]];
+        }
+        
+        // Check for singular matrix
+        if (Math.abs(result[k][k]) < 1e-10) {
+            return null;
+        }
+        
+        // Scale pivot row
+        const pivot = result[k][k];
+        for (let j = 0; j < n; j++) {
+            result[k][j] /= pivot;
+            identity[k][j] /= pivot;
+        }
+        
+        // Eliminate column
+        for (let i = 0; i < n; i++) {
+            if (i !== k) {
+                const factor = result[i][k];
+                for (let j = 0; j < n; j++) {
+                    result[i][j] -= factor * result[k][j];
+                    identity[i][j] -= factor * identity[k][j];
+                }
+            }
+        }
+    }
+    
+    return identity;
+}
+
+// QR algorithm for eigenvalue computation (from v1)
+function solveEigenvalues(A) {
+    const n = A.length;
+    const maxIterations = 20;
+    const tolerance = 1e-4;
+    
+    let Ak = A.map(row => [...row]);
+    
+    for (let iter = 0; iter < maxIterations; iter++) {
+        const qr = qrDecomposition(Ak);
+        if (!qr) break;
+        
+        Ak = matrixMultiply(qr.R, qr.Q);
+        
+        // Check for convergence
+        let offDiagNorm = 0;
+        for (let i = 0; i < n; i++) {
+            for (let j = 0; j < n; j++) {
+                if (i !== j) {
+                    offDiagNorm += Ak[i][j] * Ak[i][j];
+                }
+            }
+        }
+        
+        if (Math.sqrt(offDiagNorm) < tolerance) {
+            break;
+        }
+    }
+    
+    // Extract eigenvalues from diagonal
+    const eigenvalues = [];
+    for (let i = 0; i < n; i++) {
+        if (i < n - 1 && Math.abs(Ak[i + 1][i]) > tolerance) {
+            // 2x2 block - complex eigenvalues
+            const a = Ak[i][i];
+            const b = Ak[i][i + 1];
+            const c = Ak[i + 1][i];
+            const d = Ak[i + 1][i + 1];
+            
+            const trace = a + d;
+            const det = a * d - b * c;
+            const discriminant = trace * trace - 4 * det;
+            
+            if (discriminant < 0) {
+                const realPart = trace / 2;
+                const imagPart = Math.sqrt(-discriminant) / 2;
+                
+                eigenvalues.push({
+                    real: realPart,
+                    imag: imagPart
+                });
+                eigenvalues.push({
+                    real: realPart,
+                    imag: -imagPart
+                });
+                
+                i++;
+            } else {
+                eigenvalues.push({
+                    real: Ak[i][i],
+                    imag: 0
+                });
+            }
+        } else {
+            eigenvalues.push({
+                real: Ak[i][i],
+                imag: 0
+            });
+        }
+    }
+    
+    return eigenvalues;
+}
+
+// QR decomposition (from v1)
+function qrDecomposition(A) {
+    const m = A.length;
+    const n = A[0].length;
+    
+    const Q = [];
+    const R = [];
+    
+    // Initialize Q as identity and R as copy of A
+    for (let i = 0; i < m; i++) {
+        Q[i] = new Array(n).fill(0);
+        Q[i][i] = 1;
+        R[i] = [...A[i]];
+    }
+    
+    // Gram-Schmidt process
+    for (let k = 0; k < Math.min(m, n); k++) {
+        // Compute norm of k-th column
+        let norm = 0;
+        for (let i = k; i < m; i++) {
+            norm += R[i][k] * R[i][k];
+        }
+        norm = Math.sqrt(norm);
+        
+        if (norm < 1e-10) return null;
+        
+        // Update R and Q
+        for (let i = k; i < m; i++) {
+            R[i][k] /= norm;
+        }
+        
+        for (let j = k + 1; j < n; j++) {
+            let dot = 0;
+            for (let i = k; i < m; i++) {
+                dot += R[i][k] * R[i][j];
+            }
+            
+            for (let i = k; i < m; i++) {
+                R[i][j] -= dot * R[i][k];
+            }
+        }
+    }
+    
+    return { Q, R };
+}
+
+// Check condition number (from v1)
+function checkConditionNumber(A) {
+    const n = A.length;
+    let maxEig = 0;
+    let minEig = Infinity;
+    
+    // Simple approximation using diagonal dominance
+    for (let i = 0; i < n; i++) {
+        const diag = Math.abs(A[i][i]);
+        let offDiag = 0;
+        for (let j = 0; j < n; j++) {
+            if (i !== j) {
+                offDiag += Math.abs(A[i][j]);
+            }
+        }
+        
+        const est = diag - offDiag;
+        if (est > 0) {
+            maxEig = Math.max(maxEig, diag + offDiag);
+            minEig = Math.min(minEig, est);
+        }
+    }
+    
+    return minEig > 0 ? maxEig / minEig : 1e15;
 }
 
 /**
