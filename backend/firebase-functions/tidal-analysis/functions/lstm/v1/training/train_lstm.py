@@ -172,7 +172,7 @@ def train_model():
     if not cuda_available:
         print(f"⚠️  Using CPU Training")
         print(f"  Reason: {'No CUDA support in PyTorch installation' if not hasattr(torch.version, 'cuda') or not torch.version.cuda else 'GPU not available'}")
-        print(f"  For GPU training: Run install-pytorch-manual.bat and select CUDA option")
+        print(f"  For GPU training: Run install-pytorch-interactive.bat and select CUDA option")
         print(f"  Or visit: https://pytorch.org/get-started/locally/")
     
     # Update batch size based on actual device capability

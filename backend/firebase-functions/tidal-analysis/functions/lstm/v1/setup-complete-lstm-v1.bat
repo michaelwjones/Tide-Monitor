@@ -49,7 +49,7 @@ goto MENU
 echo.
 echo Step 1: Installing PyTorch and dependencies...
 echo =============================================
-call setup-pytorch.bat
+call install-pytorch-automatic.bat
 if errorlevel 1 (
     echo Step 1 failed!
     pause

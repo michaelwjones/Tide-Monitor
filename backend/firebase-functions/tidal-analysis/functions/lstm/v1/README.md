@@ -28,23 +28,23 @@ Historical Data (72h) � LSTM � Next Minute � Add to Sequence � Repeat 1,
 
 ## Setup
 
-**Option 1 - Automated Setup (Recommended):**
+**Option 1 - Automatic Installation (Recommended):**
 ```bash
-setup-pytorch.bat
+install-pytorch-automatic.bat
 ```
-*Automatically installs PyTorch with CUDA GPU support, falls back to CPU if no GPU available*
+*Automatically tries CUDA-enabled PyTorch, falls back to CPU if needed*
 
-**Option 2 - Manual Installation:**
+**Option 2 - Interactive Installation:**
+```bash
+install-pytorch-interactive.bat
+```
+*Menu-driven installer with specific CUDA version choices*
+
+**Option 3 - Manual Installation:**
 ```bash
 pip install -r requirements.txt
 ```
-
-**Option 3 - Installation Issues:**
-If you encounter PyTorch installation errors, run:
-```bash
-install-pytorch-manual.bat
-```
-*Provides multiple PyTorch installation options with different CUDA versions*
+*Direct pip installation using requirements.txt*
 
 **GPU Training:**
 - **Automatic Detection**: Training script automatically uses GPU if available
@@ -53,7 +53,7 @@ install-pytorch-manual.bat
 - **Fallback**: Seamlessly falls back to CPU if no GPU detected
 
 **Troubleshooting:**
-- **Installation Errors**: Use `install-pytorch-manual.bat` for step-by-step installation
+- **Installation Errors**: Use `install-pytorch-interactive.bat` for step-by-step installation
 - **CUDA Issues**: Run `python check_gpu.py` to verify GPU setup
 - **Version Conflicts**: Try default PyTorch installation: `pip install torch`
 

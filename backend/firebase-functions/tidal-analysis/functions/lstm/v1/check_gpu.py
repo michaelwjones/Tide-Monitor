@@ -147,7 +147,7 @@ def print_training_recommendations(has_gpu):
         if not cuda_compiled:
             print("🔧 ISSUE: PyTorch not compiled with CUDA support")
             print("To enable GPU training:")
-            print("  1. Run: install-pytorch-manual.bat")
+            print("  1. Run: install-pytorch-interactive.bat")
             print("  2. Select option [2] or [3] for CUDA support")
             print("  3. Or manually reinstall:")
             print("     pip uninstall torch")
