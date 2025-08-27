@@ -56,6 +56,11 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Web Das
 - **Advanced trend line analysis** with dual methodologies:
   - **Water Level Harmonics**: Matrix Pencil signal analysis for non-periodic tidal reconstruction
   - **Wind/Wave Splines**: 30-point smoothed cubic spline interpolation
+- **24-Hour LSTM Forecasting**: Neural network-powered water level predictions
+  - **Iterative Prediction**: Uses last 72 hours to generate 1,440 future predictions
+  - **Visual Integration**: Dashed orange forecast lines extend 24 hours into future
+  - **Auto-Refresh**: Fresh forecasts generated every 6 hours via Firebase Functions
+  - **Machine Learning**: PyTorch-trained LSTM with ONNX deployment for cloud inference
 - **Automatic tidal frequency analysis** with comprehensive results table
   - **Immediate chart display**: Chart loads instantly when data arrives
   - **Background analysis**: Matrix Pencil analysis runs once per data refresh with caching
@@ -89,6 +94,7 @@ Simply visit the live dashboard links above - no installation required!
 1. Navigate to `backend/firebase-functions/`
 2. Use `deploy-enrichment.bat` for NOAA data enrichment (always safe)
 3. Use `deploy-matrix-pencil-v1.bat` for tidal analysis (costs money when enabled)
+4. Use `tidal-analysis/functions/lstm/v1/deploy-lstm-v1.bat` for LSTM forecasting (requires model training)
 
 ## 📊 Data Format
 
@@ -172,6 +178,11 @@ The system collects readings every minute with the following data points:
 - **Dual Methodology Trend Analysis**: Unified interface with specialized algorithms
   - **Water Levels**: Matrix Pencil signal analysis for non-periodic tidal reconstruction
   - **Wind/Wave Data**: Enhanced 30-point smoothed cubic splines
+- **LSTM Neural Network Forecasting**: 24-hour predictive modeling
+  - **Iterative Architecture**: 72-hour input sequences generate 1,440 future predictions
+  - **Machine Learning**: PyTorch-trained LSTM with 2-layer, 128-unit architecture
+  - **Cloud Inference**: ONNX deployment on Firebase Functions with 6-hour update cycle
+  - **Visual Integration**: Dashed orange forecast lines extending 24 hours beyond current data
 - **Model Validation**: Analysis Error plot shows residuals (measured - predicted + 1 offset)
   - **Quality Assessment**: Visual feedback on Matrix Pencil reconstruction accuracy
   - **Error Distribution**: Reveals systematic biases or random errors in tidal modeling
