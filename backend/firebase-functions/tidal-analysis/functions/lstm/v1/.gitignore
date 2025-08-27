@@ -1,0 +1,27 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Training data and outputs - NEVER COMMIT THESE
+data-preparation/data/
+training/trained_models/
+training/inference/
+
+# Model files (will be copied to inference/ for deployment)
+*.onnx
+*.pth
+
+# Environment files
+.env
+*.env
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

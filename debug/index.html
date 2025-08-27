@@ -107,7 +107,7 @@
             <div style="display: flex; align-items: center;">
                 <a href="../index.html" class="main-link">← Main Dashboard</a>
                 <button id="toggleTrendlines" class="toggle-trendlines">Show Trend Lines</button>
-                <button id="togglePrediction" class="toggle-prediction">Show 24h Prediction</button>
+                <button id="togglePrediction" class="toggle-prediction">Show 24h LSTM Forecast</button>
                 <button id="show24Hours" class="toggle-trendlines" style="background: #007bff; margin-left: 10px;">24 Hours</button>
                 <button id="show72Hours" class="toggle-trendlines" style="background: #6c757d; margin-left: 5px;">72 Hours</button>
             </div>
@@ -1127,14 +1127,108 @@
             }
         }
 
+        // Fetch LSTM 24-hour forecasts from Firebase
+        async function fetchLSTMPredictions() {
+            try {
+                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/tidal-analysis/lstm-v1-forecasts/.json?orderBy="$key"&limitToLast=1');
+                const data = await response.json();
+                
+                if (!data) {
+                    console.log('No LSTM forecasts found');
+                    return null;
+                }
+                
+                // Get the most recent forecast batch
+                const latestBatchKey = Object.keys(data).sort().pop();
+                const latestBatch = data[latestBatchKey];
+                
+                if (!latestBatch || !latestBatch.forecast) {
+                    console.log('No forecast data in latest batch');
+                    return null;
+                }
+                
+                console.log(`Fetched LSTM forecast: ${latestBatch.forecast.length} predictions`);
+                
+                // Convert predictions to chart-compatible format
+                const predictions = latestBatch.forecast.map(pred => ({
+                    timestamp: new Date(pred.timestamp),
+                    prediction: pred.prediction,
+                    step: pred.step
+                }));
+                
+                return {
+                    predictions: predictions,
+                    generatedAt: new Date(latestBatch.generated_at),
+                    modelVersion: latestBatch.model_version,
+                    inputDataCount: latestBatch.input_data_count
+                };
+                
+            } catch (error) {
+                console.error('Error fetching LSTM predictions:', error);
+                return null;
+            }
+        }
+
+        // Add LSTM predictions to the chart
+        async function addLSTMPredictions() {
+            const forecastData = await fetchLSTMPredictions();
+            
+            if (!forecastData || !debugChartInstance) {
+                return;
+            }
+            
+            // Convert predictions to chart data (water level in feet)
+            const predictionData = forecastData.predictions.map(pred => ({
+                x: pred.timestamp,
+                y: pred.prediction / 304.8 // Convert mm to feet
+            }));
+            
+            // Add prediction dataset to chart
+            const predictionDataset = {
+                label: 'LSTM 24h Forecast',
+                data: predictionData,
+                borderColor: '#FF6B35',
+                backgroundColor: '#FF6B3520',
+                fill: false,
+                tension: 0.1,
+                pointRadius: 1,
+                pointHoverRadius: 3,
+                borderWidth: 2,
+                borderDash: [5, 5], // Dashed line to distinguish from real data
+                yAxisID: 'y-water'
+            };
+            
+            // Add dataset to chart
+            debugChartInstance.data.datasets.push(predictionDataset);
+            debugChartInstance.update('none');
+            
+            console.log(`Added LSTM predictions: ${predictionData.length} points`);
+        }
+
+        // Remove LSTM predictions from the chart
+        function removeLSTMPredictions() {
+            if (!debugChartInstance) return;
+            
+            // Find and remove LSTM prediction dataset
+            debugChartInstance.data.datasets = debugChartInstance.data.datasets.filter(
+                dataset => dataset.label !== 'LSTM 24h Forecast'
+            );
+            debugChartInstance.update('none');
+            
+            console.log('Removed LSTM predictions from chart');
+        }
+
         // Toggle 24-hour prediction visibility
         async function togglePrediction() {
             predictionVisible = !predictionVisible;
             
             const button = document.getElementById('togglePrediction');
             if (predictionVisible) {
-                button.textContent = 'Hide 24h Prediction';
+                button.textContent = 'Hide 24h LSTM Forecast';
                 button.classList.add('active');
+                
+                // Add LSTM predictions to the chart
+                await addLSTMPredictions();
                 
                 // Extend chart x-axis to show 24 hours into future for prediction
                 if (debugChartInstance) {
@@ -1146,14 +1240,12 @@
                     debugChartInstance.options.plugins.zoom.limits.x.max = extendedMax;
                     debugChartInstance.update('none'); // Update without animation for smooth transition
                 }
-                
-                // If trend lines are visible, update them to include prediction
-                if (trendLinesVisible) {
-                    await addTrendLines();
-                }
             } else {
-                button.textContent = 'Show 24h Prediction';
+                button.textContent = 'Show 24h LSTM Forecast';
                 button.classList.remove('active');
+                
+                // Remove LSTM predictions from chart
+                removeLSTMPredictions();
                 
                 // Reset chart x-axis to current time (remove future prediction view)
                 if (debugChartInstance) {
@@ -1163,11 +1255,6 @@
                     // Reset zoom limits to current time
                     debugChartInstance.options.plugins.zoom.limits.x.max = now;
                     debugChartInstance.update('none'); // Update without animation for smooth transition
-                }
-                
-                // If trend lines are visible, update them to remove prediction
-                if (trendLinesVisible) {
-                    await addTrendLines();
                 }
             }
         }
