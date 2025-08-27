@@ -5,6 +5,7 @@ echo.
 
 :MENU
 echo Choose an option:
+echo [0] Check GPU Support and Performance
 echo [1] Run Step 1: Install PyTorch and dependencies
 echo [2] Run Step 2: Fetch training data from Firebase  
 echo [3] Run Step 3: Create training sequences
@@ -16,6 +17,7 @@ echo [Q] Quit
 echo.
 set /p choice=Enter your choice: 
 
+if /i "%choice%"=="0" goto STEP0
 if /i "%choice%"=="1" goto STEP1
 if /i "%choice%"=="2" goto STEP2
 if /i "%choice%"=="3" goto STEP3
@@ -27,6 +29,20 @@ if /i "%choice%"=="q" goto END
 
 echo Invalid choice. Please try again.
 echo.
+goto MENU
+
+:STEP0
+echo.
+echo Step 0: Checking GPU Support and Performance...
+echo ================================================
+python check_gpu.py
+if errorlevel 1 (
+    echo GPU check completed with warnings - you can still proceed with CPU training
+    pause
+    goto MENU
+)
+echo GPU check completed successfully!
+pause
 goto MENU
 
 :STEP1

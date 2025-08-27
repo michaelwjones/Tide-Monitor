@@ -21,9 +21,12 @@ def load_trained_model():
             dropout=config['dropout']
         )
         
-        # Load trained weights
+        # Load trained weights and ensure CPU for ONNX conversion
         model.load_state_dict(checkpoint['model_state_dict'])
         model.eval()
+        
+        # Move model to CPU for ONNX conversion (required for deployment)
+        model = model.cpu()
         
         print(f"Loaded trained model (val_loss: {checkpoint['val_loss']:.6f})")
         return model, config

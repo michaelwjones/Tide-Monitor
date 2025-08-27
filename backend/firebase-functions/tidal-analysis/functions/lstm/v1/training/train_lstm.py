@@ -118,22 +118,41 @@ def train_model():
     if X is None:
         return
     
-    # Training configuration
+    # Training configuration (optimized for GPU if available)
     config = {
         'hidden_size': 128,
         'num_layers': 2,
         'dropout': 0.2,
         'learning_rate': 0.001,
-        'batch_size': 32,
+        'batch_size': 64 if torch.cuda.is_available() else 32,  # Larger batch for GPU
         'num_epochs': 50,
         'patience': 10  # Early stopping patience
     }
     
     print(f"Training configuration: {config}")
     
-    # Device
+    # Device selection with detailed GPU information
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Using device: {device}")
+    
+    if device.type == 'cuda':
+        gpu_name = torch.cuda.get_device_name(0)
+        gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
+        print(f"🚀 GPU Training Enabled!")
+        print(f"  Device: {gpu_name}")
+        print(f"  Memory: {gpu_memory:.1f} GB")
+        print(f"  CUDA Version: {torch.version.cuda}")
+        
+        # Clear GPU cache before starting
+        torch.cuda.empty_cache()
+        
+        # Enable GPU optimizations
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.enabled = True
+        
+    else:
+        print(f"⚠️  Using CPU Training (GPU not available)")
+        print(f"  For faster training, install CUDA-enabled PyTorch")
+        print(f"  Visit: https://pytorch.org/get-started/locally/")
     
     # Create dataloaders
     train_loader, val_loader = create_dataloaders(X, y, config['batch_size'])
@@ -177,7 +196,14 @@ def train_model():
         train_losses.append(train_loss)
         val_losses.append(val_loss)
         
-        print(f"Train Loss: {train_loss:.6f}, Val Loss: {val_loss:.6f}")
+        # GPU memory monitoring
+        gpu_memory_info = ""
+        if device.type == 'cuda':
+            memory_allocated = torch.cuda.memory_allocated(0) / 1024**3
+            memory_reserved = torch.cuda.memory_reserved(0) / 1024**3
+            gpu_memory_info = f", GPU: {memory_allocated:.1f}/{memory_reserved:.1f} GB"
+        
+        print(f"Train Loss: {train_loss:.6f}, Val Loss: {val_loss:.6f}{gpu_memory_info}")
         
         # Early stopping
         if val_loss < best_val_loss:
@@ -215,6 +241,12 @@ def train_model():
     
     with open('trained_models/training_history.json', 'w') as f:
         json.dump(training_history, f, indent=2)
+    
+    # Final GPU cleanup
+    if device.type == 'cuda':
+        torch.cuda.empty_cache()
+        final_memory = torch.cuda.memory_allocated(0) / 1024**3
+        print(f"🧹 GPU cache cleared, final memory usage: {final_memory:.1f} GB")
     
     print(f"\nTraining completed!")
     print(f"Best validation loss: {best_val_loss:.6f}")

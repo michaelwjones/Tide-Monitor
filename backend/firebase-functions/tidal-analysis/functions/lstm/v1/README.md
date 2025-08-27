@@ -18,25 +18,32 @@ Training data spans from **June 30, 2025** to **August 27, 2025** (~2 months of 
 ## Architecture
 
 ```
-Historical Data (72h) í LSTM í Next Minute í Add to Sequence í Repeat 1,440x
-     4,320 samples         ì         ì                ë
-                    Single Prediction  ê
-                           ì
+Historical Data (72h) ÔøΩ LSTM ÔøΩ Next Minute ÔøΩ Add to Sequence ÔøΩ Repeat 1,440x
+     4,320 samples         ÔøΩ         ÔøΩ                ÔøΩ
+                    Single Prediction  ÔøΩ
+                           ÔøΩ
                    24-Hour Forecast
                    (1,440 predictions)
 ```
 
 ## Setup
 
-**Option 1 - Automated Setup:**
+**Option 1 - Automated Setup (Recommended):**
 ```bash
 setup-pytorch.bat
 ```
+*Automatically installs PyTorch with CUDA GPU support, falls back to CPU if no GPU available*
 
 **Option 2 - Manual Installation:**
 ```bash
 pip install -r requirements.txt
 ```
+
+**GPU Training:**
+- **Automatic Detection**: Training script automatically uses GPU if available
+- **Performance**: 5-10x faster training with CUDA-compatible GPUs  
+- **Memory**: Larger batch sizes (64 vs 32) for improved training efficiency
+- **Fallback**: Seamlessly falls back to CPU if no GPU detected
 
 **Then proceed with:**
 1. Use data preparation scripts to fetch and prepare training data

@@ -14,8 +14,14 @@ if errorlevel 1 (
 echo Installing essential packages only...
 echo.
 
-REM Install PyTorch (CPU version for Windows)
-pip install torch --index-url https://download.pytorch.org/whl/cpu
+REM Install PyTorch with GPU support (CUDA) - falls back to CPU if no GPU
+echo Installing PyTorch with GPU support...
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+REM Verify installation and show device info
+echo.
+echo Checking PyTorch installation and GPU availability...
+python -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}'); print(f'Device count: {torch.cuda.device_count()}'); print(f'Current device: {torch.cuda.current_device() if torch.cuda.is_available() else \"CPU\"}'); print(f'Device name: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}')"
 
 REM Install core packages for data processing and visualization
 pip install numpy pandas matplotlib
@@ -39,6 +45,10 @@ python -c "import onnx; print(' ONNX installed')"
 python -c "import onnxruntime; print(' ONNX Runtime installed')"
 python -c "import matplotlib; print(' Matplotlib installed')"
 python -c "import tqdm; print(' TQDM installed')"
+
+echo.
+echo GPU Training Status:
+python -c "import torch; print('  Device:', 'GPU -', torch.cuda.get_device_name(0), f'({torch.cuda.get_device_properties(0).total_memory // 1024**3} GB)' if torch.cuda.is_available() else 'CPU only (install CUDA for GPU acceleration)')"
 
 echo.
 echo Setup complete! You can now run:
