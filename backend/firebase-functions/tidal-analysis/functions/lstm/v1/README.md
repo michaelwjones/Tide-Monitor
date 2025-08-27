@@ -34,13 +34,7 @@ install-pytorch-automatic.bat
 ```
 *Automatically tries CUDA-enabled PyTorch, falls back to CPU if needed*
 
-**Option 2 - Interactive Installation:**
-```bash
-install-pytorch-interactive.bat
-```
-*Menu-driven installer with specific CUDA version choices*
-
-**Option 3 - Manual Installation:**
+**Option 2 - Manual Installation:**
 ```bash
 pip install -r requirements.txt
 ```
@@ -53,15 +47,36 @@ pip install -r requirements.txt
 - **Fallback**: Seamlessly falls back to CPU if no GPU detected
 
 **Troubleshooting:**
-- **Installation Errors**: Use `install-pytorch-interactive.bat` for step-by-step installation
 - **CUDA Issues**: Run `python check_gpu.py` to verify GPU setup
 - **Version Conflicts**: Try default PyTorch installation: `pip install torch`
 
 **Then proceed with:**
 1. Use data preparation scripts to fetch and prepare training data
 2. Train model locally with PyTorch (single-step ahead prediction)
-3. Convert to ONNX and deploy to Firebase Functions for iterative forecasting
+3. **Test model performance** with the testing interface
+4. Convert to ONNX and deploy to Firebase Functions for iterative forecasting
 
-## Important Note
+## Testing Interface
+
+After training your model, validate it using the comprehensive testing system:
+
+```bash
+cd testing
+start-server.bat  # Windows users (auto-opens browser)
+# OR
+python server.py  # Manual start
+```
+
+**Features:**
+- **Real Data Testing**: Fetches actual tide monitor data from Firebase
+- **24-Hour Forecasting**: Generates complete 1,440-minute predictions
+- **Interactive Visualization**: Chart.js plots showing historical vs predicted data
+- **Robust Input Handling**: Works with any amount of available data (missing values padded with -1)
+
+See `testing/README.md` for complete documentation.
+
+## Important Notes
 
 **The `data-preparation/data/` folder should NEVER be committed to git** - it contains large training files generated locally. The `.gitignore` file ensures this folder is ignored.
+
+**Model Validation**: Always test your trained model with real data using the testing interface before deploying to production Firebase Functions.

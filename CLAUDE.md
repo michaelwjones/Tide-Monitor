@@ -132,7 +132,12 @@ This project uses minimal build tools. Development involves:
    - **Prerequisites**: Run `npm install` in each function directory before first deployment
    - **Logs**: `firebase functions:log`
    - **Test locally**: `firebase emulators:start --only functions`
-4. **Testing**: Manual testing with live sensor data or Firebase data inspection
+4. **LSTM Model Testing**: Comprehensive validation interface for trained models
+   - **Web Interface**: `tidal-analysis/functions/lstm/v1/testing/start-server.bat` (Windows auto-launcher)
+   - **Manual Start**: `python server.py` in testing folder, then open `http://localhost:8000`
+   - **Features**: Real Firebase data fetching, 24-hour forecasting, interactive visualization
+   - **Validation**: Test model performance before deploying to production
+5. **Testing**: Manual testing with live sensor data or Firebase data inspection
 
 ## Project Structure
 
@@ -168,6 +173,13 @@ Tide-Monitor/
     │                   ├── LSTM_V1.md   # Technical methodology documentation
     │                   ├── data-preparation/  # Python scripts for training data
     │                   ├── training/    # PyTorch model training pipeline
+    │                   ├── testing/     # Model validation and testing interface
+    │                   │   ├── README.md           # Testing documentation
+    │                   │   ├── index.html          # Web-based testing interface
+    │                   │   ├── server.py           # HTTP server for model testing
+    │                   │   ├── test_model.py       # Command-line testing script
+    │                   │   ├── start-server.bat    # Windows server launcher
+    │                   │   └── firebase_fetch.py   # Firebase data utilities
     │                   ├── inference/   # Firebase Functions ONNX deployment
     │                   └── deploy-lstm-v1.bat  # Deployment script
     └── particle.io/
