@@ -14,29 +14,37 @@ if errorlevel 1 (
 echo Installing essential packages only...
 echo.
 
-REM Try to install PyTorch with GPU support first, fall back to default if it fails
+REM Try multiple CUDA installation methods
 echo Attempting to install PyTorch with GPU support...
+echo Trying CUDA 12.1 first...
 pip install torch --index-url https://download.pytorch.org/whl/cu121
 
-REM Check if we actually got CUDA version
-python -c "import torch; exit(0 if '+cu' in torch.__version__ else 1)" >nul 2>&1
-
-if errorlevel 1 (
-    echo CUDA installation gave CPU version, trying different approach...
-    echo Uninstalling and trying default PyTorch...
-    pip uninstall torch -y >nul 2>&1
-    pip install torch
-    
-    REM Check again
-    python -c "import torch; exit(0 if '+cu' in torch.__version__ else 1)" >nul 2>&1
-    if errorlevel 1 (
-        echo Default installation also gave CPU version - this system may not support CUDA
-    ) else (
-        echo Default PyTorch installation includes CUDA support!
-    )
-) else (
-    echo CUDA-optimized PyTorch installed successfully!
+REM Check if CUDA 12.1 worked
+python -c "import torch; exit(0 if '+cu121' in torch.__version__ else 1)" >nul 2>&1
+if not errorlevel 1 (
+    echo CUDA 12.1 installation successful!
+    goto CUDA_SUCCESS
 )
+
+echo CUDA 12.1 failed, trying CUDA 11.8...
+pip uninstall torch -y >nul 2>&1
+pip install torch --index-url https://download.pytorch.org/whl/cu118
+
+REM Check if CUDA 11.8 worked  
+python -c "import torch; exit(0 if '+cu118' in torch.__version__ else 1)" >nul 2>&1
+if not errorlevel 1 (
+    echo CUDA 11.8 installation successful!
+    goto CUDA_SUCCESS
+)
+
+echo Both CUDA versions failed, trying default PyTorch...
+pip uninstall torch -y >nul 2>&1
+pip install torch
+
+:CUDA_SUCCESS
+
+REM Final verification of what we got
+python -c "import torch; has_cuda = '+cu' in torch.__version__; print('Final result:', torch.__version__); print('CUDA Support:', 'YES' if has_cuda else 'NO')"
 
 REM Verify installation and show device info
 echo.
