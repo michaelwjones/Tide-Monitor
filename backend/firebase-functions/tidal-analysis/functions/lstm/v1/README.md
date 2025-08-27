@@ -39,11 +39,23 @@ setup-pytorch.bat
 pip install -r requirements.txt
 ```
 
+**Option 3 - Installation Issues:**
+If you encounter PyTorch installation errors, run:
+```bash
+install-pytorch-manual.bat
+```
+*Provides multiple PyTorch installation options with different CUDA versions*
+
 **GPU Training:**
 - **Automatic Detection**: Training script automatically uses GPU if available
 - **Performance**: 5-10x faster training with CUDA-compatible GPUs  
 - **Memory**: Larger batch sizes (64 vs 32) for improved training efficiency
 - **Fallback**: Seamlessly falls back to CPU if no GPU detected
+
+**Troubleshooting:**
+- **Installation Errors**: Use `install-pytorch-manual.bat` for step-by-step installation
+- **CUDA Issues**: Run `python check_gpu.py` to verify GPU setup
+- **Version Conflicts**: Try default PyTorch installation: `pip install torch`
 
 **Then proceed with:**
 1. Use data preparation scripts to fetch and prepare training data

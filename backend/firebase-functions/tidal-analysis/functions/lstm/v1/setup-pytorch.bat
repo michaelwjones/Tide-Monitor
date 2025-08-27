@@ -14,9 +14,17 @@ if errorlevel 1 (
 echo Installing essential packages only...
 echo.
 
-REM Install PyTorch with GPU support (CUDA) - falls back to CPU if no GPU
-echo Installing PyTorch with GPU support...
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+REM Try to install PyTorch with GPU support first, fall back to default if it fails
+echo Attempting to install PyTorch with GPU support...
+pip install torch --index-url https://download.pytorch.org/whl/cu121 >nul 2>&1
+
+if errorlevel 1 (
+    echo CUDA-specific installation failed, installing default PyTorch...
+    echo This will include GPU support if CUDA is available on your system.
+    pip install torch
+) else (
+    echo CUDA-optimized PyTorch installed successfully!
+)
 
 REM Verify installation and show device info
 echo.

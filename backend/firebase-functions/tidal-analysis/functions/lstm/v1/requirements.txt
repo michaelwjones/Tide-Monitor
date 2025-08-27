@@ -1,7 +1,6 @@
 # LSTM v1 Tidal Analysis - Required Python Packages
-# For GPU support, install with: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+# For GPU support, install with: pip install torch --index-url https://download.pytorch.org/whl/cu121
 torch>=2.0.0
-torchvision>=0.15.0
 numpy>=1.20.0
 pandas>=1.3.0
 requests>=2.25.0
