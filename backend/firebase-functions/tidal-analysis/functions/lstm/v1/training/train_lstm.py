@@ -124,35 +124,64 @@ def train_model():
         'num_layers': 2,
         'dropout': 0.2,
         'learning_rate': 0.001,
-        'batch_size': 64 if torch.cuda.is_available() else 32,  # Larger batch for GPU
+        'batch_size': 32,  # Will be updated based on actual GPU availability
         'num_epochs': 50,
         'patience': 10  # Early stopping patience
     }
     
     print(f"Training configuration: {config}")
     
-    # Device selection with detailed GPU information
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # Device selection with robust CUDA checking
+    cuda_available = False
+    device = torch.device('cpu')  # Default to CPU
     
-    if device.type == 'cuda':
-        gpu_name = torch.cuda.get_device_name(0)
-        gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
-        print(f"🚀 GPU Training Enabled!")
-        print(f"  Device: {gpu_name}")
-        print(f"  Memory: {gpu_memory:.1f} GB")
-        print(f"  CUDA Version: {torch.version.cuda}")
-        
-        # Clear GPU cache before starting
-        torch.cuda.empty_cache()
-        
-        # Enable GPU optimizations
-        torch.backends.cudnn.benchmark = True
-        torch.backends.cudnn.enabled = True
-        
+    try:
+        if torch.cuda.is_available() and hasattr(torch, 'version') and torch.version.cuda:
+            # Additional check to ensure CUDA is actually functional
+            test_tensor = torch.tensor([1.0])
+            test_tensor.cuda()  # This will fail if CUDA not properly compiled
+            cuda_available = True
+            device = torch.device('cuda')
+    except (RuntimeError, AssertionError) as e:
+        print(f"⚠️  CUDA check failed: {e}")
+        cuda_available = False
+        device = torch.device('cpu')
+    
+    if cuda_available and device.type == 'cuda':
+        try:
+            gpu_name = torch.cuda.get_device_name(0)
+            gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
+            print(f"🚀 GPU Training Enabled!")
+            print(f"  Device: {gpu_name}")
+            print(f"  Memory: {gpu_memory:.1f} GB")
+            print(f"  CUDA Version: {torch.version.cuda}")
+            
+            # Clear GPU cache before starting
+            torch.cuda.empty_cache()
+            
+            # Enable GPU optimizations
+            torch.backends.cudnn.benchmark = True
+            torch.backends.cudnn.enabled = True
+            
+        except Exception as e:
+            print(f"⚠️  GPU setup failed: {e}")
+            print(f"  Falling back to CPU training")
+            cuda_available = False
+            device = torch.device('cpu')
+    
+    if not cuda_available:
+        print(f"⚠️  Using CPU Training")
+        print(f"  Reason: {'No CUDA support in PyTorch installation' if not hasattr(torch.version, 'cuda') or not torch.version.cuda else 'GPU not available'}")
+        print(f"  For GPU training: Run install-pytorch-manual.bat and select CUDA option")
+        print(f"  Or visit: https://pytorch.org/get-started/locally/")
+    
+    # Update batch size based on actual device capability
+    if cuda_available:
+        config['batch_size'] = 64  # Larger batch for GPU
+        print(f"  Batch size optimized for GPU: {config['batch_size']}")
     else:
-        print(f"⚠️  Using CPU Training (GPU not available)")
-        print(f"  For faster training, install CUDA-enabled PyTorch")
-        print(f"  Visit: https://pytorch.org/get-started/locally/")
+        config['batch_size'] = 32  # Smaller batch for CPU
+        print(f"  Batch size optimized for CPU: {config['batch_size']}")
     
     # Create dataloaders
     train_loader, val_loader = create_dataloaders(X, y, config['batch_size'])
@@ -196,12 +225,16 @@ def train_model():
         train_losses.append(train_loss)
         val_losses.append(val_loss)
         
-        # GPU memory monitoring
+        # GPU memory monitoring (only if CUDA is actually available)
         gpu_memory_info = ""
-        if device.type == 'cuda':
-            memory_allocated = torch.cuda.memory_allocated(0) / 1024**3
-            memory_reserved = torch.cuda.memory_reserved(0) / 1024**3
-            gpu_memory_info = f", GPU: {memory_allocated:.1f}/{memory_reserved:.1f} GB"
+        if cuda_available and device.type == 'cuda':
+            try:
+                memory_allocated = torch.cuda.memory_allocated(0) / 1024**3
+                memory_reserved = torch.cuda.memory_reserved(0) / 1024**3
+                gpu_memory_info = f", GPU: {memory_allocated:.1f}/{memory_reserved:.1f} GB"
+            except Exception:
+                # Skip GPU memory monitoring if it fails
+                gpu_memory_info = ""
         
         print(f"Train Loss: {train_loss:.6f}, Val Loss: {val_loss:.6f}{gpu_memory_info}")
         
@@ -242,11 +275,14 @@ def train_model():
     with open('trained_models/training_history.json', 'w') as f:
         json.dump(training_history, f, indent=2)
     
-    # Final GPU cleanup
-    if device.type == 'cuda':
-        torch.cuda.empty_cache()
-        final_memory = torch.cuda.memory_allocated(0) / 1024**3
-        print(f"🧹 GPU cache cleared, final memory usage: {final_memory:.1f} GB")
+    # Final GPU cleanup (only if CUDA is actually available)
+    if cuda_available and device.type == 'cuda':
+        try:
+            torch.cuda.empty_cache()
+            final_memory = torch.cuda.memory_allocated(0) / 1024**3
+            print(f"🧹 GPU cache cleared, final memory usage: {final_memory:.1f} GB")
+        except Exception:
+            print("🧹 GPU cleanup attempted (some features unavailable)")
     
     print(f"\nTraining completed!")
     print(f"Best validation loss: {best_val_loss:.6f}")

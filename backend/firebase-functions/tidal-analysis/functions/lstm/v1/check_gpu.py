@@ -18,10 +18,27 @@ def check_gpu_support():
     
     # Basic PyTorch info
     print(f"PyTorch Version: {torch.__version__}")
-    print(f"CUDA Available: {torch.cuda.is_available()}")
     
-    if torch.cuda.is_available():
+    # Check for CUDA compilation
+    cuda_compiled = hasattr(torch.version, 'cuda') and torch.version.cuda is not None
+    print(f"CUDA Compiled: {cuda_compiled}")
+    if cuda_compiled:
         print(f"CUDA Version: {torch.version.cuda}")
+    
+    # Check CUDA availability with error handling
+    cuda_available = False
+    try:
+        cuda_available = torch.cuda.is_available()
+        if cuda_available:
+            # Additional test to ensure CUDA actually works
+            test_tensor = torch.tensor([1.0])
+            test_tensor.cuda()
+        print(f"CUDA Available: {cuda_available}")
+    except (RuntimeError, AssertionError) as e:
+        print(f"CUDA Available: False (Error: {e})")
+        cuda_available = False
+    
+    if cuda_available and cuda_compiled:
         print(f"GPU Count: {torch.cuda.device_count()}")
         print()
         
@@ -36,18 +53,22 @@ def check_gpu_support():
         
         # Performance test
         print("Running quick performance test...")
-        run_performance_test()
+        run_performance_test(cuda_available, cuda_compiled)
         
         # Training recommendations
         print_training_recommendations(True)
         
     else:
-        print("No CUDA-capable GPU detected.")
+        if not cuda_compiled:
+            print("PyTorch not compiled with CUDA support.")
+            print("Current installation is CPU-only.")
+        else:
+            print("No CUDA-capable GPU detected.")
         print("Training will use CPU (slower but still functional).")
         print()
         print_training_recommendations(False)
 
-def run_performance_test():
+def run_performance_test(cuda_available, cuda_compiled):
     """Run a simple performance test on GPU vs CPU"""
     try:
         # Test data similar to LSTM training
@@ -63,8 +84,8 @@ def run_performance_test():
         cpu_result = torch.matmul(test_input, test_input.transpose(-1, -2))
         cpu_time = time.time() - start_time
         
-        # GPU test
-        if torch.cuda.is_available():
+        # GPU test (only if CUDA is compiled and available)
+        if cuda_available and cuda_compiled:
             torch.cuda.empty_cache()
             test_input_gpu = test_input.cuda()
             
@@ -100,6 +121,9 @@ def print_training_recommendations(has_gpu):
     print("TRAINING RECOMMENDATIONS")
     print("=" * 60)
     
+    # Check for CUDA compilation issue
+    cuda_compiled = hasattr(torch.version, 'cuda') and torch.version.cuda is not None
+    
     if has_gpu:
         gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
         
@@ -119,10 +143,20 @@ def print_training_recommendations(has_gpu):
         print("  • Batch size: 32 (optimal for CPU)")
         print("  • Memory usage: ~4-8 GB system RAM")
         print()
-        print("To enable GPU training:")
-        print("  1. Install CUDA-compatible GPU drivers")
-        print("  2. Reinstall PyTorch with CUDA support:")
-        print("     pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121")
+        
+        if not cuda_compiled:
+            print("🔧 ISSUE: PyTorch not compiled with CUDA support")
+            print("To enable GPU training:")
+            print("  1. Run: install-pytorch-manual.bat")
+            print("  2. Select option [2] or [3] for CUDA support")
+            print("  3. Or manually reinstall:")
+            print("     pip uninstall torch")
+            print("     pip install torch --index-url https://download.pytorch.org/whl/cu121")
+        else:
+            print("To enable GPU training:")
+            print("  1. Install CUDA-compatible GPU drivers")
+            print("  2. Verify GPU hardware is supported")
+            print("  3. Restart system after driver installation")
 
 def main():
     """Main function"""
