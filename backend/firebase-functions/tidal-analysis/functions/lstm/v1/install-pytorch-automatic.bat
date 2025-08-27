@@ -16,12 +16,24 @@ echo.
 
 REM Try to install PyTorch with GPU support first, fall back to default if it fails
 echo Attempting to install PyTorch with GPU support...
-pip install torch --index-url https://download.pytorch.org/whl/cu121 >nul 2>&1
+pip install torch --index-url https://download.pytorch.org/whl/cu121
+
+REM Check if we actually got CUDA version
+python -c "import torch; exit(0 if '+cu' in torch.__version__ else 1)" >nul 2>&1
 
 if errorlevel 1 (
-    echo CUDA-specific installation failed, installing default PyTorch...
-    echo This will include GPU support if CUDA is available on your system.
+    echo CUDA installation gave CPU version, trying different approach...
+    echo Uninstalling and trying default PyTorch...
+    pip uninstall torch -y >nul 2>&1
     pip install torch
+    
+    REM Check again
+    python -c "import torch; exit(0 if '+cu' in torch.__version__ else 1)" >nul 2>&1
+    if errorlevel 1 (
+        echo Default installation also gave CPU version - this system may not support CUDA
+    ) else (
+        echo Default PyTorch installation includes CUDA support!
+    )
 ) else (
     echo CUDA-optimized PyTorch installed successfully!
 )
@@ -56,7 +68,7 @@ python -c "import tqdm; print(' TQDM installed')"
 
 echo.
 echo GPU Training Status:
-python -c "import torch; print('  Device:', 'GPU -', torch.cuda.get_device_name(0), f'({torch.cuda.get_device_properties(0).total_memory // 1024**3} GB)' if torch.cuda.is_available() else 'CPU only (install CUDA for GPU acceleration)')"
+python -c "import torch; cuda_available = torch.cuda.is_available(); has_cuda_build = '+cu' in torch.__version__; print('  PyTorch Build:', 'CUDA-enabled' if has_cuda_build else 'CPU-only'); print('  GPU Available:', 'YES -', torch.cuda.get_device_name(0) if cuda_available else 'NO'); print('  Recommendation:', 'GPU training ready!' if cuda_available else 'Use install-pytorch-interactive.bat for troubleshooting' if not has_cuda_build else 'Install CUDA drivers')"
 
 echo.
 echo Setup complete! You can now run:
