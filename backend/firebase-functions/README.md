@@ -4,6 +4,7 @@ This directory contains Firebase Cloud Functions for the Tide Monitor project:
 
 1. **Tide Enrichment** (`tide-enrichment/`) - Enriches sensor data with NOAA environmental conditions
 2. **Tidal Analysis Functions** (`tidal-analysis/functions/`) - Multiple analysis methods for advanced tidal signal processing
+3. **LSTM Forecasting** (`tidal-analysis/functions/lstm/v1/`) - Neural network-powered 24-hour water level predictions
 
 ## Overview
 
@@ -15,6 +16,9 @@ Analysis functions are organized in `tidal-analysis/functions/` by method and ve
 
 #### Matrix Pencil v1 (`matrix-pencil/v1/`)
 The `runTidalAnalysis` function runs every 5 minutes via Cloud Scheduler to perform advanced tidal harmonic analysis using the Matrix Pencil v1 method. Results are stored in `/tidal-analysis/matrix-pencil-v1/` for use by the debug dashboard.
+
+#### LSTM v1 (`lstm/v1/`)
+The `runLSTMv1Prediction` function runs every 6 hours to generate 24-hour water level forecasts using iterative neural network prediction. Uses the last 72 hours of data to produce 1,440 future predictions, stored in `/tidal-analysis/lstm-v1-forecasts/` for debug dashboard visualization.
 
 See `analysis-functions.csv` for a complete list of available analysis methods, versions, and deployment history.
 
@@ -99,6 +103,10 @@ deploy-enrichment.bat
 
 # Deploy Matrix Pencil v1 with cost control menu
 deploy-matrix-pencil-v1.bat
+
+# Deploy LSTM v1 forecasting (requires trained model)
+cd tidal-analysis/functions/lstm/v1
+deploy-lstm-v1.bat
 ```
 
 ### Deploy Individual Functions (Command Line)
@@ -108,6 +116,9 @@ firebase deploy --only functions --source tide-enrichment
 
 # Deploy Matrix Pencil v1 analysis (remember to enable first!)
 firebase deploy --only functions --source tidal-analysis/functions/matrix-pencil/v1
+
+# Deploy LSTM v1 forecasting (requires ONNX model files)
+firebase deploy --only functions --source tidal-analysis/functions/lstm/v1/inference
 ```
 
 ### Deploy Both Functions (Command Line)
@@ -124,6 +135,7 @@ firebase functions:log
 # Specific function
 firebase functions:log --only enrichTideData
 firebase functions:log --only runTidalAnalysis
+firebase functions:log --only runLSTMv1Prediction
 ```
 
 ### Test Locally
@@ -176,6 +188,11 @@ The enriched data is used by the web dashboards for:
     - **Accuracy Assessment**: Values around 1.0 indicate perfect Matrix Pencil reconstruction
     - **Systematic Error Detection**: Identifies consistent over/under-prediction patterns
     - **Quality Control**: Visual feedback on tidal harmonic analysis performance
+  - **LSTM 24-Hour Forecasting**: Neural network water level predictions
+    - **Iterative Prediction**: Uses 72-hour historical sequences to generate 1,440 future data points
+    - **Visual Integration**: Dashed orange forecast lines extending 24 hours beyond current time
+    - **Auto-Refresh**: Fresh forecasts generated every 6 hours with latest model predictions
+    - **Machine Learning**: PyTorch-trained LSTM deployed via ONNX for cloud inference
 
 ### Troubleshooting
 

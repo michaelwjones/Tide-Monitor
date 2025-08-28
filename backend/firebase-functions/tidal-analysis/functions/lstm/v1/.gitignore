@@ -1,0 +1,45 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Training data and outputs - NEVER COMMIT THESE
+data-preparation/data/
+training/trained_models/
+training/inference/
+
+# Large data files - NEVER COMMIT THESE
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+firebase_raw_data.json
+normalization_params.json
+timestamps.json
+training_history.json
+
+# Model files (will be copied to inference/ for deployment)
+*.onnx
+*.pth
+*.pt
+*.model
+
+# Node.js (for inference directory)
+node_modules/
+package-lock.json
+
+# Environment files
+.env
+*.env
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

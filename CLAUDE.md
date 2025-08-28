@@ -25,9 +25,10 @@ This is a **Tide Monitor** project that measures water levels and wave heights u
    - System status monitoring
    - Same clean layout as main dashboard for consistency
 
-4. **Firebase Cloud Functions** (`backend/firebase-functions/`) - Two separate serverless functions:
+4. **Firebase Cloud Functions** (`backend/firebase-functions/`) - Three separate serverless function systems:
    - **Data Enrichment** (`tide-enrichment/`): Automatically triggers when new readings arrive
    - **Tidal Analysis Functions** (`tidal-analysis/functions/`): Multiple analysis methods for advanced signal processing
+   - **LSTM Forecasting** (`tidal-analysis/functions/lstm/v1/`): Neural network-powered 24-hour water level predictions
    - Fetch real-time wind and water level data from NOAA station 8656483 (Duke Marine Lab)
    - Enrich each reading with environmental conditions
    - Perform strict data validation requiring at least 1 data point (uses last element)
@@ -123,14 +124,20 @@ This project uses minimal build tools. Development involves:
 1. **Firmware development**: Use Particle Workbench or Web IDE for the Arduino code
    - **Flash to device**: Run `flash.bat` in `backend/boron404x/` directory to deploy firmware to Particle Boron
 2. **Web dashboard**: Open `index.html` directly in browser or serve with local HTTP server
-3. **Firebase Functions**: Deploy Cloud Functions for data enrichment and tidal analysis
+3. **Firebase Functions**: Deploy Cloud Functions for data enrichment, tidal analysis, and LSTM forecasting
    - **Enrichment only**: `deploy-enrichment.bat` (NOAA data enrichment, always safe)
    - **Matrix Pencil v1**: `deploy-matrix-pencil-v1.bat` (tidal analysis with cost control)
-   - **Manual CLI**: `firebase deploy --only functions --source tide-enrichment` or `--source tidal-analysis/functions/matrix-pencil/v1`
+   - **LSTM v1 Forecasting**: `tidal-analysis/functions/lstm/v1/deploy-lstm-v1.bat` (requires trained model)
+   - **Manual CLI**: `firebase deploy --only functions --source tide-enrichment` or `--source tidal-analysis/functions/matrix-pencil/v1` or `--source tidal-analysis/functions/lstm/v1/inference`
    - **Prerequisites**: Run `npm install` in each function directory before first deployment
    - **Logs**: `firebase functions:log`
    - **Test locally**: `firebase emulators:start --only functions`
-4. **Testing**: Manual testing with live sensor data or Firebase data inspection
+4. **LSTM Model Testing**: Comprehensive validation interface for trained models
+   - **Web Interface**: `tidal-analysis/functions/lstm/v1/testing/start-server.bat` (Windows auto-launcher)
+   - **Manual Start**: `python server.py` in testing folder, then open `http://localhost:8000`
+   - **Features**: Real Firebase data fetching, 24-hour forecasting, interactive visualization
+   - **Validation**: Test model performance before deploying to production
+5. **Testing**: Manual testing with live sensor data or Firebase data inspection
 
 ## Project Structure
 
@@ -155,11 +162,26 @@ Tide-Monitor/
     │   └── tidal-analysis/              # Analysis functions container
     │       ├── analysis-functions.csv   # Function tracking spreadsheet
     │       └── functions/               # Organized analysis functions
-    │           └── matrix-pencil/       # Matrix Pencil analysis method
-    │               └── v1/              # Matrix Pencil version 1
-    │                   ├── README.md    # Analysis deployment guide
-    │                   ├── index.js     # Matrix Pencil v1 implementation
-    │                   └── package.json
+    │           ├── matrix-pencil/       # Matrix Pencil analysis method
+    │           │   └── v1/              # Matrix Pencil version 1
+    │           │       ├── README.md    # Analysis deployment guide
+    │           │       ├── index.js     # Matrix Pencil v1 implementation
+    │           │       └── package.json
+    │           └── lstm/                # LSTM neural network forecasting
+    │               └── v1/              # LSTM version 1
+    │                   ├── README.md    # LSTM setup and deployment guide
+    │                   ├── LSTM_V1.md   # Technical methodology documentation
+    │                   ├── data-preparation/  # Python scripts for training data
+    │                   ├── training/    # PyTorch model training pipeline
+    │                   ├── testing/     # Model validation and testing interface
+    │                   │   ├── README.md           # Testing documentation
+    │                   │   ├── index.html          # Web-based testing interface
+    │                   │   ├── server.py           # HTTP server for model testing
+    │                   │   ├── test_model.py       # Command-line testing script
+    │                   │   ├── start-server.bat    # Windows server launcher
+    │                   │   └── firebase_fetch.py   # Firebase data utilities
+    │                   ├── inference/   # Firebase Functions ONNX deployment
+    │                   └── deploy-lstm-v1.bat  # Deployment script
     └── particle.io/
         └── firebase integration.txt     # Webhook configuration
 ```
@@ -213,6 +235,12 @@ Readings are stored with auto-generated keys containing:
   - **Smoothing**: 7-point adaptive smoothing for optimal curve fitting
   - **Visual clarity**: Original data fades to 30% opacity when trend lines are shown
   - **Edge safety**: Natural splines prevent oscillation artifacts at data boundaries
+- **LSTM 24-Hour Forecasting**: Neural network water level predictions
+  - **Button**: "Show 24h LSTM Forecast" toggle beside trend line controls
+  - **Visual Display**: Dashed orange forecast lines extending 24 hours into future
+  - **Iterative Prediction**: Uses last 72 hours to generate 1,440 minute-by-minute forecasts
+  - **Auto-Refresh**: Fresh predictions generated every 6 hours by Firebase Functions
+  - **Chart Extension**: X-axis automatically extends 24 hours beyond current data when active
 - **Clean layout**: Same styling as main dashboard for consistency
 - **Navigation**: Easy switching between main and debug views
 
@@ -247,3 +275,4 @@ This removal simplified the system to focus on the two reliable wave analysis me
 ## Permissions
 
 - You have permission to commit and push code.
+- Occasionally I will ask for options, ideas, or advice. In those cases, do not make any code changes.

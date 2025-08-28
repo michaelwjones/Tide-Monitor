@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LSTM v1 Model Testing</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@3.3.1/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        textarea {
+            width: 100%;
+            height: 120px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        button {
+            background-color: #007cba;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #005a87;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f0f8ff;
+            border-radius: 5px;
+            border-left: 4px solid #007cba;
+        }
+        .error {
+            background-color: #ffe6e6;
+            border-left: 4px solid #ff4444;
+        }
+        .example {
+            font-size: 11px;
+            color: #666;
+            margin-top: 5px;
+        }
+        #chartSection {
+            width: 100%;
+            height: 400px;
+            position: relative;
+        }
+        #predictionChart {
+            width: 100% !important;
+            height: 400px !important;
+            max-width: 100%;
+            max-height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LSTM v1 Model Testing Interface</h1>
+        
+        <div class="section">
+            <h3>1. Test Data Input</h3>
+            <p>Enter 72 water level readings (in mm) - one per line:</p>
+            <textarea id="inputData" placeholder="Enter 72 water level readings, one per line...
+Example:
+1850.5
+1849.2
+1851.1
+..."></textarea>
+            <div class="example">Expected: 72 numeric values representing water levels in millimeters</div>
+        </div>
+
+        <div class="section">
+            <h3>2. Fetch Real Firebase Data</h3>
+            <button onclick="fetchFirebaseData()">Fetch Last 72 Hours from Firebase</button>
+            <div class="example">Gets real water level data from your tide monitor</div>
+        </div>
+
+        <div class="section">
+            <h3>3. Generate Sample Data</h3>
+            <button onclick="generateSampleData()">Generate 72 Sample Readings</button>
+            <div class="example">Creates realistic tidal data for testing</div>
+        </div>
+
+        <div class="section">
+            <h3>4. Test Model</h3>
+            <button onclick="testModel()">Run Single Prediction</button>
+            <button onclick="predict24Hours()" style="margin-left: 10px;">Predict Next 24 Hours</button>
+            <div class="example">Single step prediction or full 24-hour forecast</div>
+        </div>
+
+        <div class="section" id="chartSection" style="display: none;">
+            <h3>5. Visualization</h3>
+            <canvas id="predictionChart" width="800" height="400"></canvas>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script>
+        let currentData = {
+            historical: [],
+            predictions: [],
+            timestamps: []
+        };
+        
+        function generateSampleData() {
+            // Generate realistic tidal data
+            const baseLevel = 1850; // Base water level in mm
+            const tidalRange = 300; // Tidal variation in mm
+            const readings = [];
+            
+            for (let i = 0; i < 72; i++) {
+                // Simulate tidal cycle + some noise
+                const tidalComponent = Math.sin((i / 72) * 2 * Math.PI) * tidalRange;
+                const noise = (Math.random() - 0.5) * 20; // ±10mm noise
+                const reading = baseLevel + tidalComponent + noise;
+                readings.push(reading.toFixed(1));
+            }
+            
+            document.getElementById('inputData').value = readings.join('\n');
+            showResults('Generated 72 sample readings with realistic tidal patterns', false);
+        }
+
+        async function fetchFirebaseData() {
+            showResults('Fetching real data from Firebase...', false);
+            
+            try {
+                // Fetch directly from Firebase like the debug page does
+                // 72 hours * 60 minutes = 4320 readings
+                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/.json?orderBy="$key"&limitToLast=4320');
+                
+                if (!response.ok) {
+                    throw new Error(`Firebase fetch failed: ${response.status} ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                if (!data) {
+                    throw new Error('No data received from Firebase');
+                }
+
+                // Convert Firebase data to array and sort by timestamp
+                const readings = [];
+                
+                Object.entries(data).forEach(([key, reading]) => {
+                    if (reading && reading.t && reading.w) {
+                        const timestamp = new Date(reading.t);
+                        const waterLevel = parseFloat(reading.w);
+                        
+                        readings.push({
+                            timestamp: timestamp,
+                            waterLevel: waterLevel,
+                            key: key
+                        });
+                    }
+                });
+
+                // Sort by timestamp (oldest first)
+                readings.sort((a, b) => a.timestamp - b.timestamp);
+                
+                // Take all available readings (robust against any length)
+                const waterLevels = readings.map(r => r.waterLevel);
+                const timeStamps = readings.map(r => r.timestamp);
+                
+                // If we have fewer readings than expected, pad with -1 (missing value indicator)
+                const targetLength = 4320; // 72 hours ideal
+                if (waterLevels.length < targetLength) {
+                    const missingCount = targetLength - waterLevels.length;
+                    console.log(`Padding ${missingCount} missing values with -1`);
+                    
+                    // Pad the beginning with -1 values (older missing data)
+                    const paddedWaterLevels = Array(missingCount).fill(-1).concat(waterLevels);
+                    
+                    // Create corresponding timestamps for padded values
+                    const firstTime = timeStamps[0] || new Date();
+                    const paddedTimeStamps = [];
+                    for (let i = missingCount; i > 0; i--) {
+                        paddedTimeStamps.push(new Date(firstTime.getTime() - i * 60 * 1000));
+                    }
+                    paddedTimeStamps.push(...timeStamps);
+                    
+                    // Update arrays
+                    waterLevels.splice(0, 0, ...Array(missingCount).fill(-1));
+                    timeStamps.splice(0, 0, ...paddedTimeStamps.slice(0, missingCount));
+                }
+                
+                // Update the textarea with all readings for LSTM (any length)
+                document.getElementById('inputData').value = waterLevels.join('\n');
+                
+                // Store full 72 hours for visualization
+                currentData.historical = waterLevels;
+                currentData.timestamps = timeStamps;
+                
+                const validReadings = waterLevels.filter(w => w !== -1);
+                const results = `
+                    <h4>Firebase Data Fetched</h4>
+                    <p><strong>LSTM input:</strong> ${waterLevels.length} readings (${validReadings.length} valid, ${waterLevels.length - validReadings.length} padded)</p>
+                    <p><strong>Range:</strong> ${validReadings.length > 0 ? Math.min(...validReadings).toFixed(1) + ' - ' + Math.max(...validReadings).toFixed(1) + ' mm' : 'No valid data'}</p>
+                    <p><strong>Time span:</strong> ${timeStamps[0].toLocaleString()} to ${timeStamps[timeStamps.length-1].toLocaleString()}</p>
+                    <p><em>Data prepared for LSTM model (missing values padded with -1)</em></p>
+                `;
+                
+                showResults(results, false);
+
+            } catch (error) {
+                showResults(`Error fetching Firebase data: ${error.message}`, true);
+            }
+        }
+
+        async function testModel() {
+            const inputText = document.getElementById('inputData').value.trim();
+            
+            if (!inputText) {
+                showResults('Error: Please enter test data first', true);
+                return;
+            }
+
+            const readings = inputText.split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0)
+                .map(parseFloat);
+
+            // Validate input
+            // Accept any length of readings (model handles variable input)
+
+            if (readings.some(isNaN)) {
+                showResults('Error: All readings must be valid numbers', true);
+                return;
+            }
+
+            showResults('Testing with actual LSTM model...', false);
+
+            try {
+                const response = await fetch('/test-model', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ readings })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                
+                const results = `
+                    <h4>LSTM Model Test Results</h4>
+                    <p><strong>Input:</strong> 72 water level readings</p>
+                    <p><strong>Range:</strong> ${Math.min(...readings).toFixed(1)}mm - ${Math.max(...readings).toFixed(1)}mm</p>
+                    <p><strong>Average:</strong> ${(readings.reduce((a,b) => a+b) / readings.length).toFixed(1)}mm</p>
+                    <p><strong>Predicted Next Reading:</strong> ${result.prediction.toFixed(1)}mm</p>
+                    <p><strong>Change from Last:</strong> ${(result.prediction - readings[readings.length-1]).toFixed(1)}mm</p>
+                    <p><strong>Model Info:</strong> ${result.model_info || 'N/A'}</p>
+                `;
+                
+                showResults(results, false);
+
+            } catch (error) {
+                showResults(`Error testing model: ${error.message}<br><br>Make sure the Python server is running:<br><code>python server.py</code>`, true);
+            }
+        }
+
+        async function predict24Hours() {
+            const inputText = document.getElementById('inputData').value.trim();
+            
+            if (!inputText) {
+                showResults('Error: Please fetch Firebase data or enter test data first', true);
+                return;
+            }
+
+            const readings = inputText.split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0)
+                .map(parseFloat);
+
+            // Accept any length of readings (model handles variable input)
+
+            if (readings.some(isNaN)) {
+                showResults('Error: All readings must be valid numbers', true);
+                return;
+            }
+
+            showResults('Generating 24-hour forecast with LSTM model...<br><em>This may take 1-2 minutes</em>', false);
+
+            try {
+                const response = await fetch('/predict-24h', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ readings })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                
+                // Store predictions for visualization
+                currentData.predictions = result.predictions;
+                
+                // Create chart
+                createPredictionChart();
+                
+                const results = `
+                    <h4>24-Hour LSTM Forecast Results</h4>
+                    <p><strong>Input:</strong> 72 hours of historical data</p>
+                    <p><strong>Forecast:</strong> ${result.prediction_count} predictions (24 hours)</p>
+                    <p><strong>Range:</strong> ${Math.min(...result.predictions).toFixed(1)} - ${Math.max(...result.predictions).toFixed(1)} mm</p>
+                    <p><strong>Model:</strong> ${result.model_info}</p>
+                    <p><em>Chart displayed below showing historical data (blue) vs predictions (orange)</em></p>
+                `;
+                
+                showResults(results, false);
+
+            } catch (error) {
+                showResults(`Error generating forecast: ${error.message}`, true);
+            }
+        }
+
+        function createPredictionChart() {
+            try {
+                const chartSection = document.getElementById('chartSection');
+                chartSection.style.display = 'block';
+                
+                // Get canvas and clear any existing chart
+                const canvas = document.getElementById('predictionChart');
+                
+                // Set fixed canvas size
+                canvas.width = 800;
+                canvas.height = 400;
+                canvas.style.width = '100%';
+                canvas.style.height = '400px';
+                
+                const ctx = canvas.getContext('2d');
+                
+                // Destroy existing chart more safely
+                if (window.predictionChart) {
+                    try {
+                        if (typeof window.predictionChart.destroy === 'function') {
+                            window.predictionChart.destroy();
+                        } else {
+                            // Try alternative cleanup
+                            Chart.getChart(canvas)?.destroy();
+                        }
+                    } catch (e) {
+                        console.log('Chart cleanup warning:', e.message);
+                    }
+                    window.predictionChart = null;
+                }
+                
+                // Prepare historical data points
+                const historicalData = currentData.historical.map((value, index) => ({
+                    x: currentData.timestamps[index] || new Date(Date.now() - (72 - index) * 60 * 1000),
+                    y: value
+                }));
+                
+                // Prepare prediction data points (starting from last historical point)
+                const lastTime = historicalData[historicalData.length - 1].x;
+                const predictionData = currentData.predictions.map((value, index) => ({
+                    x: new Date(lastTime.getTime() + (index + 1) * 60 * 1000),
+                    y: value
+                }));
+                
+                // Create new chart
+                window.predictionChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        datasets: [
+                            {
+                                label: 'Historical Data (72h)',
+                                data: historicalData,
+                                borderColor: '#007cba',
+                                backgroundColor: 'rgba(0, 124, 186, 0.1)',
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.1
+                            },
+                            {
+                                label: '24h LSTM Forecast',
+                                data: predictionData,
+                                borderColor: '#ff6b35',
+                                backgroundColor: 'rgba(255, 107, 53, 0.1)',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                fill: false,
+                                tension: 0.1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: false,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                type: 'time',
+                                time: {
+                                    unit: 'hour',
+                                    displayFormats: {
+                                        hour: 'MMM dd HH:mm'
+                                    }
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Time'
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Water Level (mm)'
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'LSTM v1 Water Level Forecast'
+                            },
+                            legend: {
+                                display: true
+                            }
+                        }
+                    }
+                });
+                
+                console.log('Chart created successfully');
+                
+            } catch (error) {
+                console.error('Chart creation failed:', error);
+                showResults(`Chart creation failed: ${error.message}<br>Prediction data is available but visualization failed.`, true);
+            }
+        }
+
+        function showResults(message, isError) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = message;
+            resultsDiv.className = isError ? 'error' : '';
+        }
+    </script>
+</body>
+</html>
