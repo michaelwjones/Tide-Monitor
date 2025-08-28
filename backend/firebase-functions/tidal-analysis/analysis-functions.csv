@@ -1,4 +1,4 @@
 Function Name,Version,Description,Deployment Start Date,Deployment Stop Date
 Matrix Pencil,v1,Complex exponential decomposition for non-periodic tidal signal analysis using SVD-based parameter estimation,2025-08-08,
 Matrix Pencil,v2,Enhanced Matrix Pencil with 2/3 data length L parameter and 0.1% threshold for improved accuracy and frequency resolution,2025-08-13,
-LSTM Neural Network,v1,Iterative 24-hour water level forecasting using 72-hour input sequences. Training proved impractical (~24 hours per epoch) due to iterative prediction approach creating long computational graphs. Deployment abandoned due to training performance issues.,2025-08-28,2025-08-28
+LSTM Neural Network,v1,Iterative 24-hour water level forecasting using 72-hour input sequences. Training proved impractical (~24 hours per epoch) due to iterative prediction approach creating long computational graphs. Deployment abandoned due to training performance issues.,never,
