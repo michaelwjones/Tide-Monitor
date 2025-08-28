@@ -37,26 +37,39 @@ def parse_readings(raw_data):
     readings.sort(key=lambda x: x['timestamp'])
     return readings
 
-def create_sequences(data, sequence_length=4320, prediction_steps=1):
+def create_sequences(data, sequence_length=4320, prediction_steps=1440):
     """
-    Create training sequences for LSTM.
+    Create training sequences for iterative LSTM with teacher forcing.
     sequence_length: Input sequence length (4320 = 72 hours at 1 minute intervals)
-    prediction_steps: Number of steps to predict ahead (1 for single-step prediction)
+    prediction_steps: Number of steps to predict ahead (1440 = 24 hours for full iterative training)
     """
     sequences = []
     targets = []
     
+    print(f"Creating sequences with {prediction_steps} prediction steps...")
+    
     for i in range(len(data) - sequence_length - prediction_steps + 1):
-        # Input sequence
+        # Input sequence (72 hours)
         seq = data[i:i + sequence_length]
         
-        # Target (next value after sequence)
+        # Target sequence (next 24 hours for iterative training)
         target = data[i + sequence_length:i + sequence_length + prediction_steps]
         
         sequences.append(seq)
         targets.append(target)
+        
+        # Progress indicator for large datasets
+        if (i + 1) % 1000 == 0:
+            print(f"  Created {i + 1} sequences...")
     
-    return np.array(sequences), np.array(targets)
+    X = np.array(sequences)
+    y = np.array(targets)
+    
+    print(f"Sequence creation complete:")
+    print(f"  Input sequences: {X.shape} (72 hours each)")
+    print(f"  Target sequences: {y.shape} (24 hours each)")
+    
+    return X, y
 
 def normalize_data(data):
     """Z-score normalization"""
@@ -90,8 +103,9 @@ def main():
     readings = parse_readings(raw_data)
     print(f"Parsed {len(readings)} valid readings")
     
-    if len(readings) < 4321:  # Need at least sequence_length + 1 samples
-        print(f"Error: Need at least 4321 readings, got {len(readings)}")
+    min_required = 4320 + 1440  # sequence_length + prediction_steps
+    if len(readings) < min_required:  # Need at least 72 + 24 hours = 96 hours
+        print(f"Error: Need at least {min_required} readings (96 hours), got {len(readings)}")
         return
     
     # Extract water levels as time series
@@ -103,9 +117,9 @@ def main():
     # Normalize data
     normalized_data, norm_params = normalize_data(water_levels)
     
-    # Create training sequences
-    print("Creating training sequences (72-hour windows)...")
-    X, y = create_sequences(normalized_data, sequence_length=4320)
+    # Create training sequences for iterative 24-hour prediction
+    print("Creating training sequences (72-hour inputs → 24-hour targets)...")
+    X, y = create_sequences(normalized_data, sequence_length=4320, prediction_steps=1440)
     
     print(f"Created {len(X)} training sequences")
     print(f"Input shape: {X.shape}")

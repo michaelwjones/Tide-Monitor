@@ -59,7 +59,10 @@ TidalLSTM(
 - Supports sequences up to 4,320 timesteps
 
 **`train_lstm.py`** - Training Pipeline
-- Single-step ahead prediction training
+- **Iterative training approach**: 100 random timesteps per batch for memory efficiency
+- **Memory optimizations**: Automatic Mixed Precision (AMP), gradient checkpointing
+- **Architecture**: 128 hidden units, 2 layers with heavy optimization for 8GB GPU limit
+- **Performance issue**: ~5 seconds per training iteration due to sequential LSTM calls
 - Adam optimizer with learning rate scheduling
 - Early stopping based on validation loss
 - Gradient clipping to prevent exploding gradients
@@ -168,16 +171,19 @@ firebase deploy --only functions:runLSTMv1Prediction
 ## Performance Characteristics
 
 ### Training Performance
-- **Training Time**: ~30-60 minutes (50 epochs, CPU)
+- **Training Time**: ~24 hours per epoch (iterative approach with memory optimizations)
 - **Model Size**: ~2MB (ONNX format)
-- **Memory Usage**: ~1GB during training
-- **Convergence**: Typically achieves validation loss < 0.1
+- **Memory Usage**: 3-4GB during training with AMP and gradient checkpointing
+- **Training Challenges**: Iterative prediction creates extremely long computational graphs
+- **Memory Optimizations**: Random sampling (100/1440 timesteps), gradient checkpointing every 20 steps
+- **Convergence**: Training extremely slow due to architectural limitations
 
 ### Inference Performance
 - **Prediction Time**: ~5-8 minutes for 1,440 forecasts
 - **Memory Usage**: 1GB Firebase Functions allocation
 - **Model Loading**: ~10 seconds ONNX initialization
 - **Throughput**: ~4-5 predictions per second
+- **Note**: Inference performance reasonable, training performance problematic
 
 ### Accuracy Metrics
 - **Training Loss**: Mean Squared Error on normalized data

@@ -275,3 +275,4 @@ This removal simplified the system to focus on the two reliable wave analysis me
 ## Permissions
 
 - You have permission to commit and push code.
+- Occasionally I will ask for options, ideas, or advice. In those cases, do not make any code changes.

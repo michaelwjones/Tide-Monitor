@@ -42,8 +42,9 @@ pip install -r requirements.txt
 
 **GPU Training:**
 - **Automatic Detection**: Training script automatically uses GPU if available
-- **Performance**: 5-10x faster training with CUDA-compatible GPUs  
-- **Memory**: Larger batch sizes (64 vs 32) for improved training efficiency
+- **Performance**: GPU required for reasonable training times (CPU would be prohibitively slow)
+- **Memory**: Heavy optimization required - uses AMP, gradient checkpointing, random sampling
+- **Training Reality**: ~24 hours per epoch due to iterative training approach
 - **Fallback**: Seamlessly falls back to CPU if no GPU detected
 
 **Troubleshooting:**
@@ -57,6 +58,9 @@ pip install -r requirements.txt
 4. Convert to ONNX and deploy to Firebase Functions for iterative forecasting
 
 ## Testing Interface
+
+**Warning: Training Performance Issue**
+LSTM v1 uses an iterative training approach that results in ~24 hours per epoch. While the model architecture works, the training time is impractical for development cycles.
 
 After training your model, validate it using the comprehensive testing system:
 
