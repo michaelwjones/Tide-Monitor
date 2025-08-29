@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transformer v1 Model Testing</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@3.3.1/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-style: italic;
+        }
+        .section {
+            margin: 25px 0;
+            padding: 20px;
+            border: 1px solid #e1e8ed;
+            border-radius: 8px;
+            background-color: #fbfcfd;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #34495e;
+            font-weight: 500;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .info-item {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #e8ecef;
+        }
+        .info-item strong {
+            color: #2c3e50;
+        }
+        button {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+        button:hover {
+            background: linear-gradient(135deg, #2980b9, #3498db);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+        }
+        button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .status {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .status.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status.warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .status.info { background-color: #cce7ff; color: #004085; border: 1px solid #b0d4ff; }
+        
+        .chart-container {
+            position: relative;
+            height: 500px;
+            margin: 20px 0;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e1e8ed;
+            padding: 15px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #ecf0f1;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3498db, #2ecc71);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .metric-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e1e8ed;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .architecture-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .architecture-info h4 {
+            margin: 0 0 15px 0;
+            font-weight: 300;
+        }
+        .arch-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Transformer v1 Model Testing</h1>
+        <p class="subtitle">Sequence-to-Sequence Tidal Prediction with Multi-Head Attention</p>
+        
+        <!-- Model Information Section -->
+        <div class="section">
+            <h3>📊 Model Information</h3>
+            <div id="modelInfo">Loading model information...</div>
+            <div id="architectureInfo"></div>
+        </div>
+        
+        <!-- Data Input Section -->
+        <div class="section">
+            <h3>📡 Data Input (4320 readings = 72 hours)</h3>
+            <div class="button-group">
+                <button onclick="fetchFirebaseData()">
+                    📡 Fetch Last 72 Hours from Firebase
+                </button>
+                <button onclick="generateSampleData()">
+                    🧪 Generate Sample Tidal Data
+                </button>
+            </div>
+            <div id="dataStatus" style="margin-top: 15px;"></div>
+            <div id="dataMetrics" class="metrics"></div>
+        </div>
+        
+        <!-- Prediction Section -->
+        <div class="section">
+            <h3>🔮 24-Hour Tidal Prediction</h3>
+            <div class="button-group">
+                <button id="predictBtn" onclick="makePrediction()" disabled>
+                    🚀 Predict Next 24 Hours (1440 points)
+                </button>
+            </div>
+            <div id="progressContainer" style="display: none;">
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+                <div id="progressText" style="text-align: center; margin: 10px 0;"></div>
+            </div>
+            <div id="predictionStatus"></div>
+            <div id="predictionMetrics" class="metrics"></div>
+        </div>
+        
+        <!-- Chart Section -->
+        <div class="section">
+            <h3>📈 Visualization</h3>
+            <div class="chart-container">
+                <canvas id="tidalChart"></canvas>
+            </div>
+            <div style="text-align: center; margin-top: 10px;">
+                <small style="color: #7f8c8d;">
+                    Blue: Historical data (72h) | Orange: Transformer predictions (24h)
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+        let currentPredictions = null;
+        let chart = null;
+        let modelInfo = null;
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadModelInfo();
+            initializeChart();
+        });
+
+        async function loadModelInfo() {
+            try {
+                const response = await fetch('/model-info');
+                const data = await response.json();
+                modelInfo = data;
+                
+                displayModelInfo(data.model_info, data.normalization, data.config);
+            } catch (error) {
+                console.error('Error loading model info:', error);
+                document.getElementById('modelInfo').innerHTML = 
+                    '<div class="status error">❌ Failed to load model information</div>';
+            }
+        }
+
+        function displayModelInfo(info, normalization, config) {
+            const modelDiv = document.getElementById('modelInfo');
+            const archDiv = document.getElementById('architectureInfo');
+            
+            const statusClass = info.status === 'trained_model' ? 'success' : 'warning';
+            const statusText = info.status === 'trained_model' ? '✅ Trained Model' : '⚠️ Dummy Model';
+            
+            modelDiv.innerHTML = `
+                <div class="info-grid">
+                    <div class="info-item">
+                        <strong>Status:</strong> <span class="status ${statusClass}">${statusText}</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Parameters:</strong> ${info.total_parameters?.toLocaleString() || 'Unknown'}
+                    </div>
+                    <div class="info-item">
+                        <strong>Validation Loss:</strong> ${info.validation_loss?.toFixed(6) || 'N/A'}
+                    </div>
+                    <div class="info-item">
+                        <strong>Training Epoch:</strong> ${info.training_epoch || 'N/A'}
+                    </div>
+                </div>
+            `;
+            
+            if (info.status === 'trained_model') {
+                archDiv.innerHTML = `
+                    <div class="architecture-info">
+                        <h4>🏗️ Transformer Architecture</h4>
+                        <div class="arch-grid">
+                            <div><strong>Encoder Layers:</strong> ${info.encoder_layers}</div>
+                            <div><strong>Decoder Layers:</strong> ${info.decoder_layers}</div>
+                            <div><strong>Attention Heads:</strong> ${info.attention_heads}</div>
+                            <div><strong>Hidden Dimension:</strong> ${info.hidden_dimension}</div>
+                            <div><strong>Input Length:</strong> ${info.input_sequence_length}</div>
+                            <div><strong>Output Length:</strong> ${info.output_sequence_length}</div>
+                        </div>
+                        <div style="margin-top: 15px; font-size: 14px; opacity: 0.9;">
+                            <strong>Normalization:</strong> μ = ${normalization.mean?.toFixed(1)}, σ = ${normalization.std?.toFixed(1)}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        async function fetchFirebaseData() {
+            updateDataStatus('info', '📡 Fetching real data from Firebase...');
+            
+            try {
+                const response = await fetch('/fetch-firebase');
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentData = {
+                        water_levels: data.water_levels,
+                        timestamps: data.timestamps,
+                        type: 'firebase'
+                    };
+                    
+                    updateDataStatus('success', `✅ Fetched ${data.count} readings from Firebase`);
+                    displayDataMetrics(data.stats, 'Real Firebase Data');
+                    document.getElementById('predictBtn').disabled = false;
+                    updateChart();
+                } else {
+                    updateDataStatus('error', `❌ Failed to fetch data: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                updateDataStatus('error', '❌ Network error while fetching data');
+            }
+        }
+
+        async function generateSampleData() {
+            updateDataStatus('info', '🧪 Generating sample tidal data...');
+            
+            try {
+                const response = await fetch('/generate-sample');
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentData = {
+                        water_levels: data.water_levels,
+                        timestamps: data.timestamps,
+                        type: 'sample'
+                    };
+                    
+                    updateDataStatus('success', `✅ Generated ${data.count} sample readings`);
+                    displayDataMetrics(data.stats, 'Generated Sample Data');
+                    document.getElementById('predictBtn').disabled = false;
+                    updateChart();
+                } else {
+                    updateDataStatus('error', `❌ Failed to generate data: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Generation error:', error);
+                updateDataStatus('error', '❌ Error generating sample data');
+            }
+        }
+
+        async function makePrediction() {
+            if (!currentData) {
+                updatePredictionStatus('error', '❌ No input data available');
+                return;
+            }
+
+            // Show progress
+            showProgress();
+            updatePredictionStatus('info', '🧠 Running transformer inference...');
+            
+            try {
+                const startTime = Date.now();
+                
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        input_data: currentData.water_levels
+                    })
+                });
+                
+                const data = await response.json();
+                const inferenceTime = Date.now() - startTime;
+                
+                if (data.success) {
+                    currentPredictions = data.predictions;
+                    
+                    updatePredictionStatus('success', 
+                        `✅ Generated ${data.output_length} predictions in ${inferenceTime}ms`);
+                    displayPredictionMetrics(data.stats, inferenceTime);
+                    updateChart();
+                } else {
+                    updatePredictionStatus('error', `❌ Prediction failed: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Prediction error:', error);
+                updatePredictionStatus('error', '❌ Network error during prediction');
+            } finally {
+                hideProgress();
+            }
+        }
+
+        function updateDataStatus(type, message) {
+            document.getElementById('dataStatus').innerHTML = 
+                `<div class="status ${type}">${message}</div>`;
+        }
+
+        function updatePredictionStatus(type, message) {
+            document.getElementById('predictionStatus').innerHTML = 
+                `<div class="status ${type}">${message}</div>`;
+        }
+
+        function displayDataMetrics(stats, title) {
+            document.getElementById('dataMetrics').innerHTML = `
+                <h4 style="grid-column: 1/-1; margin: 0 0 10px 0;">${title}</h4>
+                <div class="metric-card">
+                    <div class="metric-value">${stats.min.toFixed(1)}</div>
+                    <div class="metric-label">Min (mm)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${stats.max.toFixed(1)}</div>
+                    <div class="metric-label">Max (mm)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${stats.mean.toFixed(1)}</div>
+                    <div class="metric-label">Mean (mm)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${stats.std.toFixed(1)}</div>
+                    <div class="metric-label">Std Dev (mm)</div>
+                </div>
+            `;
+        }
+
+        function displayPredictionMetrics(stats, inferenceTime) {
+            document.getElementById('predictionMetrics').innerHTML = `
+                <h4 style="grid-column: 1/-1; margin: 0 0 10px 0;">Prediction Metrics</h4>
+                <div class="metric-card">
+                    <div class="metric-value">${inferenceTime}</div>
+                    <div class="metric-label">Inference (ms)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${stats.min.toFixed(1)}</div>
+                    <div class="metric-label">Min (mm)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${stats.max.toFixed(1)}</div>
+                    <div class="metric-label">Max (mm)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${stats.mean.toFixed(1)}</div>
+                    <div class="metric-label">Mean (mm)</div>
+                </div>
+            `;
+        }
+
+        function showProgress() {
+            document.getElementById('progressContainer').style.display = 'block';
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 2;
+                document.getElementById('progressFill').style.width = `${Math.min(progress, 90)}%`;
+                document.getElementById('progressText').textContent = 
+                    `Processing sequence-to-sequence prediction... ${Math.min(progress, 90)}%`;
+                
+                if (progress >= 90) {
+                    clearInterval(interval);
+                }
+            }, 50);
+        }
+
+        function hideProgress() {
+            document.getElementById('progressFill').style.width = '100%';
+            document.getElementById('progressText').textContent = 'Prediction complete!';
+            
+            setTimeout(() => {
+                document.getElementById('progressContainer').style.display = 'none';
+            }, 1000);
+        }
+
+        function initializeChart() {
+            const ctx = document.getElementById('tidalChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: []
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'hour',
+                                displayFormats: {
+                                    hour: 'MMM d HH:mm'
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Water Level (mm)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart() {
+            if (!chart) return;
+
+            const datasets = [];
+
+            // Historical data
+            if (currentData && currentData.water_levels) {
+                const historicalData = currentData.water_levels.map((level, index) => ({
+                    x: new Date(currentData.timestamps[index]),
+                    y: level
+                }));
+
+                datasets.push({
+                    label: `Historical Data (72h) - ${currentData.type}`,
+                    data: historicalData,
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    fill: false,
+                    pointRadius: 0,
+                    pointHoverRadius: 3
+                });
+            }
+
+            // Prediction data
+            if (currentPredictions && currentData && currentData.timestamps) {
+                const lastTimestamp = new Date(currentData.timestamps[currentData.timestamps.length - 1]);
+                const predictionData = currentPredictions.map((level, index) => ({
+                    x: new Date(lastTimestamp.getTime() + (index + 1) * 60000), // +1 minute intervals
+                    y: level
+                }));
+
+                datasets.push({
+                    label: 'Transformer Predictions (24h)',
+                    data: predictionData,
+                    borderColor: '#e67e22',
+                    backgroundColor: 'rgba(230, 126, 34, 0.1)',
+                    borderDash: [5, 5],
+                    fill: false,
+                    pointRadius: 0,
+                    pointHoverRadius: 3
+                });
+            }
+
+            chart.data.datasets = datasets;
+            chart.update();
+        }
+    </script>
+</body>
+</html>
