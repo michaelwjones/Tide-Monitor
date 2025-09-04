@@ -91,20 +91,21 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Cloud F
   - Left Y-axis: Water level measurements (0-6 feet)
   - Right Y-axis: Wave height measurements (0-2 feet)
   - Hidden Y-axis: Valid sample count (0-512)
-- **Trend line features**:
-  - **Toggle button**: Show/hide trend lines beside main dashboard link
-  - **Matrix Pencil method**: Decomposes signals into complex exponentials Σ Aₖ e^(sₖt)
-  - **Non-periodic analysis**: Handles real-world tidal variations without periodicity assumptions
-  - **Full chart coverage**: Trend lines span entire display range with no edge artifacts
-  - **Visual feedback**: Original data fades to 30% opacity when trend lines are active
-  - **Signal components table**: Shows detected frequencies, periods, damping, and amplitudes
+- **Transformer Forecasting**: 24-hour water level predictions from transformer v1 model
+  - **Smart button**: "Show Forecast" button appears only when recent forecast available (< 10 minutes old)
+  - **Point display**: Forecast shown as individual points extending 24 hours into future
+  - **Automatic axis extension**: Chart X-axis extends to accommodate forecast timeline
+  - **Integration**: Fetches from `/tidal-analysis/transformer-v1-forecast` Firebase path
 
 ### Debug Dashboard (`debug/index.html`)
-- **Multi-axis charts**: Displays all measurement methods and NOAA data
+- **Multi-axis charts**: Displays all measurement methods and NOAA environmental data
 - **Y-axes**: Water level (0-6 ft), Wave height (0-2 ft), Wind speed (0-30 knots)
-- **NOAA integration**: Real-time wind and water level from Duke Marine Lab
-- **Error handling**: Filters out -999 API failure values
+- **NOAA integration**: Real-time wind and water level from Duke Marine Lab station 8656483
+- **Transformer forecasting**: 24-hour predictions displayed as points when recent forecast available
+- **Time range controls**: 24h/72h buttons automatically extend for forecast (48h/96h total)
+- **Error handling**: Filters out -999 API failure values and invalid data
 - **Units**: Automatic conversion from m/s to knots for wind data
+- **Clean interface**: Simplified layout focused on data visualization without analysis tables
 
 ### Firebase Cloud Functions (`backend/firebase-functions/`)
 - **Trigger**: `onValueCreated` for new readings in `/readings/` path
@@ -276,3 +277,7 @@ This removal simplified the system to focus on the two reliable wave analysis me
 
 - You have permission to commit and push code.
 - Occasionally I will ask for options, ideas, or advice. In those cases, do not make any code changes.
+- Follow directions exactly, make suggestions separately, don't make unauthorized changes to critical components.
+- When I ask you to make a change A, do not make changes A and B. Only change A. I am a very technical user, if I want B changed I will ask for it.
+- Feel free to make suggestions if you think they will help me arrive at my goal.
+- Don't run a firebase command unless specifically asked to.

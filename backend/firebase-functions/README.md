@@ -5,6 +5,7 @@ This directory contains Firebase Cloud Functions for the Tide Monitor project:
 1. **Tide Enrichment** (`tide-enrichment/`) - Enriches sensor data with NOAA environmental conditions
 2. **Tidal Analysis Functions** (`tidal-analysis/functions/`) - Multiple analysis methods for advanced tidal signal processing
 3. **LSTM Forecasting** (`tidal-analysis/functions/lstm/v1/`) - Neural network-powered 24-hour water level predictions
+4. **Transformer Forecasting** (`tidal-analysis/functions/transformer/v1/`) - Sequence-to-sequence transformer for direct 24-hour predictions
 
 ## Overview
 
@@ -19,6 +20,9 @@ The `runTidalAnalysis` function runs every 5 minutes via Cloud Scheduler to perf
 
 #### LSTM v1 (`lstm/v1/`)
 The `runLSTMv1Prediction` function runs every 6 hours to generate 24-hour water level forecasts using iterative neural network prediction. Uses the last 72 hours of data to produce 1,440 future predictions, stored in `/tidal-analysis/lstm-v1-forecasts/` for debug dashboard visualization.
+
+#### Transformer v1 (`transformer/v1/`)
+The `run_transformer_v1_analysis` function runs every 5 minutes via Cloud Scheduler to generate 24-hour water level forecasts using sequence-to-sequence transformer architecture. Uses Python runtime with 1GB memory allocation. Features direct prediction (single forward pass) with the last 433 readings (72 hours @ 10-minute intervals) to produce 144 future predictions (24 hours @ 10-minute intervals), stored in `/tidal-analysis/transformer-v1-forecast/`. Includes robust data type handling for Firebase data conversion. Debug dashboard automatically displays forecasts when updated within last 10 minutes.
 
 See `analysis-functions.csv` for a complete list of available analysis methods, versions, and deployment history.
 
@@ -107,6 +111,10 @@ deploy-matrix-pencil-v1.bat
 # Deploy LSTM v1 forecasting (requires trained model)
 cd tidal-analysis/functions/lstm/v1
 deploy-lstm-v1.bat
+
+# Deploy Transformer v1 forecasting (requires trained model)
+cd tidal-analysis/functions/transformer/v1
+deploy-transformer-v1.bat
 ```
 
 ### Deploy Individual Functions (Command Line)
@@ -119,6 +127,9 @@ firebase deploy --only functions --source tidal-analysis/functions/matrix-pencil
 
 # Deploy LSTM v1 forecasting (requires ONNX model files)
 firebase deploy --only functions --source tidal-analysis/functions/lstm/v1/inference
+
+# Deploy Transformer v1 forecasting (requires ONNX model files)
+firebase deploy --only functions --source tidal-analysis/functions/transformer/v1/inference
 ```
 
 ### Deploy Both Functions (Command Line)
@@ -136,6 +147,7 @@ firebase functions:log
 firebase functions:log --only enrichTideData
 firebase functions:log --only runTidalAnalysis
 firebase functions:log --only runLSTMv1Prediction
+firebase functions:log --only runTransformerV1Analysis
 ```
 
 ### Test Locally

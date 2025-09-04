@@ -1,87 +1,73 @@
 @echo off
-echo ================================================
-echo   Transformer v1 Firebase Functions Deployment
-echo ================================================
+set ORIGINAL_DIR=%CD%
+cd /d "%~dp0"
+echo Deploying Transformer v1 PyTorch Tidal Analysis Function...
+echo This function performs transformer-based tidal analysis every 5 minutes.
 echo.
 
-:: Check if we're in the right directory
-if not exist "inference\index.js" (
-    echo Error: inference/index.js not found
-    echo Please run this from the transformer/v1 directory
+echo Checking trained PyTorch model...
+if not exist "training\checkpoints\best.pth" (
+    echo ERROR: Trained PyTorch model not found!
+    echo Please train the transformer model first using train_transformer.py
+    echo Expected: training\checkpoints\best.pth
+    echo.
+    cd /d "%ORIGINAL_DIR%"
+    pause
+    exit /b 1
+)
+echo [OK] Trained PyTorch model found: training\checkpoints\best.pth
+
+echo.
+echo Copying model checkpoint to inference directory...
+copy "training\checkpoints\best.pth" "inference\best.pth" > nul
+if %ERRORLEVEL% EQU 0 (
+    echo [OK] Model checkpoint copied to inference directory
+) else (
+    echo [ERROR] Failed to copy model checkpoint
+    cd /d "%ORIGINAL_DIR%"
     pause
     exit /b 1
 )
 
-:: Check for trained model files
-if not exist "training\checkpoints\best.pth" (
-    echo Warning: No trained model found at training/checkpoints/best.pth
-    echo You may need to train the model first
-    echo.
-)
-
-:: Check for ONNX model in inference directory
-if not exist "inference\transformer_tidal_v1.onnx" (
-    echo Warning: ONNX model not found at inference/transformer_tidal_v1.onnx
-    echo You may need to run convert_to_onnx.py first
-    echo.
-)
-
-:: Check for model metadata
-if not exist "inference\model_metadata.json" (
-    echo Warning: Model metadata not found at inference/model_metadata.json
-    echo You may need to run convert_to_onnx.py first
-    echo.
-)
-
-echo Current directory contents:
-dir /b inference\
-
 echo.
-echo Deployment Options:
-echo 1. Deploy Transformer prediction function (runTransformerv1Prediction)
-echo 2. Deploy test function only (testTransformerv1Prediction)
-echo 3. Deploy both functions
-echo 4. Cancel
-echo.
-
-set /p choice=Enter choice (1-4): 
-
-if "%choice%"=="1" (
-    echo.
-    echo Deploying Transformer v1 prediction function...
-    cd inference
-    firebase deploy --only functions:runTransformerv1Prediction
-    cd ..
-) else if "%choice%"=="2" (
-    echo.
-    echo Deploying Transformer v1 test function...
-    cd inference
-    firebase deploy --only functions:testTransformerv1Prediction
-    cd ..
-) else if "%choice%"=="3" (
-    echo.
-    echo Deploying both Transformer v1 functions...
-    cd inference
-    firebase deploy --only functions:runTransformerv1Prediction,testTransformerv1Prediction
-    cd ..
-) else if "%choice%"=="4" (
-    echo Deployment cancelled.
-    goto :end
+echo Checking current configuration...
+if exist "inference\.env" (
+    echo Found .env file:
+    type "inference\.env"
 ) else (
-    echo Invalid choice. Please run again.
-    goto :end
+    echo No .env file found - analysis will be enabled by default
 )
 
 echo.
-echo ================================================
-echo   Deployment completed!
-echo ================================================
-echo.
-echo Next steps:
-echo 1. Check Firebase Console for function status
-echo 2. Monitor logs: firebase functions:log
-echo 3. Test manually: firebase functions:shell
-echo.
+echo Deploying Transformer v1 function to Firebase...
+cd inference
 
-:end
+echo Setting up Python virtual environment...
+if not exist "venv" (
+    python -m venv venv
+)
+call venv\Scripts\activate.bat
+echo Installing Python dependencies...
+call pip install -r requirements.txt
+
+echo Deploying to Firebase (Python runtime)...
+firebase deploy --only functions
+set DEPLOY_RESULT=%ERRORLEVEL%
+
+cd /d "%ORIGINAL_DIR%"
+if %DEPLOY_RESULT% EQU 0 (
+    echo.
+    echo [OK] Transformer v1 tidal analysis deployed successfully!
+    echo NOTE: Function runs every 5 minutes and stores results in /tidal-analysis/transformer-v1
+    echo INFO: Check Firebase Console for execution logs
+    echo.
+    echo Analysis results will appear at:
+    echo https://tide-monitor-boron-default-rtdb.firebaseio.com/tidal-analysis/transformer-v1.json
+) else (
+    echo.
+    echo [ERROR] Deployment failed!
+    echo Check the error messages above
+)
+
+echo.
 pause

@@ -82,7 +82,7 @@ echo Installing PyTorch CPU version...
 echo This will work on all systems but training will be slower.
 echo.
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-pip install tensorboard numpy pandas requests onnx onnxruntime
+pip install tensorboard numpy pandas requests flask
 echo.
 echo CPU installation completed!
 goto :verify
@@ -93,7 +93,7 @@ echo Installing PyTorch with CUDA 11.8 support...
 echo Make sure you have CUDA 11.8 installed on your system.
 echo.
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-pip install tensorboard numpy pandas requests onnx onnxruntime-gpu
+pip install tensorboard numpy pandas requests flask-gpu
 echo.
 echo CUDA 11.8 installation completed!
 goto :verify
@@ -104,7 +104,7 @@ echo Installing PyTorch with CUDA 12.1 support...
 echo Make sure you have CUDA 12.1 installed on your system.
 echo.
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-pip install tensorboard numpy pandas requests onnx onnxruntime-gpu
+pip install tensorboard numpy pandas requests flask-gpu
 echo.
 echo CUDA 12.1 installation completed!
 goto :verify
@@ -173,7 +173,7 @@ if errorlevel 1 (
     echo You can now:
     echo 1. Run data-preparation scripts to fetch and process data
     echo 2. Train the transformer model using train_transformer.py
-    echo 3. Convert trained models to ONNX format
+    echo 3. Test models with local PyTorch server
     echo.
     echo For a complete workflow, run: setup-complete-transformer-v1.bat
 )

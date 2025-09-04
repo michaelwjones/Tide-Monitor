@@ -9,10 +9,8 @@ numpy>=1.21.0
 pandas>=1.3.0
 scipy>=1.7.0
 
-# ONNX model deployment
-onnx>=1.14.0
-onnxruntime>=1.15.0
-# onnxruntime-gpu>=1.15.0  # Uncomment if using GPU inference
+# Web server for local testing
+flask>=2.0.0
 
 # HTTP requests and JSON
 requests>=2.25.0

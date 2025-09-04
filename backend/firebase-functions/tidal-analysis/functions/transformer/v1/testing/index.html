@@ -192,7 +192,7 @@
         
         <!-- Data Input Section -->
         <div class="section">
-            <h3>📡 Data Input (4320 readings = 72 hours)</h3>
+            <h3>📡 Data Input (433 readings = 72 hours @ 10min intervals)</h3>
             <div class="button-group">
                 <button onclick="fetchFirebaseData()">
                     📡 Fetch Last 72 Hours from Firebase
@@ -205,12 +205,40 @@
             <div id="dataMetrics" class="metrics"></div>
         </div>
         
+        <!-- Training Data Visualization Section -->
+        <div class="section">
+            <h3>🎯 Training Data Visualization</h3>
+            <p style="margin-bottom: 15px; color: #7f8c8d; font-style: italic;">
+                Explore random training sequences from the model's training dataset (6,547 sequences total)
+            </p>
+            <div class="button-group">
+                <button onclick="showRandomTrainingSequence()">
+                    🎲 Show Random Training Sequence
+                </button>
+                <button onclick="showTrainingDataInfo()">
+                    📊 Show Training Dataset Info
+                </button>
+            </div>
+            <div id="trainingStatus" style="margin-top: 15px;"></div>
+            <div id="trainingMetrics" class="metrics"></div>
+            
+            <!-- Training Data Chart Container -->
+            <div id="trainingChartContainer" class="chart-container" style="display: none;">
+                <canvas id="trainingChart"></canvas>
+            </div>
+            <div id="trainingChartCaption" style="text-align: center; margin-top: 10px; display: none;">
+                <small style="color: #7f8c8d;">
+                    Blue points: Training input (72h @ 10min intervals) | Orange points: Training target (24h @ 10min intervals)
+                </small>
+            </div>
+        </div>
+        
         <!-- Prediction Section -->
         <div class="section">
             <h3>🔮 24-Hour Tidal Prediction</h3>
             <div class="button-group">
                 <button id="predictBtn" onclick="makePrediction()" disabled>
-                    🚀 Predict Next 24 Hours (1440 points)
+                    🚀 Predict Next 24 Hours (144 points @ 10min intervals)
                 </button>
             </div>
             <div id="progressContainer" style="display: none;">
@@ -231,7 +259,7 @@
             </div>
             <div style="text-align: center; margin-top: 10px;">
                 <small style="color: #7f8c8d;">
-                    Blue: Historical data (72h) | Orange: Transformer predictions (24h)
+                    Blue points: Historical data (72h @ 10min intervals) | Orange points: Transformer predictions (24h @ 10min intervals)
                 </small>
             </div>
         </div>
@@ -242,11 +270,14 @@
         let currentPredictions = null;
         let chart = null;
         let modelInfo = null;
+        let trainingChart = null;
+        let currentTrainingSequence = null;
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadModelInfo();
             initializeChart();
+            initializeTrainingChart();
         });
 
         async function loadModelInfo() {
@@ -459,6 +490,208 @@
             `;
         }
 
+        async function showTrainingDataInfo() {
+            updateTrainingStatus('info', '📊 Loading training dataset information...');
+            
+            try {
+                const response = await fetch('/training-info');
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateTrainingStatus('success', 
+                        `✅ Loaded training dataset info: ${data.training.sequences} training sequences, ${data.validation.sequences} validation sequences`);
+                    
+                    displayTrainingDataInfo(data.training, data.validation);
+                } else {
+                    updateTrainingStatus('error', `❌ Failed to load training info: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Training info error:', error);
+                updateTrainingStatus('error', '❌ Network error while loading training info');
+            }
+        }
+
+        async function showRandomTrainingSequence() {
+            updateTrainingStatus('info', '🎲 Loading random training sequence...');
+            
+            try {
+                const response = await fetch('/random-training');
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentTrainingSequence = data;
+                    
+                    updateTrainingStatus('success', 
+                        `✅ Loaded training sequence ${data.sequence_index + 1}/${data.total_sequences} from ${new Date(data.start_time).toLocaleDateString()}`);
+                    
+                    displayTrainingSequenceMetrics(data.input, data.output);
+                    updateTrainingChart();
+                    
+                    // Show chart container
+                    document.getElementById('trainingChartContainer').style.display = 'block';
+                    document.getElementById('trainingChartCaption').style.display = 'block';
+                } else {
+                    updateTrainingStatus('error', `❌ Failed to load training sequence: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Training sequence error:', error);
+                updateTrainingStatus('error', '❌ Network error while loading training sequence');
+            }
+        }
+
+        function updateTrainingStatus(type, message) {
+            document.getElementById('trainingStatus').innerHTML = 
+                `<div class="status ${type}">${message}</div>`;
+        }
+
+        function displayTrainingDataInfo(training, validation) {
+            document.getElementById('trainingMetrics').innerHTML = `
+                <h4 style="grid-column: 1/-1; margin: 0 0 10px 0;">Training Dataset Overview</h4>
+                <div class="metric-card">
+                    <div class="metric-value">${training.sequences.toLocaleString()}</div>
+                    <div class="metric-label">Train Sequences</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${validation.sequences.toLocaleString()}</div>
+                    <div class="metric-label">Val Sequences</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${training.input_length}</div>
+                    <div class="metric-label">Input Length</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${training.output_length}</div>
+                    <div class="metric-label">Output Length</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${training.stats.input.mean.toFixed(0)}</div>
+                    <div class="metric-label">Train Mean (mm)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${training.stats.input.std.toFixed(0)}</div>
+                    <div class="metric-label">Train Std (mm)</div>
+                </div>
+            `;
+        }
+
+        function displayTrainingSequenceMetrics(input, output) {
+            document.getElementById('trainingMetrics').innerHTML = `
+                <h4 style="grid-column: 1/-1; margin: 0 0 10px 0;">Training Sequence #${currentTrainingSequence.sequence_index + 1}</h4>
+                <div class="metric-card">
+                    <div class="metric-value">${input.stats.min.toFixed(1)}</div>
+                    <div class="metric-label">Input Min (mm)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${input.stats.max.toFixed(1)}</div>
+                    <div class="metric-label">Input Max (mm)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${input.stats.mean.toFixed(1)}</div>
+                    <div class="metric-label">Input Mean (mm)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${output.stats.min.toFixed(1)}</div>
+                    <div class="metric-label">Target Min (mm)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${output.stats.max.toFixed(1)}</div>
+                    <div class="metric-label">Target Max (mm)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${output.stats.mean.toFixed(1)}</div>
+                    <div class="metric-label">Target Mean (mm)</div>
+                </div>
+            `;
+        }
+
+        function initializeTrainingChart() {
+            const ctx = document.getElementById('trainingChart').getContext('2d');
+            trainingChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: []
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'hour',
+                                displayFormats: {
+                                    hour: 'MMM d HH:mm'
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Water Level (mm)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTrainingChart() {
+            if (!trainingChart || !currentTrainingSequence) return;
+
+            const datasets = [];
+
+            // Input sequence (72 hours)
+            const inputData = currentTrainingSequence.input.water_levels.map((level, index) => ({
+                x: new Date(currentTrainingSequence.input.timestamps[index]),
+                y: level
+            }));
+
+            datasets.push({
+                label: 'Training Input (72h)',
+                data: inputData,
+                borderColor: '#3498db',
+                backgroundColor: '#3498db',
+                fill: false,
+                showLine: false,
+                pointRadius: 1.5,
+                pointHoverRadius: 4
+            });
+
+            // Output sequence (next 24 hours)  
+            const outputData = currentTrainingSequence.output.water_levels.map((level, index) => ({
+                x: new Date(currentTrainingSequence.output.timestamps[index]),
+                y: level
+            }));
+
+            datasets.push({
+                label: 'Training Target (24h)',
+                data: outputData,
+                borderColor: '#e67e22',
+                backgroundColor: '#e67e22',
+                fill: false,
+                showLine: false,
+                pointRadius: 1.5,
+                pointHoverRadius: 4
+            });
+
+            trainingChart.data.datasets = datasets;
+            trainingChart.update();
+        }
+
         function showProgress() {
             document.getElementById('progressContainer').style.display = 'block';
             let progress = 0;
@@ -544,10 +777,11 @@
                     label: `Historical Data (72h) - ${currentData.type}`,
                     data: historicalData,
                     borderColor: '#3498db',
-                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    backgroundColor: '#3498db',
                     fill: false,
-                    pointRadius: 0,
-                    pointHoverRadius: 3
+                    showLine: false,
+                    pointRadius: 2,
+                    pointHoverRadius: 4
                 });
             }
 
@@ -555,7 +789,7 @@
             if (currentPredictions && currentData && currentData.timestamps) {
                 const lastTimestamp = new Date(currentData.timestamps[currentData.timestamps.length - 1]);
                 const predictionData = currentPredictions.map((level, index) => ({
-                    x: new Date(lastTimestamp.getTime() + (index + 1) * 60000), // +1 minute intervals
+                    x: new Date(lastTimestamp.getTime() + (index + 1) * 600000), // +10 minute intervals
                     y: level
                 }));
 
@@ -563,11 +797,11 @@
                     label: 'Transformer Predictions (24h)',
                     data: predictionData,
                     borderColor: '#e67e22',
-                    backgroundColor: 'rgba(230, 126, 34, 0.1)',
-                    borderDash: [5, 5],
+                    backgroundColor: '#e67e22',
                     fill: false,
-                    pointRadius: 0,
-                    pointHoverRadius: 3
+                    showLine: false,
+                    pointRadius: 2,
+                    pointHoverRadius: 4
                 });
             }
 

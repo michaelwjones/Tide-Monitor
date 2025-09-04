@@ -4,33 +4,9 @@ echo   Complete Transformer v1 Setup and Training Pipeline
 echo ========================================================
 echo.
 
-:: Check Python availability
-python --version >nul 2>&1
-if errorlevel 1 (
-    echo Error: Python is not installed or not in PATH
-    echo Please install Python 3.8 or later
-    pause
-    exit /b 1
-)
-
-echo Current Python version:
-python --version
-echo.
-
-:: Check PyTorch availability
-python -c "import torch; print(f'PyTorch version: {torch.__version__}')" 2>nul
-if errorlevel 1 (
-    echo Warning: PyTorch not found
-    echo You may need to install PyTorch for training
-    echo.
-)
-
-:: Check CUDA availability
-python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')" 2>nul
-if not errorlevel 1 (
-    python -c "import torch; print(f'CUDA device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}')"
-)
-echo.
+REM Set URL variables to avoid colon issues
+set CPU_URL=https://download.pytorch.org/whl/cpu
+set CUDA_URL=https://download.pytorch.org/whl/cu121
 
 echo ========================================================
 echo   Setup Options
@@ -39,26 +15,39 @@ echo 1. Install PyTorch (CPU version)
 echo 2. Install PyTorch (CUDA version - requires NVIDIA GPU)
 echo 3. Fetch data and create training dataset
 echo 4. Train transformer model
-echo 5. Convert model to ONNX format
-echo 6. Test model locally
-echo 7. Deploy to Firebase Functions
-echo 8. Run complete pipeline (3-7)
-echo 9. Exit
+echo 5. Test model locally (PyTorch web server)
+echo 6. Deploy to Firebase Functions (PyTorch runtime)
+echo 7. Run complete pipeline (3-6)
+echo 8. Exit
 echo.
 
-set /p choice=Enter your choice (1-9): 
+set /p choice=Enter your choice (1-8): 
 
 if "%choice%"=="1" (
     echo Installing PyTorch CPU version...
-    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-    pip install tensorboard
+    echo This may take a few minutes...
+    pip install torch torchvision torchaudio --index-url %CPU_URL% >nul 2>&1
+    if errorlevel 1 (
+        echo Warning: PyTorch installation had issues, but may already be installed
+    )
+    pip install tensorboard flask >nul 2>&1
     echo PyTorch CPU installation completed.
-) else if "%choice%"=="2" (
+    goto :success
+)
+
+if "%choice%"=="2" (
     echo Installing PyTorch CUDA version...
-    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-    pip install tensorboard
+    echo This may take a few minutes...
+    pip install torch torchvision torchaudio --index-url %CUDA_URL% >nul 2>&1
+    if errorlevel 1 (
+        echo Warning: PyTorch CUDA installation had issues, but may already be installed
+    )
+    pip install tensorboard flask >nul 2>&1
     echo PyTorch CUDA installation completed.
-) else if "%choice%"=="3" (
+    goto :success
+)
+
+if "%choice%"=="3" (
     echo ========== Data Preparation ==========
     cd data-preparation
     echo Fetching Firebase data...
@@ -68,7 +57,10 @@ if "%choice%"=="1" (
         python create_training_data.py
     )
     cd ..
-) else if "%choice%"=="4" (
+    goto :success
+)
+
+if "%choice%"=="4" (
     echo ========== Training Transformer ==========
     cd training
     echo Starting transformer training...
@@ -76,28 +68,32 @@ if "%choice%"=="1" (
     echo.
     python train_transformer.py
     cd ..
-) else if "%choice%"=="5" (
-    echo ========== Converting to ONNX ==========
-    cd training
-    echo Converting trained model to ONNX format...
-    python convert_to_onnx.py
-    if not errorlevel 1 (
-        echo Copying ONNX files to inference directory...
-        copy onnx_models\transformer_tidal_v1.onnx ..\inference\
-        copy onnx_models\model_metadata.json ..\inference\
-    )
-    cd ..
-) else if "%choice%"=="6" (
+    goto :success
+)
+
+if "%choice%"=="5" (
     echo ========== Local Testing ==========
-    cd testing
-    echo Starting test server...
+    cd training
+    echo Starting PyTorch model server...
     echo Open http://localhost:8000 in your browser to test
-    python server.py
+    echo Press Ctrl+C to stop the server
+    python model_server.py
     cd ..
-) else if "%choice%"=="7" (
+    goto :success
+)
+
+if "%choice%"=="6" (
     echo ========== Firebase Deployment ==========
+    if not exist "training\checkpoints\best.pth" (
+        echo ERROR: No trained model found!
+        echo Please train a model first using option 4
+        goto :error
+    )
     call deploy-transformer-v1.bat
-) else if "%choice%"=="8" (
+    goto :success
+)
+
+if "%choice%"=="7" (
     echo ========== Complete Pipeline ==========
     echo.
     echo Step 1: Data Preparation
@@ -122,39 +118,32 @@ if "%choice%"=="1" (
     cd ..
     echo.
     
-    echo Step 3: ONNX Conversion
+    echo Step 3: Local Testing
+    echo Starting PyTorch model server for validation...
     cd training
-    python convert_to_onnx.py
-    if errorlevel 1 goto :error
-    copy onnx_models\transformer_tidal_v1.onnx ..\inference\ >nul 2>&1
-    copy onnx_models\model_metadata.json ..\inference\ >nul 2>&1
-    cd ..
-    echo.
-    
-    echo Step 4: Local Testing
-    echo Starting test server for validation...
-    cd testing
-    start /min python server.py
+    start /min python model_server.py
     timeout /t 3 >nul
     cd ..
     echo.
     
-    echo Step 5: Firebase Deployment
+    echo Step 4: Firebase Deployment
     call deploy-transformer-v1.bat
     
     echo.
     echo ========== Pipeline Complete ==========
     echo Your Transformer v1 model is now ready for production!
-    
-) else if "%choice%"=="9" (
+    echo - Local server: http://localhost:8000 (if still running)
+    echo - Firebase Functions: Check Firebase Console for deployment status
+    goto :success
+)
+
+if "%choice%"=="8" (
     echo Exiting setup.
-    goto :end
-) else (
-    echo Invalid choice. Please run again.
     goto :end
 )
 
-goto :success
+echo Invalid choice. Please run again.
+goto :end
 
 :error
 echo.

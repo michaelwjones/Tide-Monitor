@@ -9,8 +9,8 @@ class TidalDataset(Dataset):
     PyTorch Dataset for tidal prediction with seq2seq transformer.
     
     Loads preprocessed sequences from data-preparation stage:
-    - Input sequences: 4320 time steps (72 hours)
-    - Target sequences: 1440 time steps (24 hours)
+    - Input sequences: 433 time steps (72 hours at 10-minute intervals)
+    - Target sequences: 144 time steps (24 hours at 10-minute intervals)
     """
     
     def __init__(self, data_dir='../data-preparation/data', split='train'):
@@ -59,12 +59,12 @@ class TidalDataset(Dataset):
         Get a single sequence pair.
         
         Returns:
-            src: Input sequence tensor (4320, 1)
-            tgt: Target sequence tensor (1440, 1) 
+            src: Input sequence tensor (433, 1)
+            tgt: Target sequence tensor (144, 1) 
         """
         # Convert to tensors and add feature dimension
-        src = torch.from_numpy(self.X[idx]).float().unsqueeze(-1)  # (4320, 1)
-        tgt = torch.from_numpy(self.y[idx]).float().unsqueeze(-1)  # (1440, 1)
+        src = torch.from_numpy(self.X[idx]).float().unsqueeze(-1)  # (433, 1)
+        tgt = torch.from_numpy(self.y[idx]).float().unsqueeze(-1)  # (144, 1)
         
         return src, tgt
     

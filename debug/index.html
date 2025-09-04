@@ -27,28 +27,6 @@
             color: white;
             text-decoration: none;
         }
-        .toggle-trendlines {
-            background: #007bff;
-            color: white;
-            padding: 10px 16px;
-            border: none;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-            transition: background-color 0.2s;
-            cursor: pointer;
-            margin-left: 10px;
-        }
-        .toggle-trendlines:hover {
-            background: #0056b3;
-        }
-        .toggle-trendlines.active {
-            background: #28a745;
-        }
-        .toggle-trendlines.active:hover {
-            background: #218838;
-        }
         .toggle-prediction {
             background: #17a2b8;
             color: white;
@@ -71,24 +49,21 @@
         .toggle-prediction.active:hover {
             background: #e8650f;
         }
-        .tidal-analysis-table {
-            margin-top: 20px;
-            border-collapse: collapse;
-            width: 100%;
-            max-width: 600px;
+        .toggle-trendlines {
+            background: #007bff;
+            color: white;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            transition: background-color 0.2s;
+            cursor: pointer;
+            margin-left: 10px;
         }
-        .tidal-analysis-table th,
-        .tidal-analysis-table td {
-            border: 1px solid #ddd;
-            padding: 8px 12px;
-            text-align: left;
-        }
-        .tidal-analysis-table th {
-            background-color: #f5f5f5;
-            font-weight: 600;
-        }
-        .tidal-analysis-table tr:nth-child(even) {
-            background-color: #f9f9f9;
+        .toggle-trendlines:hover {
+            background: #0056b3;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
@@ -106,19 +81,11 @@
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px;">
             <div style="display: flex; align-items: center;">
                 <a href="../index.html" class="main-link">← Main Dashboard</a>
-                <button id="toggleTrendlines" class="toggle-trendlines">Show Trend Lines</button>
-                <button id="togglePrediction" class="toggle-prediction">Show 24h LSTM Forecast</button>
+                <button id="togglePrediction" class="toggle-prediction hidden">Show Forecast</button>
                 <button id="show24Hours" class="toggle-trendlines" style="background: #007bff; margin-left: 10px;">24 Hours</button>
                 <button id="show72Hours" class="toggle-trendlines" style="background: #6c757d; margin-left: 5px;">72 Hours</button>
             </div>
             <div id="chartLegend" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; font-size: 14px; flex: 1;"></div>
-        </div>
-        
-        <div id="tidalAnalysisContainer" style="margin-top: 20px;">
-            <h3>Detected Tidal Frequencies</h3>
-            <div id="analysisTablesContainer">
-                <div style="text-align: center; color: #666; padding: 20px;">Loading tidal analysis results...</div>
-            </div>
         </div>
     </div>
 
@@ -131,451 +98,110 @@
         });
 
         let debugChartInstance = null;
-        let trendLinesVisible = false;
         let predictionVisible = false;
         let currentReadings = [];
-        let detectedTidalFrequencies = null;
-        let cachedMatrixPencilResults = null; // Cache Matrix Pencil analysis results from Firebase
-
-        // Prepare data for cubic spline interpolation with light smoothing (Wind/Wave category)
-        function prepareWindWaveSplineData(data) {
-            const n = data.length;
-            if (n < 4) return null;
-            
-            // Sort data by x value and remove duplicates
-            const sortedData = [...data].sort((a, b) => a.x.getTime() - b.x.getTime());
-            const uniqueData = [];
-            
-            for (let i = 0; i < sortedData.length; i++) {
-                if (i === 0 || sortedData[i].x.getTime() !== sortedData[i-1].x.getTime()) {
-                    uniqueData.push(sortedData[i]);
-                }
-            }
-            
-            if (uniqueData.length < 4) return null;
-            
-            // Apply progressive smoothing with up to 30-point moving average
-            const lightlySmoothed = [];
-            for (let i = 0; i < uniqueData.length; i++) {
-                // Determine smoothing window size based on distance from edges
-                const distFromStart = i;
-                const distFromEnd = uniqueData.length - 1 - i;
-                const maxRadius = Math.min(distFromStart, distFromEnd);
-                
-                // Progressive smoothing: 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 30 point averages
-                const windowSizes = [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 30];
-                const radius = Math.min(maxRadius, Math.floor((windowSizes.length - 1)));
-                const windowSize = windowSizes[radius];
-                const halfWindow = Math.floor(windowSize / 2);
-                
-                // Calculate moving average
-                let sum = 0;
-                for (let j = -halfWindow; j <= halfWindow; j++) {
-                    sum += uniqueData[i + j].y;
-                }
-                const smoothedY = sum / windowSize;
-                
-                lightlySmoothed.push({
-                    x: uniqueData[i].x,
-                    y: smoothedY
-                });
-            }
-            
-            return {
-                data: lightlySmoothed,
-                type: 'cubic_spline'
-            };
-        }
-        
-        // Natural cubic spline computation using Thomas algorithm (O(n) complexity) for Wind/Wave category
-        function computeWindWaveNaturalCubicSpline(data) {
-            const n = data.length;
-            if (n < 4) return null;
-            
-            const x = data.map(d => d.x.getTime());
-            const y = data.map(d => d.y);
-            
-            // Calculate intervals
-            const h = new Array(n - 1);
-            for (let i = 0; i < n - 1; i++) {
-                h[i] = x[i + 1] - x[i];
-                if (h[i] === 0) return null; // Avoid division by zero
-            }
-            
-            // Set up the tridiagonal system for natural spline
-            const alpha = new Array(n - 1);
-            for (let i = 1; i < n - 1; i++) {
-                alpha[i] = (3 / h[i]) * (y[i + 1] - y[i]) - (3 / h[i - 1]) * (y[i] - y[i - 1]);
-            }
-            
-            // Solve tridiagonal system using Thomas algorithm
-            const l = new Array(n);
-            const mu = new Array(n);
-            const z = new Array(n);
-            
-            l[0] = 1;
-            mu[0] = 0;
-            z[0] = 0;
-            
-            for (let i = 1; i < n - 1; i++) {
-                l[i] = 2 * (x[i + 1] - x[i - 1]) - h[i - 1] * mu[i - 1];
-                mu[i] = h[i] / l[i];
-                z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
-            }
-            
-            l[n - 1] = 1;
-            z[n - 1] = 0;
-            
-            // Back substitution
-            const c = new Array(n);
-            c[n - 1] = 0;
-            
-            for (let j = n - 2; j >= 0; j--) {
-                c[j] = z[j] - mu[j] * c[j + 1];
-            }
-            
-            // Calculate spline coefficients
-            const a = new Array(n);
-            const b = new Array(n);
-            const d = new Array(n);
-            
-            for (let i = 0; i < n - 1; i++) {
-                a[i] = y[i];
-                b[i] = (y[i + 1] - y[i]) / h[i] - h[i] * (c[i + 1] + 2 * c[i]) / 3;
-                d[i] = (c[i + 1] - c[i]) / (3 * h[i]);
-            }
-            
-            return {
-                x: x,
-                a: a,
-                b: b,
-                c: c,
-                d: d,
-                n: n
-            };
-        }
-        
-        // Evaluate cubic spline at given x values for Wind/Wave category
-        function evaluateWindWaveCubicSpline(spline, xValues) {
-            const points = [];
-            
-            for (const targetX of xValues) {
-                const x = targetX.getTime();
-                
-                // Find the interval containing x
-                let i = 0;
-                while (i < spline.n - 1 && x > spline.x[i + 1]) {
-                    i++;
-                }
-                
-                // Clamp to valid range
-                i = Math.max(0, Math.min(i, spline.n - 2));
-                
-                const dx = x - spline.x[i];
-                const y = spline.a[i] + spline.b[i] * dx + spline.c[i] * dx * dx + spline.d[i] * dx * dx * dx;
-                
-                points.push({
-                    x: targetX,
-                    y: y
-                });
-            }
-            
-            return points;
-        }
-
-        // Generate tight-fitting trend line data points using cubic splines for Wind/Wave category
-        function generateWindWaveTrendLine(data, splineData) {
-            if (!splineData || !splineData.data || splineData.data.length < 4) return [];
-            
-            // Compute natural cubic spline directly from the data
-            const spline = computeWindWaveNaturalCubicSpline(splineData.data);
-            if (!spline) return [];
-            
-            // Generate evaluation points for smooth curve
-            const firstTime = splineData.data[0].x.getTime();
-            const lastTime = splineData.data[splineData.data.length - 1].x.getTime();
-            const timeRange = lastTime - firstTime;
-            
-            const evalPoints = [];
-            const numPoints = Math.min(200, splineData.data.length * 3); // More points for tighter curves
-            
-            for (let i = 0; i <= numPoints; i++) {
-                const t = i / numPoints;
-                const currentTime = firstTime + t * timeRange;
-                evalPoints.push(new Date(currentTime));
-            }
-            
-            // Evaluate spline at these points
-            return evaluateWindWaveCubicSpline(spline, evalPoints);
-        }
-
-
-        // Fetch all tidal analysis results from Firebase dynamically
-        async function fetchTidalAnalysisFromFirebase() {
-            try {
-                console.log('Fetching all tidal analysis methods from Firebase...');
-                
-                // Fetch the entire tidal-analysis node to get all analysis methods
-                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/tidal-analysis.json');
-                if (!response.ok) {
-                    throw new Error(`Firebase fetch failed: ${response.status} ${response.statusText}`);
-                }
-                
-                const allAnalysisData = await response.json();
-                if (!allAnalysisData) {
-                    console.warn('No tidal analysis data available from Firebase');
-                    updateAnalysisTables({});
-                    return null;
-                }
-                
-                console.log('Available analysis methods:', Object.keys(allAnalysisData));
-                
-                // Filter analyses that have been updated in the last 10 minutes
-                const now = Date.now();
-                const tenMinutesAgo = now - (10 * 60 * 1000);
-                const activeAnalyses = {};
-                let bestAnalysis = null;
-                let maxComponents = 0;
-                
-                for (const [methodName, methodData] of Object.entries(allAnalysisData)) {
-                    // Skip error entries
-                    if (methodName.includes('error') || !methodData || !methodData.timestamp) {
-                        continue;
-                    }
-                    
-                    const analysisTime = new Date(methodData.timestamp).getTime();
-                    const isRecent = analysisTime > tenMinutesAgo;
-                    
-                    console.log(`Analysis ${methodName}: timestamp=${methodData.timestamp}, isRecent=${isRecent}, age=${((now - analysisTime) / 60000).toFixed(1)}min`);
-                    
-                    if (isRecent && methodData.components && Array.isArray(methodData.components)) {
-                        console.log(`Processing recent analysis ${methodName} with ${methodData.components.length} components`);
-                        
-                        // Process the analysis data
-                        const processedData = {
-                            methodName: methodName,
-                            displayName: formatAnalysisName(methodName),
-                            dcComponent: methodData.dcComponent,
-                            components: methodData.components,
-                            startTime: now - (parseFloat(methodData.timeSpanHours || 24) * 60 * 60 * 1000),
-                            samplingInterval: 60,
-                            modelOrder: methodData.modelOrder,
-                            pencilParam: methodData.pencilParam,
-                            dataLength: methodData.dataPoints,
-                            methodology: methodData.methodology,
-                            computationTimeMs: methodData.computationTimeMs,
-                            timestamp: methodData.timestamp,
-                            timeSpanHours: methodData.timeSpanHours
-                        };
-                        
-                        activeAnalyses[methodName] = processedData;
-                        console.log(`${methodName}: ${methodData.components.length} components, ${methodData.computationTimeMs}ms`);
-                        
-                        // Determine best analysis (most components)
-                        if (methodData.components.length > maxComponents) {
-                            console.log(`New best analysis: ${methodName} with ${methodData.components.length} components (previous max: ${maxComponents})`);
-                            maxComponents = methodData.components.length;
-                            bestAnalysis = processedData;
-                        }
-                    } else {
-                        console.log(`Skipping ${methodName}: isRecent=${isRecent}, hasComponents=${methodData.components ? true : false}, isArray=${Array.isArray(methodData.components)}`);
-                    }
-                }
-                
-                console.log(`Found ${Object.keys(activeAnalyses).length} active analyses:`, Object.keys(activeAnalyses));
-                console.log(`Best analysis selection: maxComponents=${maxComponents}, bestAnalysis=${bestAnalysis ? bestAnalysis.displayName : 'null'}`);
-                
-                // Update the analysis tables display
-                updateAnalysisTables(activeAnalyses);
-                
-                // Store detected frequencies from best analysis for global variable
-                if (bestAnalysis) {
-                    detectedTidalFrequencies = bestAnalysis.components;
-                    console.log(`Using ${bestAnalysis.displayName} as best analysis (${maxComponents} components)`);
-                } else {
-                    console.warn('No best analysis found despite having active analyses');
-                }
-                
-                return bestAnalysis;
-                
-            } catch (error) {
-                console.error('Failed to fetch tidal analysis from Firebase:', error);
-                updateAnalysisTables({});
-                return null;
-            }
-        }
-        
-        // Format analysis method name for display
-        function formatAnalysisName(methodName) {
-            // Convert method names to readable format
-            const formatMap = {
-                'matrix-pencil-v1': 'Matrix Pencil v1',
-                'matrix-pencil-v2': 'Matrix Pencil v2 (Enhanced)',
-                'matrix-pencil': 'Matrix Pencil',
-            };
-            
-            return formatMap[methodName] || methodName.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        }
-
-        // Compute signal components using Firebase Matrix Pencil analysis
-        async function computeWaterLevelComponents(data, forceRecompute = false) {
-            // Use cached results if available and not forcing recompute
-            if (cachedMatrixPencilResults && !forceRecompute) {
-                console.log('Using cached Matrix Pencil results from Firebase');
-                return cachedMatrixPencilResults;
-            }
-            
-            // Fetch analysis results from Firebase
-            const results = await fetchTidalAnalysisFromFirebase();
-            
-            if (!results) {
-                console.warn('No tidal analysis results available from Firebase - skipping trends');
-                updateAnalysisTables({});
-                return null;
-            }
-            
-            // Cache the results for future use
-            cachedMatrixPencilResults = results;
-            
-            return results;
-        }
-        
-        // Evaluate Matrix Pencil signal reconstruction: Σ Aₖ e^(sₖt) where sₖ = σₖ + jωₖ
-        // Can evaluate anywhere - no periodicity assumptions
-        function evaluateMatrixPencilReconstruction(pencilData, xValues) {
-            const points = [];
-            
-            for (const targetX of xValues) {
-                const t = (targetX.getTime() - pencilData.startTime) / 1000; // seconds from start
-                
-                // Start with DC component
-                let y = pencilData.dcComponent;
-                
-                // Add all signal components: Aₖ e^(σₖt) cos(ωₖt + φₖ)
-                for (const component of pencilData.components) {
-                    const dampedAmplitude = component.amplitude * Math.exp(component.damping * t);
-                    y += dampedAmplitude * Math.cos(component.frequency * t + component.phase);
-                }
-                
-                points.push({
-                    x: targetX,
-                    y: y
-                });
-            }
-            
-            return points;
-        }
-        
-        // Generate Matrix Pencil trend line data points for Water Level category
-        // Extended to show 24 hours into the future for tidal prediction if enabled
-        // Returns object with historical and prediction datasets for visual distinction
-        async function generateWaterLevelTrendLine(displayData, analysisData) {
-            if (!displayData || displayData.length < 4) return { historical: [], prediction: [] };
-            
-            // Fetch Matrix Pencil components from Firebase
-            const pencilResult = await computeWaterLevelComponents(analysisData);
-            if (!pencilResult) return { historical: [], prediction: [] };
-            
-            // Generate evaluation points for smooth curve over current display range
-            const firstTime = displayData[0].x.getTime();
-            const lastTime = displayData[displayData.length - 1].x.getTime();
-            const currentTime = new Date().getTime(); // Current time for splitting historical/prediction
-            
-            // Historical data points (first time to current time)
-            const historicalPoints = [];
-            const historicalNumPoints = 150;
-            for (let i = 0; i <= historicalNumPoints; i++) {
-                const t = i / historicalNumPoints;
-                const timePoint = firstTime + t * (currentTime - firstTime);
-                historicalPoints.push(new Date(timePoint));
-            }
-            
-            // Evaluate Matrix Pencil reconstruction for historical data
-            const historicalData = evaluateMatrixPencilReconstruction(pencilResult, historicalPoints);
-            
-            // Only generate prediction data if prediction is enabled
-            let predictionData = [];
-            if (predictionVisible) {
-                const futureTime = currentTime + (24 * 60 * 60 * 1000); // Add 24 hours for prediction
-                
-                // Prediction data points (current time to future time)
-                const predictionPoints = [];
-                const predictionNumPoints = 100;
-                for (let i = 0; i <= predictionNumPoints; i++) {
-                    const t = i / predictionNumPoints;
-                    const timePoint = currentTime + t * (futureTime - currentTime);
-                    predictionPoints.push(new Date(timePoint));
-                }
-                
-                // Evaluate Matrix Pencil reconstruction for prediction data
-                predictionData = evaluateMatrixPencilReconstruction(pencilResult, predictionPoints);
-            }
-            
-            return {
-                historical: historicalData,
-                prediction: predictionData
-            };
-        }
 
         async function fetchDebugData() {
             try {
-                // Clear cached Matrix Pencil results when fetching new data
-                cachedMatrixPencilResults = null;
+                console.log('Fetching debug data...');
                 
-                // Fetch full 72 hours of data for display and analysis
-                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/.json?orderBy="$key"&limitToLast=4320');
+                // Fetch last 4320 readings (72 hours)
+                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/readings.json?orderBy="$key"&limitToLast=4320');
                 const data = await response.json();
                 
-                // Define time ranges
-                const now = new Date();
-                const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-                
-                // Convert all data for FFT analysis (72 hours)
+                if (!data) {
+                    document.getElementById('loading').textContent = 'No data available';
+                    return;
+                }
+
+                // Convert Firebase data to array with all measurements
                 const allReadings = Object.entries(data).map(([key, value]) => ({
-                    id: key,
-                    timestamp: new Date(value.t).toLocaleString('en-US', { 
-                        timeZone: 'America/New_York',
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit'
-                    }),
+                    timestamp: new Date(value.t),
                     rawTimestamp: new Date(value.t),
-                    waterLevel: (value.w / 304.8).toFixed(2),
-                    wavesPercentile: (value.hp !== undefined && value.hp !== null) ? (value.hp / 304.8).toFixed(2) : '--',
-                    wavesEnvelope: (value.he !== undefined && value.he !== null) ? (value.he / 304.8).toFixed(2) : '--',
-                    waterLevelPercentile: (value.wp !== undefined && value.wp !== null) ? (value.wp / 304.8).toFixed(2) : '--',
-                    waterLevelEnvelope: (value.we !== undefined && value.we !== null) ? (value.we / 304.8).toFixed(2) : '--',
+                    waterLevel: (value.w / 304.8).toFixed(2), // Convert mm to feet
+                    waterLevelRaw: value.w / 304.8,
+                    waveHeightPercentile: value.hp ? (value.hp / 304.8).toFixed(2) : '--',
+                    waveHeightPercentileRaw: value.hp ? value.hp / 304.8 : null,
+                    waveHeightEnvelope: value.he ? (value.he / 304.8).toFixed(2) : '--',
+                    waveHeightEnvelopeRaw: value.he ? value.he / 304.8 : null,
+                    waterLevelPercentile: value.wp ? (value.wp / 304.8).toFixed(2) : '--',
+                    waterLevelPercentileRaw: value.wp ? value.wp / 304.8 : null,
+                    waterLevelEnvelope: value.we ? (value.we / 304.8).toFixed(2) : '--',
+                    waterLevelEnvelopeRaw: value.we ? value.we / 304.8 : null,
                     validSamples: value.vs || '--',
                     validSamplesRaw: value.vs || 0,
-                    // NOAA data from Duke Marine Lab
-                    dukeWaterLevel: (value.wm !== undefined && value.wm !== null && value.wm !== "-999") ? parseFloat(value.wm).toFixed(2) : '--',
-                    dukeWaterLevelRaw: (value.wm !== undefined && value.wm !== null && value.wm !== "-999") ? parseFloat(value.wm) : null,
-                    windSpeed: (value.ws !== undefined && value.ws !== null && value.ws !== "-999") ? (parseFloat(value.ws) * 1.944).toFixed(1) : '--', // Convert m/s to knots
+                    windSpeed: (value.ws !== undefined && value.ws !== null && value.ws !== "-999") ? (parseFloat(value.ws) * 1.944).toFixed(1) : '--',
                     windSpeedRaw: (value.ws !== undefined && value.ws !== null && value.ws !== "-999") ? (parseFloat(value.ws) * 1.944) : null,
-                    gustSpeed: (value.gs !== undefined && value.gs !== null && value.gs !== "-999") ? (parseFloat(value.gs) * 1.944).toFixed(1) : '--', // Convert m/s to knots
-                    gustSpeedRaw: (value.gs !== undefined && value.gs !== null && value.gs !== "-999") ? (parseFloat(value.gs) * 1.944) : null
+                    windDirection: (value.wd !== undefined && value.wd !== null && value.wd !== "-999") ? parseFloat(value.wd).toFixed(0) : '--',
+                    gustSpeed: (value.gs !== undefined && value.gs !== null && value.gs !== "-999") ? (parseFloat(value.gs) * 1.944).toFixed(1) : '--',
+                    gustSpeedRaw: (value.gs !== undefined && value.gs !== null && value.gs !== "-999") ? (parseFloat(value.gs) * 1.944) : null,
+                    dukeWaterLevel: (value.wm !== undefined && value.wm !== null && value.wm !== "-999") ? parseFloat(value.wm).toFixed(2) : '--',
+                    dukeWaterLevelRaw: (value.wm !== undefined && value.wm !== null && value.wm !== "-999") ? parseFloat(value.wm) : null
                 }));
                 
-                // Store all readings for both FFT analysis and chart display
-                currentReadings = allReadings;  // Full 72hr dataset for analysis and display
+                // Store readings for chart display
+                currentReadings = allReadings;
                 
-                // Create debug chart with full 72hr data
+                // Check for transformer forecast availability
+                const transformerData = await fetchTransformerPredictions();
+                if (transformerData) {
+                    document.getElementById('togglePrediction').classList.remove('hidden');
+                } else {
+                    document.getElementById('togglePrediction').classList.add('hidden');
+                }
+                
+                // Create debug chart
                 createDebugChart(allReadings);
                 
                 // Hide loading and show content
                 document.getElementById('loading').classList.add('hidden');
                 document.getElementById('content').classList.remove('hidden');
-                
-                // Run automatic tidal analysis for table (async, after chart is displayed)
-                setTimeout(async () => {
-                    await performTidalAnalysis(allReadings);
-                }, 0);
             } catch (error) {
                 console.error('Error fetching debug data:', error);
                 document.getElementById('loading').textContent = 'Error loading data. Check console for details.';
+            }
+        }
+
+        // Fetch Transformer 24-hour forecasts from Firebase
+        async function fetchTransformerPredictions() {
+            try {
+                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/tidal-analysis/transformer-v1-forecast.json');
+                const data = await response.json();
+                
+                if (!data || !data.forecast) {
+                    console.log('No Transformer forecasts found');
+                    return null;
+                }
+                
+                // Check if forecast was updated in the last 10 minutes
+                const generatedAt = new Date(data.generated_at);
+                const now = new Date();
+                const timeDiff = (now - generatedAt) / (1000 * 60); // minutes
+                
+                if (timeDiff > 10) {
+                    console.log(`Transformer forecast is ${timeDiff.toFixed(1)} minutes old, not showing`);
+                    return null;
+                }
+                
+                console.log(`Fetched Transformer forecast: ${data.forecast.length} predictions`);
+                
+                // Each prediction has: timestamp (ISO string), prediction (mm), step
+                const predictions = data.forecast.map(pred => ({
+                    timestamp: new Date(pred.timestamp),
+                    prediction: pred.prediction, // Keep in mm
+                    step: pred.step
+                }));
+                
+                return {
+                    predictions: predictions,
+                    generatedAt: generatedAt,
+                    modelVersion: data.model_version,
+                    inputDataCount: data.input_data_count
+                };
+                
+            } catch (error) {
+                console.error('Error fetching Transformer predictions:', error);
+                return null;
             }
         }
 
@@ -586,128 +212,135 @@
             }
             
             const ctx = document.getElementById('debugChart').getContext('2d');
-            
-            // Filter out any invalid timestamps
-            const validReadings = readings.filter(r => r.rawTimestamp.getTime() > 0);
-            
-            // Set time range - default display 24 hours, but allow zoom to 72 hours
+
+            // Set initial time range to last 24 hours
             const now = new Date();
             const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-            const seventyTwoHoursAgo = new Date(now.getTime() - (72 * 60 * 60 * 1000));
-            
-            
+
             debugChartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    datasets: [{
-                        label: 'Water Level (Average)',
-                        data: validReadings.map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevel)})),
-                        borderColor: 'rgba(0, 0, 255, 1)',
-                        backgroundColor: 'rgba(0, 0, 255, 0.1)',
-                        borderWidth: 1,
-                        pointRadius: 0,
-                        pointHoverRadius: 0,
-                        yAxisID: 'y',
-                        order: 1
-                    }, {
-                        label: 'Water Level (Percentile)',
-                        data: validReadings.filter(r => r.waterLevelPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelPercentile)})),
-                        borderColor: 'rgba(0, 255, 255, 1)',
-                        backgroundColor: 'rgba(0, 255, 255, 0.1)',
-                        borderWidth: 1,
-                        pointRadius: 0,
-                        pointHoverRadius: 0,
-                        yAxisID: 'y',
-                        order: 2
-                    }, {
-                        label: 'Water Level (Envelope)',
-                        data: validReadings.filter(r => r.waterLevelEnvelope !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevelEnvelope)})),
-                        borderColor: 'rgba(255, 0, 255, 1)',
-                        backgroundColor: 'rgba(255, 0, 255, 0.1)',
-                        borderWidth: 1,
-                        pointRadius: 0,
-                        pointHoverRadius: 0,
-                        yAxisID: 'y',
-                        order: 3
-                    }, {
-                        label: 'Wave Height (Percentile)',
-                        data: validReadings.filter(r => r.wavesPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesPercentile)})),
-                        borderColor: 'rgba(255, 0, 0, 1)',
-                        backgroundColor: 'rgba(255, 0, 0, 0.1)',
-                        borderWidth: 1,
-                        pointRadius: 0,
-                        pointHoverRadius: 0,
-                        yAxisID: 'y1',
-                        order: 5
-                    }, {
-                        label: 'Wave Height (Envelope)',
-                        data: validReadings.filter(r => r.wavesEnvelope !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesEnvelope)})),
-                        borderColor: 'rgba(255, 165, 0, 1)',
-                        backgroundColor: 'rgba(255, 165, 0, 0.1)',
-                        borderWidth: 1,
-                        pointRadius: 0,
-                        pointHoverRadius: 0,
-                        yAxisID: 'y1',
-                        order: 6
-                    }, {
-                        label: 'Valid Samples',
-                        data: validReadings.map(r => ({x: r.rawTimestamp, y: r.validSamplesRaw})),
-                        borderColor: 'rgba(128, 128, 128, 1)',
-                        backgroundColor: 'rgba(128, 128, 128, 0.1)',
-                        borderWidth: 1,
-                        pointRadius: 0,
-                        pointHoverRadius: 0,
-                        yAxisID: 'y2',
-                        order: 8
-                    }, {
-                        label: 'Duke Marine Lab Water Level',
-                        data: validReadings.filter(r => r.dukeWaterLevelRaw !== null).map(r => ({x: r.rawTimestamp, y: r.dukeWaterLevelRaw + 1.2})),
-                        borderColor: 'rgba(0, 0, 139, 1)',
-                        backgroundColor: 'rgba(0, 0, 139, 0.1)',
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        pointHoverRadius: 0,
-                        yAxisID: 'y',
-                        order: 0,
-                        borderDash: [5, 5]
-                    }, {
-                        label: 'Wind Speed',
-                        data: validReadings.filter(r => r.windSpeedRaw !== null).map(r => ({x: r.rawTimestamp, y: r.windSpeedRaw})),
-                        borderColor: 'rgba(0, 128, 0, 1)',
-                        backgroundColor: 'rgba(0, 128, 0, 0.1)',
-                        borderWidth: 1,
-                        pointRadius: 0,
-                        pointHoverRadius: 0,
-                        yAxisID: 'y3',
-                        order: 9
-                    }, {
-                        label: 'Gust Speed',
-                        data: validReadings.filter(r => r.gustSpeedRaw !== null).map(r => ({x: r.rawTimestamp, y: r.gustSpeedRaw})),
-                        borderColor: 'rgba(0, 100, 0, 1)',
-                        backgroundColor: 'rgba(0, 100, 0, 0.1)',
-                        borderWidth: 1,
-                        pointRadius: 0,
-                        pointHoverRadius: 0,
-                        yAxisID: 'y3',
-                        order: 10,
-                        borderDash: [3, 3]
-                    }, {
-                        label: 'Analysis Error',
-                        data: [], // Will be populated after Matrix Pencil analysis is available
-                        borderColor: 'rgba(255, 100, 100, 1)',
-                        backgroundColor: 'rgba(255, 100, 100, 0.1)',
-                        borderWidth: 1,
-                        pointRadius: 0,
-                        pointHoverRadius: 0,
-                        yAxisID: 'y',
-                        order: 11
-                    }]
+                    datasets: [
+                        {
+                            label: 'Water Level (Average)',
+                            data: readings.map(r => ({ x: r.rawTimestamp, y: r.waterLevelRaw })),
+                            borderColor: '#007bff',
+                            backgroundColor: '#007bff20',
+                            fill: false,
+                            tension: 0.1,
+                            pointRadius: 0,
+                            pointHoverRadius: 2,
+                            yAxisID: 'y-water'
+                        },
+                        {
+                            label: 'Water Level (Percentile)',
+                            data: readings.map(r => ({ x: r.rawTimestamp, y: r.waterLevelPercentileRaw })).filter(p => p.y !== null),
+                            borderColor: '#17a2b8',
+                            backgroundColor: '#17a2b820',
+                            fill: false,
+                            tension: 0.1,
+                            pointRadius: 0,
+                            pointHoverRadius: 2,
+                            yAxisID: 'y-water'
+                        },
+                        {
+                            label: 'Water Level (Envelope)',
+                            data: readings.map(r => ({ x: r.rawTimestamp, y: r.waterLevelEnvelopeRaw })).filter(p => p.y !== null),
+                            borderColor: '#dc3545',
+                            backgroundColor: '#dc354520',
+                            fill: false,
+                            tension: 0.1,
+                            pointRadius: 0,
+                            pointHoverRadius: 2,
+                            yAxisID: 'y-water'
+                        },
+                        {
+                            label: 'Wave Height (Percentile)',
+                            data: readings.map(r => ({ x: r.rawTimestamp, y: r.waveHeightPercentileRaw })).filter(p => p.y !== null),
+                            borderColor: '#fd7e14',
+                            backgroundColor: '#fd7e1420',
+                            fill: false,
+                            tension: 0.1,
+                            pointRadius: 0,
+                            pointHoverRadius: 2,
+                            yAxisID: 'y-wave'
+                        },
+                        {
+                            label: 'Wave Height (Envelope)',
+                            data: readings.map(r => ({ x: r.rawTimestamp, y: r.waveHeightEnvelopeRaw })).filter(p => p.y !== null),
+                            borderColor: '#e83e8c',
+                            backgroundColor: '#e83e8c20',
+                            fill: false,
+                            tension: 0.1,
+                            pointRadius: 0,
+                            pointHoverRadius: 2,
+                            yAxisID: 'y-wave'
+                        },
+                        {
+                            label: 'Valid Samples',
+                            data: readings.map(r => ({ x: r.rawTimestamp, y: r.validSamplesRaw })),
+                            borderColor: '#6c757d',
+                            backgroundColor: '#6c757d20',
+                            fill: false,
+                            tension: 0.1,
+                            pointRadius: 0,
+                            pointHoverRadius: 2,
+                            yAxisID: 'y-samples',
+                            hidden: true
+                        },
+                        {
+                            label: 'Wind Speed',
+                            data: readings.map(r => ({ x: r.rawTimestamp, y: r.windSpeedRaw })).filter(p => p.y !== null),
+                            borderColor: '#28a745',
+                            backgroundColor: '#28a74520',
+                            fill: false,
+                            tension: 0.1,
+                            pointRadius: 0,
+                            pointHoverRadius: 2,
+                            yAxisID: 'y-wind'
+                        },
+                        {
+                            label: 'Gust Speed',
+                            data: readings.map(r => ({ x: r.rawTimestamp, y: r.gustSpeedRaw })).filter(p => p.y !== null),
+                            borderColor: '#155724',
+                            backgroundColor: '#15572420',
+                            fill: false,
+                            tension: 0.1,
+                            pointRadius: 0,
+                            pointHoverRadius: 2,
+                            yAxisID: 'y-wind'
+                        },
+                        {
+                            label: 'Duke Water Level',
+                            data: readings.map(r => ({ x: r.rawTimestamp, y: r.dukeWaterLevelRaw })).filter(p => p.y !== null),
+                            borderColor: '#004085',
+                            backgroundColor: '#00408520',
+                            fill: false,
+                            tension: 0.1,
+                            pointRadius: 0,
+                            pointHoverRadius: 2,
+                            yAxisID: 'y-water'
+                        }
+                    ]
                 },
                 options: {
-                    animation: false,
                     responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
                     scales: {
-                        y: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                timezone: 'America/New_York'
+                            },
+                            min: twentyFourHoursAgo,
+                            max: now,
+                            title: {
+                                display: true,
+                                text: 'Time (Eastern)'
+                            }
+                        },
+                        'y-water': {
                             type: 'linear',
                             position: 'left',
                             min: 0,
@@ -715,9 +348,12 @@
                             title: {
                                 display: true,
                                 text: 'Water Level (feet)'
+                            },
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
                             }
                         },
-                        y1: {
+                        'y-wave': {
                             type: 'linear',
                             position: 'right',
                             min: 0,
@@ -730,21 +366,11 @@
                                 drawOnChartArea: false
                             }
                         },
-                        y2: {
+                        'y-wind': {
                             type: 'linear',
                             position: 'right',
                             min: 0,
-                            max: 512,
-                            display: false,
-                            grid: {
-                                drawOnChartArea: false
-                            }
-                        },
-                        y3: {
-                            type: 'linear',
-                            position: 'right',
-                            min: 0,
-                            max: 40,
+                            max: 30,
                             title: {
                                 display: true,
                                 text: 'Wind Speed (knots)'
@@ -753,34 +379,19 @@
                                 drawOnChartArea: false
                             }
                         },
-                        x: {
-                            type: 'time',
-                            min: twentyFourHoursAgo,
-                            max: now,
-                            time: {
-                                displayFormats: {
-                                    hour: 'h:mm a'
-                                }
-                            },
-                            title: {
-                                display: false
-                            }
+                        'y-samples': {
+                            type: 'linear',
+                            position: 'right',
+                            min: 0,
+                            max: 512,
+                            display: false
                         }
                     },
                     plugins: {
                         legend: {
                             display: false
                         },
-                        title: {
-                            display: false
-                        },
                         zoom: {
-                            limits: {
-                                x: {
-                                    min: seventyTwoHoursAgo,
-                                    max: now
-                                }
-                            },
                             zoom: {
                                 wheel: {
                                     enabled: true,
@@ -788,413 +399,84 @@
                                 },
                                 drag: {
                                     enabled: true,
-                                    backgroundColor: 'rgba(225,225,225,0.3)',
-                                    borderColor: 'rgba(225,225,225,1)',
-                                    borderWidth: 1
-                                },
-                                pinch: {
-                                    enabled: true
+                                    backgroundColor: 'rgba(54, 162, 235, 0.2)'
                                 },
                                 mode: 'x',
-                                scaleMode: 'x'
+                                onZoomComplete: function({chart}) {
+                                    chart.update('none');
+                                }
                             },
                             pan: {
                                 enabled: true,
-                                mode: 'x',
-                                scaleMode: 'x'
+                                mode: 'x'
+                            },
+                            limits: {
+                                x: {
+                                    min: readings[0]?.rawTimestamp || twentyFourHoursAgo,
+                                    max: now
+                                }
                             }
                         }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
                     }
-                }
+                },
+                plugins: [Chart.zoomPlugin]
             });
-            
-            // Generate custom legend
+
+            // Create custom legend
+            createCustomLegend();
+        }
+
+        function createCustomLegend() {
             const legendContainer = document.getElementById('chartLegend');
-            if (legendContainer) {
-                const legendItems = [
-                    { label: 'Water Level (Average)', color: 'blue' },
-                    { label: 'Duke Marine Lab Water Level', color: 'darkblue', dash: true },
-                    { label: 'Water Level (Percentile)', color: 'cyan' },
-                    { label: 'Water Level (Envelope)', color: 'magenta' },
-                    { label: 'Wave Height (Percentile)', color: 'red' },
-                    { label: 'Wave Height (Envelope)', color: 'orange' },
-                    { label: 'Wind Speed', color: 'green' },
-                    { label: 'Gust Speed', color: 'darkgreen', dot: true },
-                    { label: 'Valid Samples', color: 'gray' },
-                    { label: 'Analysis Error', color: 'rgb(255, 100, 100)' }
-                ];
-                
-                legendContainer.innerHTML = legendItems.map(item => `
-                    <span style="display: flex; align-items: center; gap: 5px;">
-                        <span style="width: 16px; height: 3px; background-color: ${item.color}; display: inline-block; ${item.dash ? 'background-image: repeating-linear-gradient(to right, ' + item.color + ' 0px, ' + item.color + ' 2px, transparent 2px, transparent 4px);' : item.dot ? 'background-image: repeating-linear-gradient(to right, ' + item.color + ' 0px, ' + item.color + ' 1px, transparent 1px, transparent 3px);' : ''}"></span>
-                        <span>${item.label}</span>
-                    </span>
-                `).join('');
-            }
-            
-            // Add trend lines if enabled
-            if (trendLinesVisible) {
-                setTimeout(async () => {
-                    await addTrendLines();
-                }, 0);
-            }
-        }
-
-        // Add water level trend lines using Matrix Pencil analysis from Firebase
-        async function addWaterLevelTrendLines() {
-            if (!debugChartInstance || !currentReadings.length) return;
-            
-            // Use full 72hr dataset for both analysis and display
-            const allValidReadings = currentReadings.filter(r => r.rawTimestamp.getTime() > 0);
-            
-            // Use all data for display (full 72 hours)
-            const displayReadings = allValidReadings;
-            
-            // Water level dataset indices: 0, 1, 2, 6
-            const waterLevelIndices = [0, 1, 2, 6];
-            
-            // Reduce opacity of water level datasets
-            debugChartInstance.data.datasets.forEach((dataset, index) => {
-                if (waterLevelIndices.includes(index)) {
-                    dataset.borderColor = dataset.borderColor.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*[^)]+\)/, (match, r, g, b) => {
-                        return `rgba(${r}, ${g}, ${b}, 0.3)`;
-                    });
-                    dataset.backgroundColor = dataset.backgroundColor.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*[^)]+\)/, (match, r, g, b) => {
-                        return `rgba(${r}, ${g}, ${b}, 0.05)`;
-                    });
-                }
-            });
-            
-            // Define water level datasets for Matrix Pencil trend lines
-            // Only calculate trend lines for average water level data (from Firebase)
-            const waterLevelConfigs = [
-                {
-                    datasetIndex: 0,
-                    label: 'Water Level (Average) - Matrix Pencil',
-                    analysisData: allValidReadings.map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevel)})),
-                    displayData: displayReadings.map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevel)})),
-                    borderColor: 'rgba(0, 0, 255, 0.9)',
-                    yAxisID: 'y'
-                }
-            ];
-            
-            // Calculate and add Matrix Pencil trend lines asynchronously
-            for (const config of waterLevelConfigs) {
-                if (config.displayData.length >= 4) {
-                    try {
-                        // Generate trend line using Matrix Pencil analysis from Firebase
-                        const trendData = await generateWaterLevelTrendLine(config.displayData, config.analysisData);
-                        
-                        if (trendData && (trendData.historical.length > 0 || trendData.prediction.length > 0)) {
-                            // Add historical trend line (solid line)
-                            if (trendData.historical.length > 0) {
-                                debugChartInstance.data.datasets.push({
-                                    label: config.label,
-                                    data: trendData.historical,
-                                    borderColor: config.borderColor,
-                                    backgroundColor: 'transparent',
-                                    borderWidth: 3,
-                                    pointRadius: 0,
-                                    pointHoverRadius: 0,
-                                    yAxisID: config.yAxisID,
-                                    order: 200 + config.datasetIndex,
-                                    borderDash: [15, 10]
-                                });
-                            }
-                            
-                            // Add prediction trend line (dotted line with different styling)
-                            if (trendData.prediction.length > 0) {
-                                debugChartInstance.data.datasets.push({
-                                    label: config.label + ' (24h Prediction)',
-                                    data: trendData.prediction,
-                                    borderColor: config.borderColor,
-                                    backgroundColor: 'transparent',
-                                    borderWidth: 2,
-                                    pointRadius: 0,
-                                    pointHoverRadius: 0,
-                                    yAxisID: config.yAxisID,
-                                    order: 200 + config.datasetIndex + 10,
-                                    borderDash: [5, 5], // Smaller dots for prediction
-                                    opacity: 0.7 // Slightly transparent to indicate uncertainty
-                                });
-                            }
-                        } else {
-                            console.warn(`No trend data available for ${config.label}`);
-                        }
-                    } catch (error) {
-                        console.error(`Error generating trend line for ${config.label}:`, error);
-                    }
-                }
-            }
-            
-            // Add vertical line to indicate current time / start of prediction (only if prediction is visible)
-            if (predictionVisible) {
-                const now = new Date();
-                const yAxisRange = [0, 6]; // Water level range
-                debugChartInstance.data.datasets.push({
-                    label: 'Current Time (Prediction Start)',
-                    data: [{x: now, y: yAxisRange[0]}, {x: now, y: yAxisRange[1]}],
-                    borderColor: 'rgba(255, 0, 0, 0.6)',
-                    backgroundColor: 'transparent',
-                    borderWidth: 1,
-                    pointRadius: 0,
-                    pointHoverRadius: 0,
-                    yAxisID: 'y',
-                    order: 300,
-                    borderDash: [2, 2]
-                });
-            }
-            
-            debugChartInstance.update();
-        }
-        
-        // Add wind/wave trend lines using cubic splines
-        function addWindWaveTrendLines() {
-            if (!debugChartInstance || !currentReadings.length) return;
-            
-            const validReadings = currentReadings.filter(r => r.rawTimestamp.getTime() > 0);
-            
-            // Wind/wave dataset indices: 3, 4, 5, 7, 8
-            const windWaveIndices = [3, 4, 5, 7, 8];
-            
-            // Reduce opacity of wind/wave datasets
-            debugChartInstance.data.datasets.forEach((dataset, index) => {
-                if (windWaveIndices.includes(index)) {
-                    dataset.borderColor = dataset.borderColor.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*[^)]+\)/, (match, r, g, b) => {
-                        return `rgba(${r}, ${g}, ${b}, 0.3)`;
-                    });
-                    dataset.backgroundColor = dataset.backgroundColor.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*[^)]+\)/, (match, r, g, b) => {
-                        return `rgba(${r}, ${g}, ${b}, 0.05)`;
-                    });
-                }
-            });
-            
-            // Define wind/wave datasets for cubic spline trend lines
-            const windWaveConfigs = [
-                {
-                    datasetIndex: 3,
-                    label: 'Wave Height (Percentile) - Spline',
-                    data: validReadings.filter(r => r.wavesPercentile !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesPercentile)})),
-                    borderColor: 'rgba(255, 0, 0, 0.8)',
-                    yAxisID: 'y1'
-                },
-                {
-                    datasetIndex: 4,
-                    label: 'Wave Height (Envelope) - Spline',
-                    data: validReadings.filter(r => r.wavesEnvelope !== '--').map(r => ({x: r.rawTimestamp, y: parseFloat(r.wavesEnvelope)})),
-                    borderColor: 'rgba(255, 165, 0, 0.8)',
-                    yAxisID: 'y1'
-                },
-                {
-                    datasetIndex: 7,
-                    label: 'Wind Speed - Spline',
-                    data: validReadings.filter(r => r.windSpeedRaw !== null).map(r => ({x: r.rawTimestamp, y: r.windSpeedRaw})),
-                    borderColor: 'rgba(0, 128, 0, 0.8)',
-                    yAxisID: 'y3'
-                },
-                {
-                    datasetIndex: 8,
-                    label: 'Gust Speed - Spline',
-                    data: validReadings.filter(r => r.gustSpeedRaw !== null).map(r => ({x: r.rawTimestamp, y: r.gustSpeedRaw})),
-                    borderColor: 'rgba(0, 100, 0, 0.8)',
-                    yAxisID: 'y3'
-                }
-            ];
-            
-            // Calculate and add cubic spline trend lines
-            windWaveConfigs.forEach(config => {
-                if (config.data.length >= 4) { // Need at least 4 points for cubic splines
-                    const splineData = prepareWindWaveSplineData(config.data);
-                    
-                    if (splineData) {
-                        const trendData = generateWindWaveTrendLine(config.data, splineData);
-                        
-                        if (trendData && trendData.length > 0) {
-                            debugChartInstance.data.datasets.push({
-                                label: config.label,
-                                data: trendData,
-                                borderColor: config.borderColor,
-                                backgroundColor: 'transparent',
-                                borderWidth: 2,
-                                pointRadius: 0,
-                                pointHoverRadius: 0,
-                                yAxisID: config.yAxisID,
-                                order: 300 + config.datasetIndex,
-                                borderDash: [8, 4]
-                            });
-                        }
-                    } else {
-                        console.warn(`Failed to prepare spline data for ${config.label}`);
-                    }
-                }
-            });
-            
-            debugChartInstance.update();
-        }
-
-        // Remove water level trend lines from chart
-        function removeWaterLevelTrendLines() {
             if (!debugChartInstance) return;
-            
-            // Remove water level trend line datasets (those with "Matrix Pencil" in their label)
-            // Also remove current time vertical line
-            debugChartInstance.data.datasets = debugChartInstance.data.datasets.filter(dataset => 
-                !dataset.label.includes('Matrix Pencil') && !dataset.label.includes('Current Time')
-            );
-            
-            // Restore original opacity for water level datasets
-            const waterLevelIndices = [0, 1, 2, 6];
-            debugChartInstance.data.datasets.forEach((dataset, index) => {
-                if (waterLevelIndices.includes(index)) {
-                    // Restore original colors based on dataset type
-                    if (dataset.label === 'Water Level (Average)') {
-                        dataset.borderColor = 'rgba(0, 0, 255, 1)';
-                        dataset.backgroundColor = 'rgba(0, 0, 255, 0.1)';
-                    } else if (dataset.label === 'Water Level (Percentile)') {
-                        dataset.borderColor = 'rgba(0, 255, 255, 1)';
-                        dataset.backgroundColor = 'rgba(0, 255, 255, 0.1)';
-                    } else if (dataset.label === 'Water Level (Envelope)') {
-                        dataset.borderColor = 'rgba(255, 0, 255, 1)';
-                        dataset.backgroundColor = 'rgba(255, 0, 255, 0.1)';
-                    } else if (dataset.label === 'Duke Marine Lab Water Level') {
-                        dataset.borderColor = 'rgba(0, 0, 139, 1)';
-                        dataset.backgroundColor = 'rgba(0, 0, 139, 0.1)';
-                    }
-                }
-            });
-            
-            debugChartInstance.update();
-        }
-        
-        // Remove wind/wave trend lines from chart
-        function removeWindWaveTrendLines() {
-            if (!debugChartInstance) return;
-            
-            // Remove wind/wave trend line datasets (those with "Spline" in their label)
-            debugChartInstance.data.datasets = debugChartInstance.data.datasets.filter(dataset => 
-                !dataset.label.includes('Spline')
-            );
-            
-            // Restore original opacity for wind/wave datasets
-            const windWaveIndices = [3, 4, 5, 7, 8];
-            debugChartInstance.data.datasets.forEach((dataset, index) => {
-                if (windWaveIndices.includes(index)) {
-                    // Restore original colors based on dataset type
-                    if (dataset.label === 'Wave Height (Percentile)') {
-                        dataset.borderColor = 'rgba(255, 0, 0, 1)';
-                        dataset.backgroundColor = 'rgba(255, 0, 0, 0.1)';
-                    } else if (dataset.label === 'Wave Height (Envelope)') {
-                        dataset.borderColor = 'rgba(255, 165, 0, 1)';
-                        dataset.backgroundColor = 'rgba(255, 165, 0, 0.1)';
-                    } else if (dataset.label === 'Wind Speed') {
-                        dataset.borderColor = 'rgba(0, 128, 0, 1)';
-                        dataset.backgroundColor = 'rgba(0, 128, 0, 0.1)';
-                    } else if (dataset.label === 'Gust Speed') {
-                        dataset.borderColor = 'rgba(0, 100, 0, 1)';
-                        dataset.backgroundColor = 'rgba(0, 100, 0, 0.1)';
-                    }
-                }
-            });
-            
-            debugChartInstance.update();
+
+            const legendItems = [
+                { label: 'Water Level (Average)', color: '#007bff' },
+                { label: 'Water Level (Percentile)', color: '#17a2b8' },
+                { label: 'Water Level (Envelope)', color: '#dc3545' },
+                { label: 'Wave Height (Percentile)', color: '#fd7e14' },
+                { label: 'Wave Height (Envelope)', color: '#e83e8c' },
+                { label: 'Wind Speed', color: '#28a745' },
+                { label: 'Gust Speed', color: '#155724' },
+                { label: 'Duke Water Level', color: '#004085' }
+            ];
+
+            legendContainer.innerHTML = legendItems.map(item => `
+                <div style="display: flex; align-items: center;">
+                    <div style="width: 20px; height: 3px; background-color: ${item.color}; margin-right: 8px;"></div>
+                    <span>${item.label}</span>
+                </div>
+            `).join('');
         }
 
-        // Add all trend lines (both categories using different methods)
-        async function addTrendLines() {
-            await addWaterLevelTrendLines();
-            addWindWaveTrendLines();
-        }
-        
-        // Remove all trend lines (both categories)
-        function removeTrendLines() {
-            removeWaterLevelTrendLines();
-            removeWindWaveTrendLines();
-        }
-        
-        // Toggle trend lines visibility (unified interface)
-        async function toggleTrendLines() {
-            trendLinesVisible = !trendLinesVisible;
-            
-            const button = document.getElementById('toggleTrendlines');
-            if (trendLinesVisible) {
-                button.textContent = 'Hide Trend Lines';
-                button.classList.add('active');
-                await addTrendLines();
-            } else {
-                button.textContent = 'Show Trend Lines';
-                button.classList.remove('active');
-                removeTrendLines();
-            }
-        }
-
-        // Fetch LSTM 24-hour forecasts from Firebase
-        async function fetchLSTMPredictions() {
-            try {
-                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/tidal-analysis/lstm-v1-forecasts/.json?orderBy="$key"&limitToLast=1');
-                const data = await response.json();
-                
-                if (!data) {
-                    console.log('No LSTM forecasts found');
-                    return null;
-                }
-                
-                // Get the most recent forecast batch
-                const latestBatchKey = Object.keys(data).sort().pop();
-                const latestBatch = data[latestBatchKey];
-                
-                if (!latestBatch || !latestBatch.forecast) {
-                    console.log('No forecast data in latest batch');
-                    return null;
-                }
-                
-                console.log(`Fetched LSTM forecast: ${latestBatch.forecast.length} predictions`);
-                
-                // Convert predictions to chart-compatible format
-                const predictions = latestBatch.forecast.map(pred => ({
-                    timestamp: new Date(pred.timestamp),
-                    prediction: pred.prediction,
-                    step: pred.step
-                }));
-                
-                return {
-                    predictions: predictions,
-                    generatedAt: new Date(latestBatch.generated_at),
-                    modelVersion: latestBatch.model_version,
-                    inputDataCount: latestBatch.input_data_count
-                };
-                
-            } catch (error) {
-                console.error('Error fetching LSTM predictions:', error);
-                return null;
-            }
-        }
-
-        // Add LSTM predictions to the chart
-        async function addLSTMPredictions() {
-            const forecastData = await fetchLSTMPredictions();
+        // Add Transformer predictions to the chart
+        async function addTransformerPredictions() {
+            const forecastData = await fetchTransformerPredictions();
             
             if (!forecastData || !debugChartInstance) {
                 return;
             }
             
-            // Convert predictions to chart data (water level in feet)
+            // Convert predictions to chart data (water level in feet, points only)
             const predictionData = forecastData.predictions.map(pred => ({
                 x: pred.timestamp,
                 y: pred.prediction / 304.8 // Convert mm to feet
             }));
             
-            // Add prediction dataset to chart
+            // Add prediction dataset to chart (points only, no connecting lines)
             const predictionDataset = {
-                label: 'LSTM 24h Forecast',
+                label: 'Transformer 24h Forecast',
                 data: predictionData,
                 borderColor: '#FF6B35',
-                backgroundColor: '#FF6B3520',
+                backgroundColor: '#FF6B35',
                 fill: false,
-                tension: 0.1,
-                pointRadius: 1,
-                pointHoverRadius: 3,
-                borderWidth: 2,
-                borderDash: [5, 5], // Dashed line to distinguish from real data
+                showLine: false, // Don't connect points with lines
+                pointRadius: 3,
+                pointHoverRadius: 5,
                 yAxisID: 'y-water'
             };
             
@@ -1202,20 +484,20 @@
             debugChartInstance.data.datasets.push(predictionDataset);
             debugChartInstance.update('none');
             
-            console.log(`Added LSTM predictions: ${predictionData.length} points`);
+            console.log(`Added Transformer predictions: ${predictionData.length} points`);
         }
 
-        // Remove LSTM predictions from the chart
-        function removeLSTMPredictions() {
+        // Remove Transformer predictions from the chart
+        function removeTransformerPredictions() {
             if (!debugChartInstance) return;
             
-            // Find and remove LSTM prediction dataset
+            // Find and remove Transformer prediction dataset
             debugChartInstance.data.datasets = debugChartInstance.data.datasets.filter(
-                dataset => dataset.label !== 'LSTM 24h Forecast'
+                dataset => dataset.label !== 'Transformer 24h Forecast'
             );
             debugChartInstance.update('none');
             
-            console.log('Removed LSTM predictions from chart');
+            console.log('Removed Transformer predictions from chart');
         }
 
         // Toggle 24-hour prediction visibility
@@ -1224,11 +506,11 @@
             
             const button = document.getElementById('togglePrediction');
             if (predictionVisible) {
-                button.textContent = 'Hide 24h LSTM Forecast';
+                button.textContent = 'Hide Forecast';
                 button.classList.add('active');
                 
-                // Add LSTM predictions to the chart
-                await addLSTMPredictions();
+                // Add Transformer predictions to the chart
+                await addTransformerPredictions();
                 
                 // Extend chart x-axis to show 24 hours into future for prediction
                 if (debugChartInstance) {
@@ -1241,11 +523,11 @@
                     debugChartInstance.update('none'); // Update without animation for smooth transition
                 }
             } else {
-                button.textContent = 'Show 24h LSTM Forecast';
+                button.textContent = 'Show Forecast';
                 button.classList.remove('active');
                 
-                // Remove LSTM predictions from chart
-                removeLSTMPredictions();
+                // Remove Transformer predictions from chart
+                removeTransformerPredictions();
                 
                 // Reset chart x-axis to current time (remove future prediction view)
                 if (debugChartInstance) {
@@ -1259,199 +541,10 @@
             }
         }
 
-        // Perform automatic tidal analysis for table display using Firebase Matrix Pencil
-        async function performTidalAnalysis(readings) {
-            if (!readings || readings.length < 4) {
-                updateAnalysisTables({});
-                return;
-            }
-            
-            try {
-                // Fetch Matrix Pencil analysis from Firebase (data parameter not used)
-                const pencilResult = await computeWaterLevelComponents(null);
-                
-                // If Matrix Pencil analysis failed, show no results
-                if (!pencilResult) {
-                    updateAnalysisTables({});
-                } else {
-                    // Calculate and add analysis error after Matrix Pencil results are available
-                    await addAnalysisError(readings, pencilResult);
-                }
-                // Table is automatically updated in computeWaterLevelComponents
-            } catch (error) {
-                console.error('Error performing tidal analysis:', error);
-                updateAnalysisTables({});
-            }
-        }
-        
-        // Calculate and display analysis error: measured - reconstructed + 1
-        async function addAnalysisError(readings, pencilResult) {
-            if (!debugChartInstance || !readings || !pencilResult) {
-                console.warn('Cannot add analysis error: missing chart, readings, or pencil results');
-                return;
-            }
-            
-            try {
-                console.log('Calculating analysis error...');
-                
-                // Filter valid readings
-                const validReadings = readings.filter(r => r.rawTimestamp.getTime() > 0);
-                
-                // Calculate error for each data point: measured - reconstructed + 1
-                const errorData = validReadings.map(reading => {
-                    const timePoint = reading.rawTimestamp;
-                    const measuredLevel = parseFloat(reading.waterLevel);
-                    
-                    // Get reconstructed value at this time point
-                    const reconstructed = evaluateMatrixPencilReconstruction(pencilResult, [timePoint]);
-                    const reconstructedValue = reconstructed[0]?.y || 0;
-                    
-                    // Calculate error: measured - reconstructed + 1 (offset to keep negatives visible)
-                    const error = measuredLevel - reconstructedValue + 1;
-                    
-                    return {x: timePoint, y: error};
-                });
-                
-                // Find the Analysis Error dataset (should be the last one)
-                const analysisErrorIndex = debugChartInstance.data.datasets.findIndex(
-                    dataset => dataset.label === 'Analysis Error'
-                );
-                
-                if (analysisErrorIndex !== -1) {
-                    // Update the Analysis Error dataset with calculated data
-                    debugChartInstance.data.datasets[analysisErrorIndex].data = errorData;
-                    debugChartInstance.update();
-                    
-                    console.log(`Added analysis error data with ${errorData.length} points`);
-                } else {
-                    console.warn('Analysis Error dataset not found in chart');
-                }
-                
-            } catch (error) {
-                console.error('Error calculating analysis error:', error);
-            }
-        }
-        
-        // Update analysis tables with dynamic method display
-        function updateAnalysisTables(activeAnalyses) {
-            const container = document.getElementById('analysisTablesContainer');
-            
-            if (!activeAnalyses || Object.keys(activeAnalyses).length === 0) {
-                container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">No recent tidal analysis results (last 10 minutes)</div>';
-                return;
-            }
-            
-            // Clear existing content
-            container.innerHTML = '';
-            
-            // Create a table for each active analysis method
-            for (const [methodName, analysisData] of Object.entries(activeAnalyses)) {
-                const methodDiv = document.createElement('div');
-                methodDiv.style.marginBottom = '30px';
-                
-                // Calculate time since analysis
-                const analysisTime = new Date(analysisData.timestamp);
-                const now = new Date();
-                const minutesAgo = Math.round((now - analysisTime) / 60000);
-                
-                // Method header with status info
-                const header = document.createElement('h4');
-                header.style.color = '#333';
-                header.style.marginBottom = '10px';
-                header.innerHTML = `
-                    ${analysisData.displayName} 
-                    <span style="font-size: 14px; color: #666; font-weight: normal;">
-                        (${analysisData.components.length} components, ${analysisData.computationTimeMs}ms, ${minutesAgo}min ago)
-                    </span>
-                `;
-                methodDiv.appendChild(header);
-                
-                // Create table for this method
-                const table = document.createElement('table');
-                table.className = 'tidal-analysis-table';
-                table.innerHTML = `
-                    <thead>
-                        <tr>
-                            <th>Rank</th>
-                            <th>Period</th>
-                            <th>Frequency (cycles/day)</th>
-                            <th>Amplitude</th>
-                            <th>Damping (1/s)</th>
-                            <th>Phase Offset</th>
-                            <th>Component Type</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                `;
-                
-                const tbody = table.querySelector('tbody');
-                
-                // Add components for this method
-                if (analysisData.components.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #999;">No signal components detected</td></tr>';
-                } else {
-                    analysisData.components.forEach((component, index) => {
-                        const cyclesPerDay = 24 / component.periodHours;
-                        const tidalType = getTidalType(component.periodHours);
-                        
-                        const row = document.createElement('tr');
-                        const periodMinutes = Math.round(component.periodHours * 60);
-                        const displayHours = Math.floor(periodMinutes / 60);
-                        const displayMins = periodMinutes % 60;
-                        const periodDisplay = displayMins === 0 ? `${displayHours}h` : `${displayHours}h ${displayMins}m`;
-                        
-                        // Format damping coefficient (positive = growing, negative = decaying)
-                        const dampingDisplay = component.damping >= 0 ? 
-                            `+${component.damping.toExponential(2)}` : 
-                            component.damping.toExponential(2);
-                        
-                        // Convert phase from radians to hours and minutes: phase (rad) * period (h) / (2π)
-                        const phaseHours = (component.phase * component.periodHours) / (2 * Math.PI);
-                        const phaseMinutes = Math.round(Math.abs(phaseHours) * 60);
-                        const phaseDisplayHours = Math.floor(phaseMinutes / 60);
-                        const phaseDisplayMins = phaseMinutes % 60;
-                        const phaseSign = phaseHours >= 0 ? '+' : '-';
-                        const phaseDisplay = phaseDisplayMins === 0 ? 
-                            `${phaseSign}${phaseDisplayHours}h` : 
-                            `${phaseSign}${phaseDisplayHours}h ${phaseDisplayMins}m`;
-                        
-                        row.innerHTML = `
-                            <td>${index + 1}</td>
-                            <td>${periodDisplay}</td>
-                            <td>${cyclesPerDay.toFixed(3)}</td>
-                            <td>${component.amplitude.toFixed(4)}</td>
-                            <td>${dampingDisplay}</td>
-                            <td>${phaseDisplay}</td>
-                            <td>${tidalType}</td>
-                        `;
-                        tbody.appendChild(row);
-                    });
-                }
-                
-                methodDiv.appendChild(table);
-                container.appendChild(methodDiv);
-            }
-        }
-        
-        // Classify tidal type based on period
-        function getTidalType(periodHours) {
-            if (periodHours >= 23 && periodHours <= 25) {
-                return 'Diurnal (O1/K1)';
-            } else if (periodHours >= 11.5 && periodHours <= 12.5) {
-                return 'Semi-diurnal (M2/S2)';
-            } else if (periodHours >= 6 && periodHours <= 8) {
-                return 'Quarter-diurnal';
-            } else if (periodHours >= 4 && periodHours <= 6) {
-                return 'Higher harmonic';
-            } else {
-                return 'Other';
-            }
-        }
-        
-        // Initialize toggle button event listener
+        // Initialize event listeners
         window.addEventListener('load', function() {
-            document.getElementById('toggleTrendlines').addEventListener('click', toggleTrendLines);
             document.getElementById('togglePrediction').addEventListener('click', togglePrediction);
+            
             document.getElementById('show24Hours').addEventListener('click', function() {
                 if (debugChartInstance) {
                     const now = new Date();
@@ -1475,16 +568,18 @@
                 if (debugChartInstance) {
                     const now = new Date();
                     const seventyTwoHoursAgo = new Date(now.getTime() - (72 * 60 * 60 * 1000));
+                    debugChartInstance.options.scales.x.min = seventyTwoHoursAgo;
                     
                     // If prediction is visible, extend max to show 24 hours of prediction
                     if (predictionVisible) {
                         const extendedMax = new Date(now.getTime() + (24 * 60 * 60 * 1000));
-                        debugChartInstance.zoomScale('x', {min: seventyTwoHoursAgo, max: extendedMax});
+                        debugChartInstance.options.scales.x.max = extendedMax;
                         debugChartInstance.options.plugins.zoom.limits.x.max = extendedMax;
                     } else {
-                        debugChartInstance.zoomScale('x', {min: seventyTwoHoursAgo, max: now});
+                        debugChartInstance.options.scales.x.max = now;
                         debugChartInstance.options.plugins.zoom.limits.x.max = now;
                     }
+                    debugChartInstance.update();
                 }
             });
         });

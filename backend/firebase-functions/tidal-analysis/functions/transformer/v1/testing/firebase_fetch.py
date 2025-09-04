@@ -1,27 +1,22 @@
 #!/usr/bin/env python3
 """
-Fetch real data from Firebase for Transformer testing
-Gets exactly 4320 readings (72 hours) of water level data for seq2seq input
+Firebase Data Fetching for Transformer v1 Testing
+Gets exactly 433 readings (72 hours @ 10min intervals) of water level data for seq2seq input
 """
 
 import requests
-import json
-from datetime import datetime, timedelta
 import numpy as np
+from datetime import datetime, timedelta
 
-def fetch_firebase_data(hours=72):
+def fetch_firebase_data():
     """
-    Fetch the most recent data from Firebase
-    Returns list of water level readings (w field) in chronological order
+    Fetch the last 4320 readings from Firebase (3 days of 1-minute data)
+    Then downsample to 433 readings (10-minute intervals for 72 hours)
     """
-    firebase_url = "https://tide-monitor-boron-default-rtdb.firebaseio.com/readings.json"
+    firebase_url = "https://tide-monitor-boron-default-rtdb.firebaseio.com/readings.json?orderBy=\"$key\"&limitToLast=4320"
     
     try:
-        print(f"📡 Fetching last {hours} hours from Firebase...")
-        
-        # Calculate cutoff time
-        cutoff_time = datetime.now() - timedelta(hours=hours)
-        cutoff_iso = cutoff_time.isoformat()
+        print("📡 Fetching last 4320 readings from Firebase...")
         
         response = requests.get(firebase_url, timeout=30)
         response.raise_for_status()
@@ -30,11 +25,10 @@ def fetch_firebase_data(hours=72):
         if not data:
             raise ValueError("No data received from Firebase")
         
-        print(f"📦 Received {len(data)} total readings")
+        print(f"📦 Received {len(data)} readings")
         
-        # Filter and sort data
-        valid_readings = []
-        
+        # Convert to list and sort by timestamp
+        readings = []
         for key, reading in data.items():
             if not isinstance(reading, dict):
                 continue
@@ -46,42 +40,69 @@ def fetch_firebase_data(hours=72):
             try:
                 # Parse timestamp
                 timestamp_str = reading['t']
-                timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-                
-                # Filter by time
-                if timestamp < cutoff_time:
-                    continue
+                if timestamp_str.endswith('Z'):
+                    timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                else:
+                    timestamp = datetime.fromisoformat(timestamp_str + '+00:00')
                 
                 # Get water level
                 water_level = float(reading['w'])
                 
                 # Basic validation (reasonable water level range)
                 if 300 < water_level < 5000:  # Sensor range in mm
-                    valid_readings.append({
+                    readings.append({
                         'timestamp': timestamp,
                         'water_level': water_level,
                         'iso_time': timestamp_str
                     })
                     
             except (ValueError, TypeError, KeyError) as e:
-                # Skip invalid readings
                 continue
         
-        if not valid_readings:
-            raise ValueError("No valid readings found in the specified time range")
+        if not readings:
+            raise ValueError("No valid readings found after filtering")
         
         # Sort by timestamp (oldest first)
-        valid_readings.sort(key=lambda x: x['timestamp'])
+        readings.sort(key=lambda x: x['timestamp'])
         
-        print(f"✅ Found {len(valid_readings)} valid readings in last {hours} hours")
-        print(f"📅 Time range: {valid_readings[0]['iso_time']} to {valid_readings[-1]['iso_time']}")
-        print(f"🌊 Water level range: {min(r['water_level'] for r in valid_readings):.1f} - {max(r['water_level'] for r in valid_readings):.1f} mm")
+        print(f"✅ Found {len(readings)} valid readings")
+        print(f"📅 Time range: {readings[0]['iso_time']} to {readings[-1]['iso_time']}")
         
-        # Extract just the water levels
-        water_levels = [r['water_level'] for r in valid_readings]
-        timestamps = [r['timestamp'] for r in valid_readings]
+        # Downsample from 1-minute to 10-minute intervals
+        # Take every 10th reading to get exactly 432 readings
+        print(f"📊 Downsampling to 10-minute intervals...")
         
-        return water_levels, timestamps, valid_readings
+        # Take every 10th reading to get 433 readings from 4320
+        if len(readings) >= 4320:
+            # Perfect case: take every 10th reading, including first and last
+            downsampled = [readings[i] for i in range(0, len(readings), 10)]
+            # Ensure we include the very last reading
+            if readings[-1] not in downsampled:
+                downsampled.append(readings[-1])
+        else:
+            # Less than ideal: use what we have and space evenly
+            if len(readings) >= 433:
+                indices = np.linspace(0, len(readings)-1, 433, dtype=int)
+                downsampled = [readings[i] for i in indices]
+            else:
+                # Very few readings - just use what we have
+                downsampled = readings
+        
+        # Ensure exactly 433 readings
+        if len(downsampled) > 433:
+            downsampled = downsampled[-433:]  # Take last 433
+        
+        print(f"✅ Downsampled to {len(downsampled)} readings for transformer input")
+        
+        if downsampled:
+            print(f"📅 Final time range: {downsampled[0]['iso_time']} to {downsampled[-1]['iso_time']}")
+            print(f"🌊 Water level range: {min(r['water_level'] for r in downsampled):.1f} - {max(r['water_level'] for r in downsampled):.1f} mm")
+        
+        # Extract water levels and timestamps
+        water_levels = [r['water_level'] for r in downsampled]
+        timestamps = [r['timestamp'] for r in downsampled]
+        
+        return water_levels, timestamps
         
     except requests.RequestException as e:
         raise Exception(f"Firebase request failed: {e}")
@@ -90,26 +111,20 @@ def fetch_firebase_data(hours=72):
 
 def get_transformer_input_sequence():
     """
-    Get exactly 4320 readings for Transformer seq2seq input (72 hours)
+    Get exactly 433 readings for Transformer seq2seq input (72 hours @ 10min intervals)
     Transformer requires fixed-length input for proper attention computation
     """
     try:
-        water_levels, timestamps, full_data = fetch_firebase_data(hours=72)
+        water_levels, timestamps = fetch_firebase_data()
         
-        target_length = 4320  # 72 hours * 60 minutes = 4320 readings
+        target_length = 433  # 72 hours * 6 readings/hour + 1 = 433 readings (first + last)
         
         if len(water_levels) < target_length:
-            # Try extending the time range
-            print(f"⚠️  Only {len(water_levels)} readings found, extending search...")
-            for extended_hours in [96, 120, 168]:  # 4, 5, 7 days
-                print(f"🔍 Trying {extended_hours} hours...")
-                water_levels, timestamps, full_data = fetch_firebase_data(hours=extended_hours)
-                
-                if len(water_levels) >= target_length:
-                    break
-            
-            if len(water_levels) < target_length:
-                print(f"⚠️  Still insufficient data: {len(water_levels)} readings")
+            print(f"⚠️  Only {len(water_levels)} readings found, need {target_length}")
+            if len(water_levels) < 50:  # Too few to work with
+                print("❌ Insufficient data - using sample data instead")
+                return create_sample_data()
+            else:
                 print(f"🔧 Padding sequence to {target_length} with mean value")
                 
                 # Pad with mean value at the beginning
@@ -123,127 +138,63 @@ def get_transformer_input_sequence():
                 # Create timestamps for padding
                 first_time = timestamps[0]
                 pad_timestamps = [
-                    first_time - timedelta(minutes=pad_length - i) 
+                    first_time - timedelta(minutes=10 * (pad_length - i)) 
                     for i in range(pad_length)
                 ]
                 
                 water_levels = list(padding) + water_levels
                 timestamps = pad_timestamps + timestamps
-                
-                print(f"✅ Padded to {len(water_levels)} readings")
-        
-        # Take the most recent 4320 readings
+
+        # Take the most recent 433 readings
         if len(water_levels) > target_length:
             water_levels = water_levels[-target_length:]
             timestamps = timestamps[-target_length:]
-            print(f"📊 Using most recent {target_length} readings")
         
-        print(f"🎯 Final sequence length: {len(water_levels)} (target: {target_length})")
+        print(f"🎯 Final sequence: {len(water_levels)} readings")
         
         return water_levels, timestamps
         
     except Exception as e:
-        print(f"❌ Error fetching data: {e}")
-        return None, None
+        print(f"❌ Error fetching Firebase data: {e}")
+        print("🧪 Falling back to sample data")
+        return create_sample_data()
 
 def create_sample_data():
     """
-    Create realistic tidal sample data for testing
-    Generates 4320 readings with tidal patterns and noise
+    Generates 433 readings with tidal patterns and noise
     """
-    print("🧪 Generating sample tidal data...")
+    print("🧪 Generating 433 sample readings...")
     
-    # Parameters for realistic tidal simulation
-    hours = 72
-    minutes_per_hour = 60
-    total_minutes = hours * minutes_per_hour  # 4320
+    hours = 72  # 72 hours of data
+    total_minutes = hours * 6 + 1  # 433 readings at 10-minute intervals (first + last)
     
-    # Time array
+    # Time array (72 hours)
     t = np.linspace(0, hours, total_minutes)
     
-    # Tidal components (realistic for North Carolina coast)
-    # Semi-diurnal tide (12.42 hour period)
-    M2 = 800 * np.sin(2 * np.pi * t / 12.42)  # Principal semi-diurnal
+    # Base water level (around 2000mm)
+    base_level = 2000
     
-    # Diurnal components (24 hour period)  
-    K1 = 300 * np.sin(2 * np.pi * t / 24.0)   # Diurnal
+    # Tidal components
+    M2_tide = 400 * np.sin(2 * np.pi * t / 12.42)  # Principal semi-diurnal (12.42 hours)
+    S2_tide = 150 * np.sin(2 * np.pi * t / 12.0)   # Solar semi-diurnal (12 hours)
+    K1_tide = 100 * np.sin(2 * np.pi * t / 25.8)   # Diurnal (23.93 hours)
+    O1_tide = 80 * np.sin(2 * np.pi * t / 25.8)    # Principal diurnal (25.82 hours)
     
-    # Weather effects (longer periods)
-    weather = 200 * np.sin(2 * np.pi * t / 48.0) + 100 * np.sin(2 * np.pi * t / 36.0)
+    # Add some weather effects and noise
+    weather_trend = 100 * np.sin(2 * np.pi * t / 48)  # 2-day weather cycle
+    noise = np.random.normal(0, 20, total_minutes)      # Random noise
     
-    # Base water level (in mm)
-    base_level = 2000  # 2 meters
+    # Combine all components
+    water_levels = base_level + M2_tide + S2_tide + K1_tide + O1_tide + weather_trend + noise
     
-    # Combine components
-    water_levels = base_level + M2 + K1 + weather
-    
-    # Add realistic noise
-    noise = np.random.normal(0, 50, len(water_levels))  # 5cm std dev
-    water_levels += noise
-    
-    # Ensure values are in valid sensor range
+    # Ensure realistic range
     water_levels = np.clip(water_levels, 300, 5000)
     
-    # Create timestamps (current time going backwards)
-    now = datetime.now()
-    timestamps = [now - timedelta(minutes=total_minutes - i - 1) for i in range(total_minutes)]
+    # Generate timestamps (every 10 minutes for 72 hours)
+    start_time = datetime.now() - timedelta(hours=72)
+    timestamps = [start_time + timedelta(minutes=10 * i) for i in range(total_minutes)]
     
     print(f"✅ Generated {len(water_levels)} sample readings")
-    print(f"🌊 Range: {water_levels.min():.1f} - {water_levels.max():.1f} mm")
-    print(f"📅 Time span: {timestamps[0].strftime('%Y-%m-%d %H:%M')} to {timestamps[-1].strftime('%Y-%m-%d %H:%M')}")
+    print(f"🌊 Range: {min(water_levels):.1f} - {max(water_levels):.1f} mm")
     
-    return list(water_levels), timestamps
-
-def main():
-    """Test the Firebase fetch functionality"""
-    print("🧪 Testing Transformer Firebase Data Fetch")
-    print("=" * 45)
-    
-    # Test real data fetch
-    print("\n1️⃣  Testing real Firebase data:")
-    water_levels, timestamps = get_transformer_input_sequence()
-    
-    if water_levels:
-        print(f"✅ Successfully fetched {len(water_levels)} readings")
-        print(f"📈 First 5: {[f'{w:.1f}' for w in water_levels[:5]]}")
-        print(f"📉 Last 5: {[f'{w:.1f}' for w in water_levels[-5:]]}")
-        
-        # Save for inspection
-        with open('transformer_real_data.json', 'w') as f:
-            json.dump({
-                'water_levels': water_levels,
-                'timestamps': [t.isoformat() for t in timestamps],
-                'count': len(water_levels),
-                'stats': {
-                    'min': float(min(water_levels)),
-                    'max': float(max(water_levels)),
-                    'mean': float(np.mean(water_levels)),
-                    'std': float(np.std(water_levels))
-                }
-            }, f, indent=2)
-        
-        print(f"💾 Real data saved to transformer_real_data.json")
-    
-    # Test sample data generation
-    print("\n2️⃣  Testing sample data generation:")
-    sample_levels, sample_times = create_sample_data()
-    
-    with open('transformer_sample_data.json', 'w') as f:
-        json.dump({
-            'water_levels': sample_levels,
-            'timestamps': [t.isoformat() for t in sample_times],
-            'count': len(sample_levels),
-            'stats': {
-                'min': float(min(sample_levels)),
-                'max': float(max(sample_levels)),
-                'mean': float(np.mean(sample_levels)),
-                'std': float(np.std(sample_levels))
-            }
-        }, f, indent=2)
-    
-    print(f"💾 Sample data saved to transformer_sample_data.json")
-    
-    print("\n✅ All tests completed!")
-
-if __name__ == "__main__":
-    main()
+    return water_levels.tolist(), timestamps

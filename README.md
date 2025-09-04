@@ -51,28 +51,20 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Web Das
 - **Intuitive time controls**: Dedicated 24-hour and 72-hour buttons for quick navigation
 - **Advanced zoom functionality**: Click-and-drag selection and Ctrl+mouse wheel for precise control
 - **Multi-axis charts** for detailed analysis with extended timeframe
-- **Enhanced visualization** of wave calculation methods
-- **System diagnostics** with valid sample tracking
-- **Advanced trend line analysis** with dual methodologies:
-  - **Water Level Harmonics**: Matrix Pencil signal analysis for non-periodic tidal reconstruction
-  - **Wind/Wave Splines**: 30-point smoothed cubic spline interpolation
-- **24-Hour LSTM Forecasting**: Neural network-powered water level predictions
-  - **Iterative Prediction**: Uses last 72 hours to generate 1,440 future predictions
-  - **Visual Integration**: Dashed orange forecast lines extend 24 hours into future
-  - **Auto-Refresh**: Fresh forecasts generated every 6 hours via Firebase Functions
-  - **Machine Learning**: PyTorch-trained LSTM with ONNX deployment for cloud inference
-- **Automatic tidal frequency analysis** with comprehensive results table
-  - **Immediate chart display**: Chart loads instantly when data arrives
-  - **Background analysis**: Matrix Pencil analysis runs once per data refresh with caching
-  - **Auto-updating**: Analysis refreshes every 2 minutes with new data
-- **Analysis Error Visualization**: Shows model accuracy by plotting measured minus predicted values plus 1 offset
-  - **Perfect fit indicator**: Values around 1.0 indicate excellent model accuracy
-  - **Overestimate detection**: Values < 1.0 show where model predicts higher than measured
-  - **Underestimate detection**: Values > 1.0 show where model predicts lower than measured
-  - **Residual analysis**: Helps validate Matrix Pencil reconstruction quality
-- **NOAA environmental data** integration (wind, water level)
-- **Wind range**: 0-40 knots for comprehensive weather tracking
-- **Real-time tidal constituent identification** (M2, S2, O1, K1, etc.)
+- **Enhanced visualization** of all wave calculation methods and NOAA environmental data
+- **System diagnostics** with valid sample tracking and wind/gust monitoring
+- **24-Hour Transformer Forecasting**: Neural network-powered water level predictions
+  - **Smart visibility**: Forecast button appears only when recent predictions are available (< 10 minutes old)
+  - **Point-based display**: Predictions shown as individual points extending 24 hours into future
+  - **Automatic axis extension**: Chart timeline extends to accommodate forecast display
+  - **Adaptive time controls**: 24h/72h buttons account for forecast extension (48h/96h total)
+  - **Direct Prediction**: Uses sequence-to-sequence transformer with last 72 hours to generate 144 future predictions
+  - **Visual Integration**: Orange forecast points extend 24 hours into future with no connecting lines
+  - **Auto-Refresh**: Fresh forecasts generated every 5 minutes via Firebase Functions
+  - **Machine Learning**: PyTorch-trained transformer with direct prediction for cloud inference
+- **NOAA environmental data** integration (wind, water level from Duke Marine Lab)
+- **Wind range**: 0-30 knots for comprehensive weather tracking
+- **Clean interface**: Simplified layout focused on data visualization without analysis tables
 
 ## 🚀 Quick Start
 

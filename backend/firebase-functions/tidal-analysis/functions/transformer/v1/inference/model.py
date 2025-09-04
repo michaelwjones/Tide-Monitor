@@ -35,13 +35,13 @@ class PositionalEncoding(nn.Module):
 
 class TidalTransformer(nn.Module):
     """
-    Sequence-to-sequence transformer for tidal prediction.
+    Sequence-to-sequence transformer for tidal prediction with 10-minute intervals.
     
     Architecture:
     - 6-layer encoder, 3-layer decoder
     - 8 attention heads, 256 hidden dimensions
-    - Input: 4320 time steps (72 hours)
-    - Output: 1440 time steps (24 hours)
+    - Input: 433 time steps (72 hours at 10-minute intervals)
+    - Output: 144 time steps (24 hours at 10-minute intervals)
     """
     
     def __init__(self, 
@@ -75,8 +75,12 @@ class TidalTransformer(nn.Module):
             num_decoder_layers=num_decoder_layers,
             dim_feedforward=dim_feedforward,
             dropout=dropout,
-            batch_first=False  # (seq_len, batch_size, d_model)
+            batch_first=True  # (batch_size, seq_len, d_model) for better performance
         )
+        
+        # Enable gradient checkpointing to save memory
+        if hasattr(self.transformer, 'enable_nested_tensor'):
+            self.transformer.enable_nested_tensor = False
         
         # Initialize weights
         self.init_weights()
@@ -89,7 +93,7 @@ class TidalTransformer(nn.Module):
                 if module.bias is not None:
                     nn.init.constant_(module.bias, 0)
     
-    def generate_square_subsequent_mask(self, sz):
+    def generate_square_subsequent_mask(self, sz: int):
         """Generate causal mask for decoder to prevent looking at future tokens"""
         mask = torch.triu(torch.ones(sz, sz), diagonal=1)
         return mask.masked_fill(mask == 1, float('-inf'))
@@ -108,21 +112,25 @@ class TidalTransformer(nn.Module):
         """
         batch_size, src_seq_len, _ = src.shape
         
-        # Project input to model dimension and transpose for transformer
+        # Project input to model dimension (batch_first=True, no transpose needed)
         src = self.input_projection(src)  # (batch_size, seq_len, d_model)
-        src = src.transpose(0, 1)         # (seq_len, batch_size, d_model)
         
-        # Add positional encoding
+        # Add positional encoding (need to transpose for pos_encoder, then back)
+        src = src.transpose(0, 1)         # (seq_len, batch_size, d_model) for pos_encoder
         src = self.pos_encoder(src)
-        
+        src = src.transpose(0, 1)         # (batch_size, seq_len, d_model) for transformer
+
         if self.training and tgt is not None and torch.rand(1).item() < teacher_forcing_ratio:
             # Training with teacher forcing
-            tgt = self.input_projection(tgt)
-            tgt = tgt.transpose(0, 1)  # (tgt_seq_len, batch_size, d_model)
+            tgt = self.input_projection(tgt)  # (batch_size, seq_len, d_model)
+            
+            # Add positional encoding (transpose for pos_encoder, then back)
+            tgt = tgt.transpose(0, 1)         # (seq_len, batch_size, d_model) for pos_encoder
             tgt = self.pos_encoder(tgt)
+            tgt = tgt.transpose(0, 1)         # (batch_size, seq_len, d_model) for transformer
             
             # Create causal mask for decoder
-            tgt_seq_len = tgt.size(0)
+            tgt_seq_len = tgt.size(1)  # seq_len dimension is now index 1
             tgt_mask = self.generate_square_subsequent_mask(tgt_seq_len).to(src.device)
             
             # Transformer forward pass
@@ -130,38 +138,49 @@ class TidalTransformer(nn.Module):
             
         else:
             # Inference or training without teacher forcing (autoregressive)
-            output_seq_len = 1440  # 24 hours
+            output_seq_len = 144  # 24 hours at 10-minute intervals
             
             # Start with encoder output
             memory = self.transformer.encoder(src)
             
-            # Initialize decoder input with zeros (or last encoder output)
-            decoder_input = torch.zeros(1, batch_size, self.d_model).to(src.device)
+            # Memory-efficient autoregressive generation with sliding window
+            max_context = 72  # Keep only last 72 tokens for context
+            decoder_input = torch.zeros(batch_size, 1, self.d_model).to(src.device)  # (batch_size, 1, d_model)
             outputs = []
             
             # Autoregressive generation
             for i in range(output_seq_len):
-                # Create causal mask
-                tgt_mask = self.generate_square_subsequent_mask(i + 1).to(src.device)
+                # Always slice to max_context to avoid conditional logic during tracing
+                # This is safe even when current_len <= max_context
+                decoder_input = decoder_input[:, -max_context:, :]
+                current_len = decoder_input.size(1)
                 
-                # Decoder forward pass
+                # Use fixed window size to avoid dynamic operations during tracing
+                # Use current_len directly since it's now bounded by max_context
+                tgt_mask = self.generate_square_subsequent_mask(current_len).to(src.device)
+                
+                # Decoder forward pass with full decoder input (already windowed above)
                 decoder_output = self.transformer.decoder(
                     decoder_input, memory, tgt_mask=tgt_mask
                 )
                 
                 # Take the last output token
-                current_output = decoder_output[-1:, :, :]  # (1, batch_size, d_model)
-                outputs.append(current_output)
+                current_output = decoder_output[:, -1:, :]  # (batch_size, 1, d_model)
+                outputs.append(current_output.clone())  # Clone to avoid memory references
                 
-                # Append current output to decoder input for next iteration
-                decoder_input = torch.cat([decoder_input, current_output], dim=0)
+                # Append current output to decoder input
+                decoder_input = torch.cat([decoder_input, current_output], dim=1)  # Concat along seq_len
+                
+                # Clear cache periodically during inference
+                if i % 100 == 0 and not torch.jit.is_tracing():
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
             
             # Concatenate all outputs
-            output = torch.cat(outputs, dim=0)  # (output_seq_len, batch_size, d_model)
+            output = torch.cat(outputs, dim=1)  # (batch_size, output_seq_len, d_model)
         
-        # Project back to input dimension and transpose
-        output = self.output_projection(output)  # (seq_len, batch_size, input_dim)
-        output = output.transpose(0, 1)          # (batch_size, seq_len, input_dim)
+        # Project back to input dimension (already in batch_first format)
+        output = self.output_projection(output)  # (batch_size, seq_len, input_dim)
         
         return output
     
@@ -178,8 +197,9 @@ class TidalTransformer(nn.Module):
             'hidden_dimension': self.d_model,
             'total_parameters': total_params,
             'trainable_parameters': trainable_params,
-            'input_sequence_length': 4320,
-            'output_sequence_length': 1440
+            'input_sequence_length': 433,
+            'output_sequence_length': 144,
+            'interval_minutes': 10
         }
 
 def create_model():
@@ -212,12 +232,12 @@ if __name__ == "__main__":
     
     # Test forward pass
     batch_size = 2
-    src = torch.randn(batch_size, 4320, 1)  # 72 hours input
-    tgt = torch.randn(batch_size, 1440, 1)  # 24 hours target
+    src = torch.randn(batch_size, 433, 1)  # 72 hours input at 10-minute intervals
+    tgt = torch.randn(batch_size, 144, 1)  # 24 hours target at 10-minute intervals
     
     print(f"\nTesting forward pass...")
-    print(f"Input shape: {src.shape}")
-    print(f"Target shape: {tgt.shape}")
+    print(f"Input shape: {src.shape} (72h at 10-min intervals)")
+    print(f"Target shape: {tgt.shape} (24h at 10-min intervals)")
     
     # Test with teacher forcing
     model.train()

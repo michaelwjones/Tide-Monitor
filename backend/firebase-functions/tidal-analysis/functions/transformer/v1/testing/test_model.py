@@ -70,18 +70,18 @@ def predict_sequence(model, input_data, norm_params):
     
     Args:
         model: Trained transformer model
-        input_data: List of 4320 water level readings (72 hours)
+        input_data: List of 433 water level readings (72 hours @ 10min intervals)
         norm_params: Normalization parameters from training
     
     Returns:
-        predictions: List of 1440 predicted water levels (24 hours)
+        predictions: List of 144 predicted water levels (24 hours @ 10min intervals)
     """
     # Normalize input data
     input_array = np.array(input_data, dtype=np.float32)
     normalized_input = normalize_data(input_array, norm_params)
     
     # Convert to tensor format: (batch_size, seq_len, input_dim)
-    input_tensor = torch.from_numpy(normalized_input).unsqueeze(0).unsqueeze(-1)  # (1, 4320, 1)
+    input_tensor = torch.from_numpy(normalized_input).unsqueeze(0).unsqueeze(-1)  # (1, 433, 1)
     
     print(f"🧠 Input tensor shape: {input_tensor.shape}")
     
@@ -95,7 +95,7 @@ def predict_sequence(model, input_data, norm_params):
     print(f"🎯 Output tensor shape: {output_tensor.shape}")
     
     # Convert back to numpy and denormalize
-    normalized_predictions = output_tensor.squeeze().numpy()  # (1440,)
+    normalized_predictions = output_tensor.squeeze().numpy()  # (144,)
     predictions = denormalize_data(normalized_predictions, norm_params)
     
     return predictions.tolist()
@@ -182,8 +182,8 @@ def interactive_test():
             print("❌ Invalid choice")
             continue
         
-        if not input_data or len(input_data) != 4320:
-            print(f"❌ Error: Need exactly 4320 readings, got {len(input_data) if input_data else 0}")
+        if not input_data or len(input_data) != 433:
+            print(f"❌ Error: Need exactly 433 readings, got {len(input_data) if input_data else 0}")
             continue
         
         # Make prediction
@@ -257,8 +257,8 @@ def main():
                 data = json.load(f)
                 input_data = data['water_levels']
             
-            if len(input_data) != 4320:
-                print(f"❌ Error: File contains {len(input_data)} readings, need 4320")
+            if len(input_data) != 433:
+                print(f"❌ Error: File contains {len(input_data)} readings, need 433")
                 return 1
             
             predictions = predict_sequence(model, input_data, norm_params)

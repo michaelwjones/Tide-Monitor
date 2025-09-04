@@ -14,7 +14,7 @@ def load_firebase_data():
         return None
 
 def parse_readings(raw_data):
-    """Parse Firebase readings into time series data"""
+    """Parse Firebase readings into time series data with 10-minute downsampling"""
     readings = []
     
     for key, reading in raw_data.items():
@@ -35,24 +35,47 @@ def parse_readings(raw_data):
     
     # Sort by timestamp
     readings.sort(key=lambda x: x['timestamp'])
-    return readings
+    
+    # Downsample to 10-minute intervals for maximum training efficiency
+    print(f"Original readings: {len(readings)}")
+    downsampled = downsample_to_10_minutes(readings)
+    print(f"Downsampled to 10-minute intervals: {len(downsampled)}")
+    
+    return downsampled
 
-def create_sequences(data, input_length=4320, output_length=1440):
+def downsample_to_10_minutes(readings):
+    """Downsample readings to 10-minute intervals by taking every 10th reading + endpoint"""
+    if len(readings) == 0:
+        return readings
+    
+    # Take every 10th reading (assumes 1-minute intervals) + include the last reading
+    # This gives us 10-minute intervals which reduces sequence length by 90%
+    downsampled = []
+    for i in range(0, len(readings), 10):
+        downsampled.append(readings[i])
+    
+    # Include the last reading if it wasn't already included
+    if len(readings) % 10 != 0:
+        downsampled.append(readings[-1])
+    
+    return downsampled
+
+def create_sequences(data, input_length=433, output_length=144):
     """
-    Create training sequences for seq2seq transformer.
-    input_length: Input sequence length (4320 = 72 hours at 1 minute intervals)
-    output_length: Output sequence length (1440 = 24 hours for direct prediction)
+    Create training sequences for seq2seq transformer with 10-minute intervals.
+    input_length: Input sequence length (433 = 72 hours at 10 minute intervals + endpoint)
+    output_length: Output sequence length (144 = 24 hours at 10 minute intervals)
     """
     sequences = []
     targets = []
     
-    print(f"Creating seq2seq sequences: {input_length} inputs → {output_length} outputs...")
+    print(f"Creating seq2seq sequences: {input_length} inputs → {output_length} outputs (10-minute intervals)...")
     
     for i in range(len(data) - input_length - output_length + 1):
-        # Input sequence (72 hours)
+        # Input sequence (72 hours at 10-minute intervals)
         input_seq = data[i:i + input_length]
         
-        # Target sequence (next 24 hours for direct prediction)
+        # Target sequence (next 24 hours at 10-minute intervals for direct prediction)
         target_seq = data[i + input_length:i + input_length + output_length]
         
         sequences.append(input_seq)
@@ -66,8 +89,8 @@ def create_sequences(data, input_length=4320, output_length=1440):
     y = np.array(targets)
     
     print(f"Sequence creation complete:")
-    print(f"  Input sequences: {X.shape} (72 hours each)")
-    print(f"  Target sequences: {y.shape} (24 hours each)")
+    print(f"  Input sequences: {X.shape} (72 hours at 10-min intervals)")
+    print(f"  Target sequences: {y.shape} (24 hours at 10-min intervals)")
     
     return X, y
 
@@ -124,9 +147,9 @@ def main():
     readings = parse_readings(raw_data)
     print(f"Parsed {len(readings)} valid readings")
     
-    min_required = 4320 + 1440  # input_length + output_length
+    min_required = 433 + 144  # input_length + output_length (at 10-minute intervals)
     if len(readings) < min_required:
-        print(f"Error: Need at least {min_required} readings (96 hours), got {len(readings)}")
+        print(f"Error: Need at least {min_required} readings (96 hours at 10-min intervals), got {len(readings)}")
         return
     
     # Extract water levels as time series
@@ -139,8 +162,8 @@ def main():
     normalized_data, norm_params = normalize_data(water_levels)
     
     # Create training sequences for seq2seq transformer
-    print("Creating training sequences (72-hour inputs → 24-hour targets)...")
-    X, y = create_sequences(normalized_data, input_length=4320, output_length=1440)
+    print("Creating training sequences (72-hour inputs → 24-hour targets at 10-minute intervals)...")
+    X, y = create_sequences(normalized_data, input_length=433, output_length=144)
     
     # Create train/validation split
     X_train, X_val, y_train, y_val = create_train_val_split(X, y)
@@ -162,8 +185,9 @@ def main():
     # Save timestamps for reference
     timestamp_data = {
         'timestamps': [t.isoformat() for t in timestamps],
-        'input_length': 4320,
-        'output_length': 1440,
+        'input_length': 433,
+        'output_length': 144,
+        'interval_minutes': 10,
         'total_sequences': len(X),
         'train_sequences': len(X_train),
         'val_sequences': len(X_val),

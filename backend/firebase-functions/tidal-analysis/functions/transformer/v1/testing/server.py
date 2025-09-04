@@ -88,6 +88,10 @@ class TransformerHandler(BaseHTTPRequestHandler):
             self.fetch_firebase_data()
         elif self.path == '/generate-sample':
             self.generate_sample_data()
+        elif self.path == '/training-info':
+            self.serve_training_info()
+        elif self.path == '/random-training':
+            self.serve_random_training_sequence()
         else:
             self.send_error(404)
     
@@ -110,7 +114,7 @@ class TransformerHandler(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'text/html')
         self.end_headers()
         
-        with open(html_file, 'r') as f:
+        with open(html_file, 'r', encoding='utf-8') as f:
             self.wfile.write(f.read().encode())
     
     def serve_model_info(self):
@@ -191,6 +195,172 @@ class TransformerHandler(BaseHTTPRequestHandler):
                 'success': False
             }, 500)
     
+    def serve_training_info(self):
+        """Serve training dataset information"""
+        try:
+            print("📊 Loading training dataset info...")
+            
+            # Load training data files
+            data_dir = Path(__file__).parent.parent / 'data-preparation' / 'data'
+            
+            X_train_path = data_dir / 'X_train.npy'
+            y_train_path = data_dir / 'y_train.npy' 
+            X_val_path = data_dir / 'X_val.npy'
+            y_val_path = data_dir / 'y_val.npy'
+            
+            if not all(p.exists() for p in [X_train_path, y_train_path, X_val_path, y_val_path]):
+                self.send_json_response({
+                    'error': 'Training data files not found',
+                    'success': False
+                }, 404)
+                return
+            
+            # Load arrays
+            X_train = np.load(X_train_path)
+            y_train = np.load(y_train_path)
+            X_val = np.load(X_val_path)
+            y_val = np.load(y_val_path)
+            
+            # Calculate statistics
+            train_stats = {
+                'input': {
+                    'min': float(np.min(X_train)),
+                    'max': float(np.max(X_train)),
+                    'mean': float(np.mean(X_train)),
+                    'std': float(np.std(X_train))
+                },
+                'output': {
+                    'min': float(np.min(y_train)),
+                    'max': float(np.max(y_train)),
+                    'mean': float(np.mean(y_train)),
+                    'std': float(np.std(y_train))
+                }
+            }
+            
+            val_stats = {
+                'input': {
+                    'min': float(np.min(X_val)),
+                    'max': float(np.max(X_val)),
+                    'mean': float(np.mean(X_val)),
+                    'std': float(np.std(X_val))
+                },
+                'output': {
+                    'min': float(np.min(y_val)),
+                    'max': float(np.max(y_val)),
+                    'mean': float(np.mean(y_val)),
+                    'std': float(np.std(y_val))
+                }
+            }
+            
+            self.send_json_response({
+                'success': True,
+                'training': {
+                    'sequences': X_train.shape[0],
+                    'input_length': X_train.shape[1], 
+                    'output_length': y_train.shape[1],
+                    'stats': train_stats
+                },
+                'validation': {
+                    'sequences': X_val.shape[0],
+                    'input_length': X_val.shape[1],
+                    'output_length': y_val.shape[1], 
+                    'stats': val_stats
+                }
+            })
+            
+        except Exception as e:
+            print(f"❌ Training info error: {e}")
+            traceback.print_exc()
+            self.send_json_response({
+                'error': str(e),
+                'success': False
+            }, 500)
+    
+    def serve_random_training_sequence(self):
+        """Serve a random training sequence with timestamps"""
+        try:
+            print("🎲 Loading random training sequence...")
+            
+            # Load training data files
+            data_dir = Path(__file__).parent.parent / 'data-preparation' / 'data'
+            
+            X_train_path = data_dir / 'X_train.npy'
+            y_train_path = data_dir / 'y_train.npy'
+            timestamps_path = data_dir / 'timestamps.json'
+            
+            if not all(p.exists() for p in [X_train_path, y_train_path, timestamps_path]):
+                self.send_json_response({
+                    'error': 'Training data files not found',
+                    'success': False
+                }, 404)
+                return
+            
+            # Load arrays
+            X_train = np.load(X_train_path)
+            y_train = np.load(y_train_path)
+            
+            # Load timestamps
+            with open(timestamps_path, 'r') as f:
+                timestamp_data = json.load(f)
+            timestamps = timestamp_data['timestamps']
+            
+            # Select random sequence
+            random_idx = np.random.randint(0, len(X_train))
+            input_sequence = X_train[random_idx].tolist()  # 433 points
+            output_sequence = y_train[random_idx].tolist()  # 144 points
+            
+            # Generate timestamps for the sequence
+            start_time = datetime.fromisoformat(timestamps[random_idx].replace('Z', '+00:00'))
+            
+            # Input timestamps (72 hours @ 10min intervals = 433 points)
+            input_timestamps = []
+            for i in range(433):
+                ts = start_time + timedelta(minutes=i * 10)
+                input_timestamps.append(ts.isoformat())
+            
+            # Output timestamps (next 24 hours @ 10min intervals = 144 points)  
+            output_timestamps = []
+            for i in range(144):
+                ts = start_time + timedelta(minutes=(433 + i) * 10)
+                output_timestamps.append(ts.isoformat())
+            
+            self.send_json_response({
+                'success': True,
+                'sequence_index': int(random_idx),
+                'total_sequences': int(len(X_train)),
+                'start_time': start_time.isoformat(),
+                'input': {
+                    'water_levels': input_sequence,
+                    'timestamps': input_timestamps,
+                    'count': len(input_sequence),
+                    'stats': {
+                        'min': float(np.min(input_sequence)),
+                        'max': float(np.max(input_sequence)),
+                        'mean': float(np.mean(input_sequence)),
+                        'std': float(np.std(input_sequence))
+                    }
+                },
+                'output': {
+                    'water_levels': output_sequence,
+                    'timestamps': output_timestamps,
+                    'count': len(output_sequence),
+                    'stats': {
+                        'min': float(np.min(output_sequence)),
+                        'max': float(np.max(output_sequence)),
+                        'mean': float(np.mean(output_sequence)),
+                        'std': float(np.std(output_sequence))
+                    }
+                }
+            })
+            
+        except Exception as e:
+            print(f"❌ Random training sequence error: {e}")
+            traceback.print_exc()
+            self.send_json_response({
+                'error': str(e),
+                'success': False
+            }, 500)
+    
     def handle_prediction(self):
         """Handle prediction requests"""
         try:
@@ -205,9 +375,9 @@ class TransformerHandler(BaseHTTPRequestHandler):
             
             input_data = request_data['input_data']
             
-            if len(input_data) != 4320:
+            if len(input_data) != 433:
                 self.send_json_response({
-                    'error': f'Invalid input length: {len(input_data)} (expected 4320)',
+                    'error': f'Invalid input length: {len(input_data)} (expected 433)',
                     'success': False
                 }, 400)
                 return
@@ -254,13 +424,13 @@ class TransformerHandler(BaseHTTPRequestHandler):
             if self.model_info.get('status') == 'dummy_model':
                 print("⚠️  Using dummy model - generating synthetic predictions")
                 # Generate realistic tidal pattern for next 24 hours
-                t = np.linspace(0, 24, 1440)
+                t = np.linspace(0, 24, 144)
                 base_level = np.mean(input_data)
                 
                 # Simple tidal simulation
                 M2_tide = 400 * np.sin(2 * np.pi * t / 12.42)  # Semi-diurnal
                 K1_tide = 150 * np.sin(2 * np.pi * t / 24.0)   # Diurnal
-                noise = np.random.normal(0, 30, 1440)
+                noise = np.random.normal(0, 30, 144)
                 
                 predictions = base_level + M2_tide + K1_tide + noise
                 predictions = np.clip(predictions, 300, 5000)
@@ -273,18 +443,18 @@ class TransformerHandler(BaseHTTPRequestHandler):
             normalized_input = (input_array - mean) / std
             
             # Convert to tensor format: (batch_size, seq_len, input_dim)
-            input_tensor = torch.from_numpy(normalized_input).unsqueeze(0).unsqueeze(-1)  # (1, 4320, 1)
+            input_tensor = torch.from_numpy(normalized_input).unsqueeze(0).unsqueeze(-1)  # (1, 433, 1)
             
             # Inference
             start_time = time.time()
             with torch.no_grad():
-                output_tensor = self.model(input_tensor)  # (1, 1440, 1)
+                output_tensor = self.model(input_tensor)  # (1, 144, 1)
             inference_time = time.time() - start_time
             
             print(f"⚡ Inference completed in {inference_time*1000:.1f} ms")
             
             # Denormalize output
-            normalized_predictions = output_tensor.squeeze().numpy()  # (1440,)
+            normalized_predictions = output_tensor.squeeze().numpy()  # (144,)
             predictions = normalized_predictions * std + mean
             
             return predictions.tolist()

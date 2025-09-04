@@ -6,7 +6,7 @@ Advanced sequence-to-sequence transformer model for 24-hour tidal prediction usi
 
 This implementation uses a modern transformer architecture to predict tidal patterns, offering significant advantages over traditional approaches:
 
-- **Direct Prediction**: Single forward pass generates full 24-hour forecast (1440 predictions)
+- **Direct Prediction**: Single forward pass generates full 24-hour forecast (144 predictions)
 - **Attention Mechanisms**: Multi-head attention captures complex temporal dependencies
 - **Parallel Processing**: Efficient computation compared to iterative methods
 - **Long-Range Dependencies**: Superior handling of extended temporal patterns
@@ -17,8 +17,8 @@ This implementation uses a modern transformer architecture to predict tidal patt
 - **Architecture**: Sequence-to-sequence transformer
 - **Encoder**: 6 layers, 8 attention heads, 256 hidden dimensions
 - **Decoder**: 3 layers, 8 attention heads, 256 hidden dimensions
-- **Input Length**: 4320 time steps (72 hours at 1-minute intervals)
-- **Output Length**: 1440 time steps (24 hours at 1-minute intervals)
+- **Input Length**: 433 time steps (72 hours at 10-minute intervals)
+- **Output Length**: 144 time steps (24 hours at 10-minute intervals)
 - **Parameters**: ~2.5M trainable parameters
 
 ### Key Features
@@ -35,20 +35,23 @@ transformer/v1/
 ├── data-preparation/          # Firebase data fetching and processing
 │   ├── fetch_firebase_data.py
 │   └── create_training_data.py
-├── training/                  # Model training and conversion
-│   ├── model.py              # Transformer architecture
+├── training/                  # Model training and local server
 │   ├── dataset.py            # PyTorch data loading
 │   ├── train_transformer.py  # Main training script
-│   └── convert_to_onnx.py     # ONNX export for deployment
+│   ├── model_server.py       # PyTorch web server for local testing
+│   └── checkpoints/          # Trained model storage
 ├── testing/                   # Validation and testing interface
 │   ├── index.html            # Web testing interface
 │   ├── server.py             # HTTP server for testing
 │   ├── test_model.py         # Command-line testing
 │   ├── firebase_fetch.py     # Firebase data utilities
 │   └── start-server.bat      # Windows server launcher
-├── inference/                 # Firebase Functions deployment
-│   ├── index.js              # Cloud Function implementation
-│   └── package.json          # Node.js dependencies
+├── inference/                 # Firebase Functions deployment (Python runtime)
+│   ├── main.py               # PyTorch-based Firebase Functions
+│   ├── model.py              # Transformer architecture (single source)
+│   ├── best.pth              # Trained model checkpoint
+│   ├── requirements.txt      # Python dependencies
+│   └── firebase.json         # Configuration (512MB memory)
 └── batch files and utilities
 ```
 
@@ -84,21 +87,20 @@ cd training
 python train_transformer.py        # Train model (may take hours)
 ```
 
-#### ONNX Conversion
-```bash
-python convert_to_onnx.py          # Export for deployment
-```
-
 #### Local Testing
 ```bash
-cd testing
-start-server.bat                   # Launch web interface
-# Open http://localhost:8000
+# Start PyTorch web server
+cd training
+python model_server.py             # Server at http://localhost:8000
+
+# Or run test script
+python test_server.py              # Comprehensive API testing
 ```
 
 #### Firebase Deployment
 ```bash
-deploy-transformer-v1.bat          # Deploy to Firebase Functions
+deploy-transformer-v1.bat          # Deploy to Firebase Functions (Python runtime)
+                                   # Automatically copies latest checkpoint from training/checkpoints/
 ```
 
 ## Training Configuration
@@ -138,20 +140,21 @@ deploy-transformer-v1.bat          # Deploy to Firebase Functions
 ## Firebase Integration
 
 ### Cloud Functions
-- **`runTransformerv1Prediction`**: Automatic prediction every 6 hours
-- **`testTransformerv1Prediction`**: Manual testing endpoint
+- **`run_transformer_v1_analysis`**: Scheduled prediction every 5 minutes (Python runtime)
 
-### Deployment Schedule
-- Generates forecasts at 00:00, 06:00, 12:00, 18:00 UTC
-- Stores results in `/tidal-analysis/transformer-v1-forecasts/`
-- Maintains latest forecast at `/tidal-analysis/latest-transformer-v1-forecast`
+### Deployment Configuration
+- **Runtime**: Python 3.11 with 1024MB memory allocation
+- **Automatic**: Runs every 5 minutes via Cloud Scheduler
+- **Storage**: Results in `/tidal-analysis/transformer-v1-forecast/`
+- **Error Storage**: Error information in `/tidal-analysis/transformer-v1-error/`
 
 ### Data Flow
-1. **Trigger**: New readings in Firebase `/readings`
-2. **Input**: Last 4320 readings (72 hours)
-3. **Processing**: Seq2seq transformer inference
-4. **Output**: 1440 predictions (24 hours)
-5. **Storage**: Timestamped forecast in Firebase
+1. **Scheduled Trigger**: Cloud Scheduler runs every 5 minutes
+2. **Data Fetching**: Last 4320 readings from Firebase (3 days, 1-minute data)
+3. **Downsampling**: Convert to 433 readings (10-minute intervals)
+4. **Processing**: Seq2seq transformer inference with native PyTorch
+5. **Validation**: Convert NaN/infinite to -999 (error values)
+6. **Storage**: Timestamped forecast with 144 predictions (10-minute intervals)
 
 ## Testing and Validation
 
@@ -184,15 +187,21 @@ python test_model.py --input file.json  # Test with custom data
    - Reduce learning rate
    - Verify input sequence alignment
 
-3. **ONNX Export Errors**
-   - Ensure model is in eval mode
-   - Check input tensor dimensions
-   - Use consistent PyTorch/ONNX versions
+3. **Model Loading Errors**
+   - Ensure model checkpoint exists
+   - Check PyTorch version compatibility
+   - Verify model architecture matches training
 
 4. **Firebase Deployment Issues**
-   - Verify ONNX model files in inference/
-   - Check Node.js dependencies
+   - Verify trained model checkpoint exists
+   - Check Python dependencies in Firebase Functions
    - Monitor function logs
+
+5. **Data Type Errors (NumPy casting)**
+   - Error: `ufunc 'isnan' not supported for the input types`
+   - Cause: Firebase data contains mixed types (strings, null values)
+   - Solution: Code includes robust type conversion and error handling
+   - Check logs for "Insufficient data points" if filtering is too aggressive
 
 ### Performance Optimization
 
@@ -202,23 +211,33 @@ python test_model.py --input file.json  # Test with custom data
    - Use multiple GPUs with DataParallel
 
 2. **Inference Speed**
-   - Use ONNX Runtime with GPU support
+   - Use PyTorch with optimized CPU inference
    - Optimize batch processing
    - Cache model loading in Firebase Functions
 
 ## Technical Details
 
+### Architecture Management
+- **Single Source Model**: Model architecture (`model.py`) is centralized in inference directory
+- **Training References**: Training scripts automatically import from inference/model.py
+- **Deployment**: Model definition and checkpoint are co-located for Firebase deployment
+- **Consistency**: Ensures training and inference use identical model architecture
+
 ### Input Processing
+- **Data Source**: 4320 1-minute readings from Firebase downsampled to 433 10-minute intervals
+- **Type Safety**: Robust conversion of Firebase data (strings, numbers, null) to float with error handling
+- **Data Filtering**: Filters out NaN, infinite, and non-convertible values automatically
+- **Missing Values**: Invalid/NaN inputs converted to -1 (model's missing value format)
 - **Normalization**: Z-score using training statistics
-- **Sequence Length**: Fixed 4320-point input required
+- **Sequence Length**: Fixed 433-point input required (72 hours @ 10-minute intervals)
 - **Padding Strategy**: Mean-value padding for insufficient data
-- **Data Validation**: Range checking and outlier filtering
 
 ### Output Processing
-- **Direct Prediction**: Full 1440-point sequence in single pass
-- **Denormalization**: Convert back to original water level scale
-- **Timestamping**: Minute-by-minute predictions with ISO timestamps
-- **Quality Metrics**: Statistical validation of forecast range
+- **Direct Prediction**: Full 144-point sequence in single pass (24 hours @ 10-minute intervals)
+- **Error Handling**: NaN/infinite predictions converted to -999 (debug page error format)
+- **Denormalization**: Convert back to original water level scale (mm)
+- **Timestamping**: 10-minute interval predictions with ISO timestamps
+- **Quality Metrics**: Count of error predictions and valid range validation
 
 ### Attention Patterns
 - **Temporal Focus**: Multi-head attention captures various tidal cycles
