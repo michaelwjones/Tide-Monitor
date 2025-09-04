@@ -81,7 +81,7 @@
     <div id="loading">Loading...</div>
     
     <div id="content" class="hidden">
-        <canvas id="debugChart" width="800" height="600"></canvas>
+        <canvas id="debugChart" width="800" height="500"></canvas>
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px;">
             <div style="display: flex; align-items: center;">
                 <a href="../index.html" class="main-link">← Main Dashboard</a>
@@ -337,8 +337,7 @@
                     ]
                 },
                 options: {
-                    responsive: false,
-                    maintainAspectRatio: true,
+                    responsive: true,
                     animation: false,
                     scales: {
                         x: {
