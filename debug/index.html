@@ -228,102 +228,111 @@
                         {
                             label: 'Water Level (Average)',
                             data: readings.map(r => ({ x: r.rawTimestamp, y: r.waterLevelRaw })),
-                            borderColor: '#007bff',
-                            backgroundColor: '#007bff20',
+                            borderColor: 'blue',
+                            backgroundColor: 'rgba(0, 0, 255, 0.1)',
                             fill: false,
-                            tension: 0.1,
+                            tension: 0.6,
+                            borderWidth: 2,
                             pointRadius: 0,
-                            pointHoverRadius: 2,
-                            yAxisID: 'y-water'
+                            pointHoverRadius: 0,
+                            yAxisID: 'y'
                         },
                         {
                             label: 'Water Level (Percentile)',
                             data: readings.map(r => ({ x: r.rawTimestamp, y: r.waterLevelPercentileRaw })).filter(p => p.y !== null),
-                            borderColor: '#17a2b8',
-                            backgroundColor: '#17a2b820',
+                            borderColor: 'cyan',
+                            backgroundColor: 'rgba(0, 255, 255, 0.1)',
                             fill: false,
-                            tension: 0.1,
+                            tension: 0.6,
+                            borderWidth: 1,
                             pointRadius: 0,
-                            pointHoverRadius: 2,
-                            yAxisID: 'y-water'
+                            pointHoverRadius: 0,
+                            yAxisID: 'y'
                         },
                         {
                             label: 'Water Level (Envelope)',
                             data: readings.map(r => ({ x: r.rawTimestamp, y: r.waterLevelEnvelopeRaw })).filter(p => p.y !== null),
-                            borderColor: '#dc3545',
-                            backgroundColor: '#dc354520',
+                            borderColor: 'magenta',
+                            backgroundColor: 'rgba(255, 0, 255, 0.1)',
                             fill: false,
-                            tension: 0.1,
+                            tension: 0.6,
+                            borderWidth: 1,
                             pointRadius: 0,
-                            pointHoverRadius: 2,
-                            yAxisID: 'y-water'
+                            pointHoverRadius: 0,
+                            yAxisID: 'y'
                         },
                         {
                             label: 'Wave Height (Percentile)',
                             data: readings.map(r => ({ x: r.rawTimestamp, y: r.waveHeightPercentileRaw })).filter(p => p.y !== null),
-                            borderColor: '#fd7e14',
-                            backgroundColor: '#fd7e1420',
+                            borderColor: 'red',
+                            backgroundColor: 'rgba(255, 0, 0, 0.1)',
                             fill: false,
-                            tension: 0.1,
+                            tension: 0.6,
+                            borderWidth: 1,
                             pointRadius: 0,
-                            pointHoverRadius: 2,
-                            yAxisID: 'y-wave'
+                            pointHoverRadius: 0,
+                            yAxisID: 'waveHeight'
                         },
                         {
                             label: 'Wave Height (Envelope)',
                             data: readings.map(r => ({ x: r.rawTimestamp, y: r.waveHeightEnvelopeRaw })).filter(p => p.y !== null),
-                            borderColor: '#e83e8c',
-                            backgroundColor: '#e83e8c20',
+                            borderColor: 'orange',
+                            backgroundColor: 'rgba(255, 165, 0, 0.1)',
                             fill: false,
-                            tension: 0.1,
+                            tension: 0.6,
+                            borderWidth: 1,
                             pointRadius: 0,
-                            pointHoverRadius: 2,
-                            yAxisID: 'y-wave'
+                            pointHoverRadius: 0,
+                            yAxisID: 'waveHeight'
                         },
                         {
                             label: 'Valid Samples',
                             data: readings.map(r => ({ x: r.rawTimestamp, y: r.validSamplesRaw })),
-                            borderColor: '#6c757d',
-                            backgroundColor: '#6c757d20',
+                            borderColor: 'gray',
+                            backgroundColor: 'rgba(128, 128, 128, 0.1)',
                             fill: false,
-                            tension: 0.1,
+                            tension: 0.6,
+                            borderWidth: 1,
                             pointRadius: 0,
-                            pointHoverRadius: 2,
-                            yAxisID: 'y-samples',
+                            pointHoverRadius: 0,
+                            yAxisID: 'samples',
                             hidden: true
                         },
                         {
                             label: 'Wind Speed',
                             data: readings.map(r => ({ x: r.rawTimestamp, y: r.windSpeedRaw })).filter(p => p.y !== null),
-                            borderColor: '#28a745',
-                            backgroundColor: '#28a74520',
+                            borderColor: 'green',
+                            backgroundColor: 'rgba(0, 128, 0, 0.1)',
                             fill: false,
-                            tension: 0.1,
+                            tension: 0.6,
+                            borderWidth: 2,
                             pointRadius: 0,
-                            pointHoverRadius: 2,
-                            yAxisID: 'y-wind'
+                            pointHoverRadius: 0,
+                            yAxisID: 'windSpeed'
                         },
                         {
                             label: 'Gust Speed',
                             data: readings.map(r => ({ x: r.rawTimestamp, y: r.gustSpeedRaw })).filter(p => p.y !== null),
-                            borderColor: '#155724',
-                            backgroundColor: '#15572420',
+                            borderColor: 'darkgreen',
+                            backgroundColor: 'rgba(0, 100, 0, 0.1)',
                             fill: false,
-                            tension: 0.1,
+                            tension: 0.6,
+                            borderWidth: 1,
                             pointRadius: 0,
-                            pointHoverRadius: 2,
-                            yAxisID: 'y-wind'
+                            pointHoverRadius: 0,
+                            yAxisID: 'windSpeed'
                         },
                         {
                             label: 'Duke Water Level',
                             data: readings.map(r => ({ x: r.rawTimestamp, y: r.dukeWaterLevelRaw })).filter(p => p.y !== null),
-                            borderColor: '#004085',
-                            backgroundColor: '#00408520',
+                            borderColor: 'darkblue',
+                            backgroundColor: 'rgba(0, 0, 139, 0.1)',
                             fill: false,
-                            tension: 0.1,
+                            tension: 0.6,
+                            borderWidth: 1,
                             pointRadius: 0,
-                            pointHoverRadius: 2,
-                            yAxisID: 'y-water'
+                            pointHoverRadius: 0,
+                            yAxisID: 'y'
                         }
                     ]
                 },
@@ -344,24 +353,20 @@
                                 text: 'Time (Eastern)'
                             }
                         },
-                        'y-water': {
-                            type: 'linear',
-                            position: 'left',
+                        y: {
                             min: 0,
                             max: 6,
                             title: {
                                 display: true,
                                 text: 'Water Level (feet)'
                             },
-                            grid: {
-                                color: 'rgba(0,0,0,0.1)'
-                            }
+                            position: 'left'
                         },
-                        'y-wave': {
+                        waveHeight: {
                             type: 'linear',
-                            position: 'right',
                             min: 0,
                             max: 2,
+                            position: 'right',
                             title: {
                                 display: true,
                                 text: 'Wave Height (feet)'
@@ -370,11 +375,11 @@
                                 drawOnChartArea: false
                             }
                         },
-                        'y-wind': {
+                        windSpeed: {
                             type: 'linear',
-                            position: 'right',
                             min: 0,
-                            max: 30,
+                            max: 40,
+                            position: 'right',
                             title: {
                                 display: true,
                                 text: 'Wind Speed (knots)'
@@ -383,9 +388,8 @@
                                 drawOnChartArea: false
                             }
                         },
-                        'y-samples': {
+                        samples: {
                             type: 'linear',
-                            position: 'right',
                             min: 0,
                             max: 512,
                             display: false
@@ -474,13 +478,13 @@
             const predictionDataset = {
                 label: 'Transformer 24h Forecast',
                 data: predictionData,
-                borderColor: '#FF6B35',
-                backgroundColor: '#FF6B35',
+                borderColor: 'purple',
+                backgroundColor: 'purple',
                 fill: false,
                 showLine: false, // Don't connect points with lines
                 pointRadius: 3,
                 pointHoverRadius: 5,
-                yAxisID: 'y-water'
+                yAxisID: 'y'
             };
             
             // Add dataset to chart
