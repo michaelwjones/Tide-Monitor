@@ -412,7 +412,7 @@
                             },
                             limits: {
                                 x: {
-                                    min: readings[0]?.rawTimestamp || twentyFourHoursAgo,
+                                    min: readings.length > 0 ? readings[0].rawTimestamp : twentyFourHoursAgo,
                                     max: now
                                 }
                             }
@@ -422,8 +422,7 @@
                         intersect: false,
                         mode: 'index'
                     }
-                },
-                plugins: [Chart.zoomPlugin]
+                }
             });
 
             // Create custom legend
