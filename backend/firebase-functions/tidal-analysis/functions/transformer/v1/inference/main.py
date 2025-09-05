@@ -180,8 +180,8 @@ class TransformerInferencer:
             timestamped_predictions = []
             
             for i, prediction in enumerate(predictions):
-                # 1-minute intervals starting from next minute
-                prediction_time = current_time.replace(second=0, microsecond=0) + timedelta(minutes=i + 1)
+                # 10-minute intervals starting from next 10-minute mark
+                prediction_time = current_time.replace(second=0, microsecond=0) + timedelta(minutes=(i + 1) * 10)
                 
                 timestamped_predictions.append({
                     'timestamp': prediction_time.isoformat(),
