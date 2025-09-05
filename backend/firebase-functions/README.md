@@ -35,7 +35,7 @@ See `analysis-functions.csv` for a complete list of available analysis methods, 
 - **wm**: Water level in feet (MLLW datum)
 
 ### Original Fields (from Particle device)
-- **t**: Timestamp (ISO8601 format)
+- **t**: Timestamp (ISO8601 format) - Enhanced with robust NTP sync
 - **w**: Water level in mm (sensor average)
 - **hp**: Wave height percentile method (mm)
 - **he**: Wave height envelope method (mm) 
@@ -45,6 +45,13 @@ See `analysis-functions.csv` for a complete list of available analysis methods, 
 - **coreid**: Particle device ID
 - **event**: Event name
 - **published_at**: Particle cloud timestamp
+
+### Firmware Time Synchronization
+The Particle Boron firmware includes robust time synchronization for accurate timestamps:
+- **Automatic sync**: NTP synchronization every hour (3600 seconds)
+- **Startup sync**: Manual time sync request on device initialization
+- **Cellular NTP**: Time sync works over cellular connection (no WiFi required)
+- **Error handling**: Graceful handling when cloud connection unavailable
 
 ## NOAA Data Source
 

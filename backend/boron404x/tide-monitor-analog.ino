@@ -56,13 +56,23 @@ void setup() {
     // Initialize offline storage
     storedReadingCount = 0;
     
+    // Configure time sync to every hour (3600 seconds)
+    Particle.syncTimePeriod(3600);
+    Serial.println("Time sync configured for every hour");
+    
     // Connect to Particle cloud
     Particle.connect();
     waitFor(Particle.connected, 30000);
     
     if (Particle.connected()) {
+        // Force immediate time sync on startup
+        Particle.syncTime();
+        Serial.println("Manual time sync requested on startup");
+        
         Particle.publish("tideMonitor/status", "Device initialized", PRIVATE);
         Serial.println("Connected to Particle cloud!");
+    } else {
+        Serial.println("Warning: No cloud connection - time sync unavailable");
     }
     
     Serial.printlnf("Offline storage capacity: %d readings (~%.1f hours)", 
