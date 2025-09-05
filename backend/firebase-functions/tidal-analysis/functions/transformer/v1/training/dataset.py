@@ -3,6 +3,7 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import json
 import os
+import random
 
 class TidalDataset(Dataset):
     """
@@ -13,16 +14,28 @@ class TidalDataset(Dataset):
     - Target sequences: 144 time steps (24 hours at 10-minute intervals)
     """
     
-    def __init__(self, data_dir='../data-preparation/data', split='train'):
+    def __init__(self, data_dir='../data-preparation/data', split='train', 
+                 augment=True, missing_prob=0.02, gap_prob=0.05, 
+                 noise_std=0.1, missing_value=-999):
         """
         Initialize the dataset.
         
         Args:
             data_dir: Directory containing preprocessed .npy files
             split: 'train' or 'val' for training/validation split
+            augment: Whether to apply data augmentation (only for training)
+            missing_prob: Probability of replacing individual values with missing_value
+            gap_prob: Probability of creating gaps (consecutive missing values)
+            noise_std: Standard deviation for value perturbation (in normalized space)
+            missing_value: Value to use for simulated missing data (-999)
         """
         self.data_dir = data_dir
         self.split = split
+        self.augment = augment and (split == 'train')  # Only augment training data
+        self.missing_prob = missing_prob
+        self.gap_prob = gap_prob
+        self.noise_std = noise_std
+        self.missing_value = missing_value
         
         # Load the appropriate split
         if split == 'train':
@@ -49,22 +62,88 @@ class TidalDataset(Dataset):
         print(f"  Input shape: {self.X.shape}")
         print(f"  Target shape: {self.y.shape}")
         print(f"  Normalization: mean={self.norm_params['mean']:.2f}, std={self.norm_params['std']:.2f}")
+        if self.augment:
+            print(f"  Augmentation enabled:")
+            print(f"    Missing prob: {self.missing_prob}")
+            print(f"    Gap prob: {self.gap_prob}")
+            print(f"    Noise std: {self.noise_std}")
     
     def __len__(self):
         """Return the number of sequences in the dataset"""
         return len(self.X)
     
+    def apply_missing_value_augmentation(self, sequence):
+        """
+        Apply missing value augmentation to input sequence.
+        
+        Args:
+            sequence: Input sequence tensor (seq_len, 1)
+            
+        Returns:
+            Augmented sequence with simulated missing values
+        """
+        seq_len = sequence.shape[0]
+        augmented = sequence.clone()
+        
+        # Random individual missing values
+        if self.missing_prob > 0:
+            missing_mask = torch.rand(seq_len) < self.missing_prob
+            augmented[missing_mask] = self.missing_value
+        
+        # Random gaps (consecutive missing values)
+        if self.gap_prob > 0 and random.random() < self.gap_prob:
+            # Create 1-3 gaps per sequence
+            num_gaps = random.randint(1, 3)
+            for _ in range(num_gaps):
+                # Gap length: 1-10 time steps (10-100 minutes)
+                gap_length = random.randint(1, 10)
+                gap_start = random.randint(0, max(0, seq_len - gap_length))
+                augmented[gap_start:gap_start + gap_length] = self.missing_value
+        
+        return augmented
+    
+    def apply_noise_augmentation(self, sequence):
+        """
+        Apply value perturbation to sequence (in normalized space).
+        
+        Args:
+            sequence: Input sequence tensor (seq_len, 1)
+            
+        Returns:
+            Sequence with added noise
+        """
+        if self.noise_std <= 0:
+            return sequence
+            
+        # Add Gaussian noise (only to non-missing values)
+        noise = torch.normal(0, self.noise_std, sequence.shape)
+        noisy_sequence = sequence + noise
+        
+        # Preserve missing values
+        missing_mask = (sequence == self.missing_value)
+        noisy_sequence[missing_mask] = self.missing_value
+        
+        return noisy_sequence
+    
     def __getitem__(self, idx):
         """
-        Get a single sequence pair.
+        Get a single sequence pair with optional augmentation.
         
         Returns:
-            src: Input sequence tensor (433, 1)
-            tgt: Target sequence tensor (144, 1) 
+            src: Input sequence tensor (433, 1) - possibly augmented
+            tgt: Target sequence tensor (144, 1) - always clean
         """
         # Convert to tensors and add feature dimension
         src = torch.from_numpy(self.X[idx]).float().unsqueeze(-1)  # (433, 1)
         tgt = torch.from_numpy(self.y[idx]).float().unsqueeze(-1)  # (144, 1)
+        
+        # Apply augmentation to input sequence only (during training)
+        if self.augment:
+            # Apply noise perturbation first
+            src = self.apply_noise_augmentation(src)
+            
+            # Then apply missing value simulation
+            src = self.apply_missing_value_augmentation(src)
         
         return src, tgt
     
@@ -101,7 +180,11 @@ class TidalDataset(Dataset):
 def create_data_loaders(data_dir='../data-preparation/data', 
                        batch_size=8, 
                        num_workers=0,
-                       shuffle_train=True):
+                       shuffle_train=True,
+                       augment=True,
+                       missing_prob=0.02,
+                       gap_prob=0.05,
+                       noise_std=0.1):
     """
     Create PyTorch DataLoaders for training and validation.
     
@@ -110,6 +193,10 @@ def create_data_loaders(data_dir='../data-preparation/data',
         batch_size: Batch size for training
         num_workers: Number of worker processes for data loading
         shuffle_train: Whether to shuffle training data
+        augment: Whether to apply augmentation to training data
+        missing_prob: Probability of individual missing values
+        gap_prob: Probability of creating gaps in training data
+        noise_std: Standard deviation for noise augmentation
         
     Returns:
         train_loader: DataLoader for training
@@ -119,8 +206,10 @@ def create_data_loaders(data_dir='../data-preparation/data',
     print("Creating data loaders...")
     
     # Create datasets
-    train_dataset = TidalDataset(data_dir, split='train')
-    val_dataset = TidalDataset(data_dir, split='val')
+    train_dataset = TidalDataset(data_dir, split='train', augment=augment,
+                                missing_prob=missing_prob, gap_prob=gap_prob, 
+                                noise_std=noise_std)
+    val_dataset = TidalDataset(data_dir, split='val', augment=False)  # No augmentation for validation
     
     # Create data loaders
     train_loader = DataLoader(
@@ -148,6 +237,7 @@ def create_data_loaders(data_dir='../data-preparation/data',
     print(f"  Training batches: {len(train_loader)}")
     print(f"  Validation batches: {len(val_loader)}")
     print(f"  Batch size: {batch_size}")
+    print(f"  Training shuffle: {shuffle_train} (randomizes sequence order each epoch)")
     
     return train_loader, val_loader, datasets
 

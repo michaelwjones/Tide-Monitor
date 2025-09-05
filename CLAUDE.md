@@ -25,10 +25,11 @@ This is a **Tide Monitor** project that measures water levels and wave heights u
    - System status monitoring
    - Same clean layout as main dashboard for consistency
 
-4. **Firebase Cloud Functions** (`backend/firebase-functions/`) - Three separate serverless function systems:
+4. **Firebase Cloud Functions** (`backend/firebase-functions/`) - Four separate serverless function systems:
    - **Data Enrichment** (`tide-enrichment/`): Automatically triggers when new readings arrive
    - **Tidal Analysis Functions** (`tidal-analysis/functions/`): Multiple analysis methods for advanced signal processing
    - **LSTM Forecasting** (`tidal-analysis/functions/lstm/v1/`): Neural network-powered 24-hour water level predictions
+   - **Transformer Forecasting** (`tidal-analysis/functions/transformer/v1/`): Advanced sequence-to-sequence 24-hour predictions with gap-filled training data
    - Fetch real-time wind and water level data from NOAA station 8656483 (Duke Marine Lab)
    - Enrich each reading with environmental conditions
    - Perform strict data validation requiring at least 1 data point (uses last element)
@@ -130,7 +131,8 @@ This project uses minimal build tools. Development involves:
    - **Enrichment only**: `deploy-enrichment.bat` (NOAA data enrichment, always safe)
    - **Matrix Pencil v1**: `deploy-matrix-pencil-v1.bat` (tidal analysis with cost control)
    - **LSTM v1 Forecasting**: `tidal-analysis/functions/lstm/v1/deploy-lstm-v1.bat` (requires trained model)
-   - **Manual CLI**: `firebase deploy --only functions --source tide-enrichment` or `--source tidal-analysis/functions/matrix-pencil/v1` or `--source tidal-analysis/functions/lstm/v1/inference`
+   - **Transformer v1 Forecasting**: `tidal-analysis/functions/transformer/v1/deploy-transformer-v1.bat` (requires trained model)
+   - **Manual CLI**: `firebase deploy --only functions --source tide-enrichment` or `--source tidal-analysis/functions/matrix-pencil/v1` or `--source tidal-analysis/functions/lstm/v1/inference` or `--source tidal-analysis/functions/transformer/v1/inference`
    - **Prerequisites**: Run `npm install` in each function directory before first deployment
    - **Logs**: `firebase functions:log`
    - **Test locally**: `firebase emulators:start --only functions`
@@ -169,21 +171,32 @@ Tide-Monitor/
     │           │       ├── README.md    # Analysis deployment guide
     │           │       ├── index.js     # Matrix Pencil v1 implementation
     │           │       └── package.json
-    │           └── lstm/                # LSTM neural network forecasting
-    │               └── v1/              # LSTM version 1
-    │                   ├── README.md    # LSTM setup and deployment guide
-    │                   ├── LSTM_V1.md   # Technical methodology documentation
-    │                   ├── data-preparation/  # Python scripts for training data
-    │                   ├── training/    # PyTorch model training pipeline
+    │           ├── lstm/                # LSTM neural network forecasting
+    │           │   └── v1/              # LSTM version 1
+    │           │       ├── README.md    # LSTM setup and deployment guide
+    │           │       ├── LSTM_V1.md   # Technical methodology documentation
+    │           │       ├── data-preparation/  # Python scripts for training data
+    │           │       ├── training/    # PyTorch model training pipeline
+    │           │       ├── testing/     # Model validation and testing interface
+    │           │       │   ├── README.md           # Testing documentation
+    │           │       │   ├── index.html          # Web-based testing interface
+    │           │       │   ├── server.py           # HTTP server for model testing
+    │           │       │   ├── test_model.py       # Command-line testing script
+    │           │       │   ├── start-server.bat    # Windows server launcher
+    │           │       │   └── firebase_fetch.py   # Firebase data utilities
+    │           │       ├── inference/   # Firebase Functions ONNX deployment
+    │           │       └── deploy-lstm-v1.bat  # Deployment script
+    │           └── transformer/         # Transformer neural network forecasting
+    │               └── v1/              # Transformer version 1
+    │                   ├── README.md    # Transformer setup and deployment guide
+    │                   ├── data-preparation/  # Enhanced data pipeline with gap filling
+    │                   │   ├── fetch_firebase_data.py     # Raw data fetching
+    │                   │   ├── enrich_firebase_data.py    # Gap filling and enrichment
+    │                   │   └── create_training_data.py    # Quality filtering and processing
+    │                   ├── training/    # PyTorch transformer training pipeline
     │                   ├── testing/     # Model validation and testing interface
-    │                   │   ├── README.md           # Testing documentation
-    │                   │   ├── index.html          # Web-based testing interface
-    │                   │   ├── server.py           # HTTP server for model testing
-    │                   │   ├── test_model.py       # Command-line testing script
-    │                   │   ├── start-server.bat    # Windows server launcher
-    │                   │   └── firebase_fetch.py   # Firebase data utilities
-    │                   ├── inference/   # Firebase Functions ONNX deployment
-    │                   └── deploy-lstm-v1.bat  # Deployment script
+    │                   ├── inference/   # Firebase Functions PyTorch deployment
+    │                   └── deploy-transformer-v1.bat  # Deployment script
     └── particle.io/
         └── firebase integration.txt     # Webhook configuration
 ```
@@ -246,6 +259,32 @@ Readings are stored with auto-generated keys containing:
 - **Clean layout**: Same styling as main dashboard for consistency
 - **Navigation**: Easy switching between main and debug views
 
+## Enhanced Data Processing Pipeline
+
+### Transformer v1 Data Preparation
+The transformer v1 system introduces advanced data preprocessing to handle sensor gaps and ensure high-quality training data:
+
+#### Gap Filling and Enrichment (`enrich_firebase_data.py`)
+- **Temporal Continuity**: Fills missing minute-by-minute readings with -999 synthetic values
+- **Complete Day Processing**: Only processes complete days (midnight to midnight) with sufficient coverage  
+- **Large Gap Preservation**: Doesn't fill gaps >1 hour, preserves natural outage patterns
+- **Quality Statistics**: Reports 457 synthetic readings added across 66 days (6.9 average per day)
+- **Target Validation**: Ensures 1440 readings per day or adjusts for large outages
+
+#### Quality Control and Filtering (`create_training_data.py`)
+- **Time Gap Filtering**: Removes sequences with >15 minute gaps between sequential readings
+- **Synthetic Data Filtering**: Excludes sequences with 6+ consecutive -999 values (1+ hour gaps)
+- **Output Interpolation**: Linear interpolation of -999 values in training targets for clean outputs
+- **Retention Statistics**: 87.5% retention rate (15,473 sequences from 17,674 generated)
+- **Quality Improvement**: Reduced standard deviation from 481.92mm to 335.52mm after filtering
+
+#### Data Pipeline Results
+- **Input Quality**: 94,227 enriched readings with temporal consistency
+- **Filtering Impact**: 2,201 sequences removed for timing issues, 0 for excessive synthetic data
+- **Training Dataset**: 12,378 training sequences, 3,095 validation sequences
+- **Interpolation Activity**: 7,955 synthetic values smoothly interpolated in outputs
+- **File Size**: 68.1 MB of high-quality training data
+
 ## Technical Notes
 
 - **Deployment**: Hosted on GitHub Pages with Netlify-style headers
@@ -282,3 +321,4 @@ This removal simplified the system to focus on the two reliable wave analysis me
 - When I ask you to make a change A, do not make changes A and B. Only change A. I am a very technical user, if I want B changed I will ask for it.
 - Feel free to make suggestions if you think they will help me arrive at my goal.
 - Don't run a firebase command unless specifically asked to.
+- README files should contain current state, not change history.

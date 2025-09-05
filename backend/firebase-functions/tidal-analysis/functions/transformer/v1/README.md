@@ -34,6 +34,7 @@ This implementation uses a modern transformer architecture to predict tidal patt
 transformer/v1/
 ├── data-preparation/          # Firebase data fetching and processing
 │   ├── fetch_firebase_data.py
+│   ├── enrich_firebase_data.py
 │   └── create_training_data.py
 ├── training/                  # Model training and local server
 │   ├── dataset.py            # PyTorch data loading
@@ -78,6 +79,7 @@ setup-complete-transformer-v1.bat
 ```bash
 cd data-preparation
 python fetch_firebase_data.py      # Fetch Firebase data
+python enrich_firebase_data.py     # Fill gaps and enrich data
 python create_training_data.py     # Create training sequences
 ```
 
@@ -113,6 +115,13 @@ deploy-transformer-v1.bat          # Deploy to Firebase Functions (Python runtim
 - **Dropout**: 0.1 for regularization
 - **Gradient Clipping**: 1.0 for stability
 
+### Data Augmentation (Training Only)
+- **Missing Value Simulation**: 2% probability of individual -999 values
+- **Gap Simulation**: 5% probability of creating 1-10 timestep gaps per sequence  
+- **Value Perturbation**: Gaussian noise (σ=0.1) added to normalized values
+- **Sequence Shuffling**: Randomized batch order each epoch prevents overfitting
+- **Robustness Training**: Models learn to handle real-world sensor gaps and noise
+
 ### Hardware Requirements
 - **Minimum**: 8GB RAM, modern CPU (training will be slow)
 - **Recommended**: 16GB RAM + NVIDIA GPU with 6GB+ VRAM
@@ -130,6 +139,7 @@ deploy-transformer-v1.bat          # Deploy to Firebase Functions (Python runtim
 - **Inference Speed**: Single forward pass vs 1440 iterative steps
 - **Temporal Modeling**: Better capture of long-range dependencies
 - **Parallelization**: Full sequence processed simultaneously
+- **Robustness Training**: Built-in missing value and noise simulation during training
 
 ### Expected Metrics
 - **Training Loss**: <0.1 (normalized MSE)
@@ -186,6 +196,7 @@ python test_model.py --input file.json  # Test with custom data
    - Check data normalization
    - Reduce learning rate
    - Verify input sequence alignment
+   - Consider reducing data augmentation (set augment=False for initial tests)
 
 3. **Model Loading Errors**
    - Ensure model checkpoint exists
@@ -201,12 +212,18 @@ python test_model.py --input file.json  # Test with custom data
    - Error: `ufunc 'isnan' not supported for the input types`
    - Cause: Firebase data contains mixed types (strings, null values)
    - Solution: Wrap values in `np.array()` before using numpy functions
-     - Proper type casting in main.py lines 125, 161, 272
+     - Proper type casting in main.py lines 128, 166, 171
      - Comprehensive error handling with filename/line numbers
-     - Uses -1 for missing values (model expectation)
+     - Uses -999 for missing values (consistent with data pipeline)
    - Check logs for "Insufficient data points" if filtering is too aggressive
 
-6. **Forecast Timestamp Issues**
+6. **Firmware Timestamp Issues (Bypassed)**
+   - Issue: Device timer drift caused inconsistent timing between measurements and timestamps
+   - Root Cause: Firmware uses `millis()` for scheduling but `Time.format()` for timestamps
+   - Solution: Data preparation now ignores all timestamp validation and assumes chronological order
+   - Result: 5x more training data available (no sequences filtered out for timing issues)
+
+7. **Forecast Timestamp Issues**
    - Issue: Forecast timestamps must align with sensor data timeline
    - Cause: Using current processing time creates timing offset
    - Solution: Pass `last_data_timestamp` and start predictions from last sensor reading
@@ -232,18 +249,49 @@ python test_model.py --input file.json  # Test with custom data
 - **Deployment**: Model definition and checkpoint are co-located for Firebase deployment
 - **Consistency**: Ensures training and inference use identical model architecture
 
+### Data Preparation Pipeline
+
+#### Gap Filling and Enrichment (`enrich_firebase_data.py`)
+- **Data Continuity**: Fills missing readings with -999 water level for temporal consistency
+- **Complete Days**: Processes only complete days with sufficient data coverage
+- **Gap Detection**: Identifies and handles gaps larger than 1 hour (doesn't fill large outages)
+- **Statistics Tracking**: Reports on synthetic readings generated and data quality
+- **Target Validation**: Ensures 1440 readings per day or adjusts targets for large gaps
+
+#### Sequence Quality Control (`create_training_data.py`)
+- **Time Gap Filtering**: Removes sequences with >15 minute gaps between readings
+- **Synthetic Data Filtering**: Excludes sequences with 6+ consecutive synthetic readings (1+ hour gaps)
+- **Output Interpolation**: Replaces -999 values in output sequences with linear interpolation
+- **Data Quality**: 87.5% retention rate after quality filtering
+
+#### Training Data Statistics  
+- **Total Sequences**: 15,473 high-quality training sequences
+- **Retention Rate**: 87.5% after gap and quality filtering
+- **Data Size**: 68.1 MB training data with enhanced quality
+- **Training Split**: 12,378 training sequences, 3,095 validation sequences
+- **Interpolated Values**: 7,955 synthetic values smoothly interpolated
+
+#### Processing Pipeline
+1. **Fetch**: Download raw Firebase data
+2. **Enrich**: Fill small gaps, preserve large outage periods
+3. **Generate**: Create 96-hour sequences with random offsets
+4. **Filter**: Remove sequences with timing issues or excessive synthetic data
+5. **Interpolate**: Replace remaining -999 values in outputs with realistic interpolated values
+6. **Normalize**: Apply z-score normalization for training
+7. **Augment**: Apply real-time data augmentation during training (missing values, gaps, noise)
+
 ### Input Processing
 - **Data Source**: 4320 1-minute readings from Firebase downsampled to 433 10-minute intervals
 - **Type Safety**: Robust conversion of Firebase data (strings, numbers, null) to float with error handling
 - **Data Filtering**: Filters out NaN, infinite, and non-convertible values automatically
-- **Missing Values**: Invalid/NaN inputs converted to -1 (model's missing value format)
-- **Normalization**: Z-score using training statistics
+- **Missing Values**: Invalid/NaN inputs converted to -999 (consistent with data pipeline)
+- **Normalization**: Z-score using training statistics (mean=1014.54, std=531.14)
 - **Sequence Length**: Fixed 433-point input required (72 hours @ 10-minute intervals)
 - **Padding Strategy**: Mean-value padding for insufficient data
 
 ### Output Processing
 - **Direct Prediction**: Full 144-point sequence in single pass (24 hours @ 10-minute intervals)
-- **Error Handling**: NaN/infinite predictions converted to -999 (debug page error format)
+- **Error Handling**: NaN/infinite predictions converted to -999 (consistent error format)
 - **Denormalization**: Convert back to original water level scale (mm)
 - **Timestamping**: 10-minute interval predictions with ISO timestamps
 - **Quality Metrics**: Count of error predictions and valid range validation

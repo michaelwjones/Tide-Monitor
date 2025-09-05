@@ -125,13 +125,13 @@ class TransformerInferencer:
                     # Convert to numpy array to safely use numpy functions
                     np_val = np.array(numeric_val)
                     if not np.isfinite(np_val) or np.isnan(np_val):
-                        print(f"Invalid input value: {val}, replacing with -1 (main.py:125)")
-                        validated_sequence.append(-1)
+                        print(f"Invalid input value: {val}, replacing with -999 (main.py:128)")
+                        validated_sequence.append(-999)
                     else:
                         validated_sequence.append(numeric_val)
                 except (ValueError, TypeError):
-                    print(f"Non-numeric input value: {val}, replacing with -1 (main.py:130)")
-                    validated_sequence.append(-1)
+                    print(f"Non-numeric input value: {val}, replacing with -999 (main.py:133)")
+                    validated_sequence.append(-999)
             
             # Normalize input
             normalized_input = self.normalize_data(torch.FloatTensor(validated_sequence))
@@ -163,15 +163,15 @@ class TransformerInferencer:
                     # Convert to numpy array to safely use numpy functions
                     np_pred = np.array(numeric_pred)
                     if not np.isfinite(np_pred) or np.isnan(np_pred):
-                        print(f"Invalid prediction: {pred}, replacing with -1 (main.py:161)")
-                        predictions.append(-1)
+                        print(f"Invalid prediction: {pred}, replacing with -999 (main.py:166)")
+                        predictions.append(-999)
                     else:
                         predictions.append(numeric_pred)
                 except (ValueError, TypeError):
-                    print(f"Non-numeric prediction: {pred}, replacing with -1 (main.py:166)")
-                    predictions.append(-1)
+                    print(f"Non-numeric prediction: {pred}, replacing with -999 (main.py:171)")
+                    predictions.append(-999)
             
-            valid_predictions = [p for p in predictions if p != -1]
+            valid_predictions = [p for p in predictions if p != -999]
             error_count = len(predictions) - len(valid_predictions)
             
             print(f"Valid predictions: {len(valid_predictions)}, errors: {error_count}")

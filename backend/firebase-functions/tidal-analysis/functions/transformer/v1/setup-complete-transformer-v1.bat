@@ -13,7 +13,7 @@ echo   Setup Options
 echo ========================================================
 echo 1. Install PyTorch (CPU version)
 echo 2. Install PyTorch (CUDA version - requires NVIDIA GPU)
-echo 3. Fetch data and create training dataset
+echo 3. Fetch data, fill gaps, and create training dataset
 echo 4. Train transformer model
 echo 5. Test model locally (PyTorch web server)
 echo 6. Deploy to Firebase Functions (PyTorch runtime)
@@ -53,8 +53,12 @@ if "%choice%"=="3" (
     echo Fetching Firebase data...
     python fetch_firebase_data.py
     if not errorlevel 1 (
-        echo Creating training dataset...
-        python create_training_data.py
+        echo Enriching data with gap filling...
+        python enrich_firebase_data.py
+        if not errorlevel 1 (
+            echo Creating training dataset...
+            python create_training_data.py
+        )
     )
     cd ..
     goto :success
@@ -99,6 +103,8 @@ if "%choice%"=="7" (
     echo Step 1: Data Preparation
     cd data-preparation
     python fetch_firebase_data.py
+    if errorlevel 1 goto :error
+    python enrich_firebase_data.py
     if errorlevel 1 goto :error
     python create_training_data.py
     if errorlevel 1 goto :error

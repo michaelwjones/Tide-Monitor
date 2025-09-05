@@ -323,6 +323,17 @@ class TransformerTrainer:
         print(f"   Mixed precision: {self.use_amp}")
         print(f"   Device: {self.device}")
         
+        # Data augmentation config
+        if self.config.get('augment', False):
+            print(f"\n🔄 DATA AUGMENTATION:")
+            print(f"   Missing value prob: {self.config.get('missing_prob', 0):.1%}")
+            print(f"   Gap simulation prob: {self.config.get('gap_prob', 0):.1%}")
+            print(f"   Noise std: {self.config.get('noise_std', 0):.2f}")
+            print(f"   Sequence shuffling: {self.config.get('shuffle_train', False)}")
+        else:
+            print(f"\n🔄 DATA AUGMENTATION: Disabled")
+            print(f"   Sequence shuffling: {self.config.get('shuffle_train', False)}")
+        
         # Initialize training timer
         self.training_start_time = time.time()
         training_start_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -411,7 +422,13 @@ def get_default_config():
         'grad_clip': 1.0,
         'use_amp': True,
         'patience': 15,
-        'log_interval': 5
+        'log_interval': 5,
+        # Data augmentation parameters
+        'augment': True,
+        'missing_prob': 0.02,  # 2% chance of individual missing values
+        'gap_prob': 0.05,      # 5% chance of creating gaps per sequence
+        'noise_std': 0.1,      # Noise standard deviation in normalized space
+        'shuffle_train': True  # Randomize sequence order each epoch
     }
 
 def main():
@@ -424,7 +441,12 @@ def main():
     # Create data loaders
     train_loader, val_loader, datasets = create_data_loaders(
         data_dir='../data-preparation/data',
-        batch_size=config['batch_size']
+        batch_size=config['batch_size'],
+        shuffle_train=config['shuffle_train'],
+        augment=config['augment'],
+        missing_prob=config['missing_prob'],
+        gap_prob=config['gap_prob'],
+        noise_std=config['noise_std']
     )
     
     # Create model

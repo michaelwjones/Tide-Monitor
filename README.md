@@ -175,6 +175,12 @@ The system collects readings every minute with the following data points:
   - **Machine Learning**: PyTorch-trained LSTM with 2-layer, 128-unit architecture
   - **Cloud Inference**: ONNX deployment on Firebase Functions with 6-hour update cycle
   - **Visual Integration**: Dashed orange forecast lines extending 24 hours beyond current data
+- **Transformer Forecasting**: Next-generation sequence-to-sequence predictions
+  - **Direct Prediction**: Single forward pass generates full 24-hour forecast
+  - **Attention Mechanisms**: Multi-head attention captures complex temporal dependencies
+  - **Maximum Data Usage**: 5x more training sequences by removing timestamp validation
+  - **No Temporal Filtering**: All available sensor data used for training
+  - **Robust Architecture**: 433-point input (72h) to 144-point output (24h) at 10-minute intervals
 - **Model Validation**: Analysis Error plot shows residuals (measured - predicted + 1 offset)
   - **Quality Assessment**: Visual feedback on Matrix Pencil reconstruction accuracy
   - **Error Distribution**: Reveals systematic biases or random errors in tidal modeling
