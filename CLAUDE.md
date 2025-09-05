@@ -93,8 +93,9 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Cloud F
   - Hidden Y-axis: Valid sample count (0-512)
 - **Transformer Forecasting**: 24-hour water level predictions from transformer v1 model
   - **Smart button**: "Show Forecast" button appears only when recent forecast available (< 10 minutes old)
-  - **Point display**: Forecast shown as individual points extending 24 hours into future
+  - **Point display**: Forecast shown as individual points at 10-minute intervals extending 24 hours into future
   - **Automatic axis extension**: Chart X-axis extends to accommodate forecast timeline
+  - **Button logic**: "Show Forecast" adds 24h to timeline, "Hide Forecast" removes extension
   - **Integration**: Fetches from `/tidal-analysis/transformer-v1-forecast` Firebase path
 
 ### Debug Dashboard (`debug/index.html`)

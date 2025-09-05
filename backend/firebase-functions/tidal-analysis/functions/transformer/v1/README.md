@@ -200,8 +200,17 @@ python test_model.py --input file.json  # Test with custom data
 5. **Data Type Errors (NumPy casting)**
    - Error: `ufunc 'isnan' not supported for the input types`
    - Cause: Firebase data contains mixed types (strings, null values)
-   - Solution: Code includes robust type conversion and error handling
+   - Solution: Code includes robust type conversion and error handling:
+     - Proper string validation before float conversion
+     - Try-catch blocks around numpy operations
+     - Uses -1 for missing values (model expectation)
    - Check logs for "Insufficient data points" if filtering is too aggressive
+
+6. **Forecast Timestamp Issues**
+   - Issue: X-axis values incorrect on debug dashboard
+   - Cause: Prediction timestamps must use 10-minute intervals
+   - Solution: Use `(i + 1) * 10` minutes for proper spacing
+   - Debug page uses timestamps directly from Firebase
 
 ### Performance Optimization
 
