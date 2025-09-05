@@ -405,10 +405,12 @@
 
         // Toggle 24-hour prediction visibility
         async function togglePrediction() {
-            predictionVisible = !predictionVisible;
-            
             const button = document.getElementById('togglePrediction');
-            if (predictionVisible) {
+            
+            // Check current button text to determine action
+            if (button.textContent === 'Show Forecast') {
+                // User wants to SHOW forecast - extend chart and add data
+                predictionVisible = true;
                 button.textContent = 'Hide Forecast';
                 button.classList.add('active');
                 
@@ -426,6 +428,8 @@
                     debugChartInstance.update('none'); // Update without animation for smooth transition
                 }
             } else {
+                // User wants to HIDE forecast - contract chart and remove data
+                predictionVisible = false;
                 button.textContent = 'Show Forecast';
                 button.classList.remove('active');
                 
@@ -454,15 +458,10 @@
                     const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
                     debugChartInstance.options.scales.x.min = twentyFourHoursAgo;
                     
-                    // If prediction is visible, extend max to show 24 hours of prediction
-                    if (predictionVisible) {
-                        const extendedMax = new Date(now.getTime() + (24 * 60 * 60 * 1000));
-                        debugChartInstance.options.scales.x.max = extendedMax;
-                        debugChartInstance.options.plugins.zoom.limits.x.max = extendedMax;
-                    } else {
-                        debugChartInstance.options.scales.x.max = now;
-                        debugChartInstance.options.plugins.zoom.limits.x.max = now;
-                    }
+                    // Set max to current time (forecast button will extend if needed)
+                    const maxTime = predictionVisible ? new Date(now.getTime() + (24 * 60 * 60 * 1000)) : now;
+                    debugChartInstance.options.scales.x.max = maxTime;
+                    debugChartInstance.options.plugins.zoom.limits.x.max = maxTime;
                     debugChartInstance.update();
                 }
             });
@@ -473,15 +472,10 @@
                     const seventyTwoHoursAgo = new Date(now.getTime() - (72 * 60 * 60 * 1000));
                     debugChartInstance.options.scales.x.min = seventyTwoHoursAgo;
                     
-                    // If prediction is visible, extend max to show 24 hours of prediction
-                    if (predictionVisible) {
-                        const extendedMax = new Date(now.getTime() + (24 * 60 * 60 * 1000));
-                        debugChartInstance.options.scales.x.max = extendedMax;
-                        debugChartInstance.options.plugins.zoom.limits.x.max = extendedMax;
-                    } else {
-                        debugChartInstance.options.scales.x.max = now;
-                        debugChartInstance.options.plugins.zoom.limits.x.max = now;
-                    }
+                    // Set max to current time (forecast button will extend if needed)
+                    const maxTime = predictionVisible ? new Date(now.getTime() + (24 * 60 * 60 * 1000)) : now;
+                    debugChartInstance.options.scales.x.max = maxTime;
+                    debugChartInstance.options.plugins.zoom.limits.x.max = maxTime;
                     debugChartInstance.update();
                 }
             });
