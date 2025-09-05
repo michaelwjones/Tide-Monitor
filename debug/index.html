@@ -423,8 +423,10 @@
                     const extendedMax = new Date(now.getTime() + (24 * 60 * 60 * 1000)); // Add 24 hours from now
                     debugChartInstance.options.scales.x.max = extendedMax;
                     
-                    // Also update zoom limits to allow viewing the prediction
-                    debugChartInstance.options.plugins.zoom.limits.x.max = extendedMax;
+                    // Also update zoom limits to allow viewing the prediction (if zoom plugin exists)
+                    if (debugChartInstance.options.plugins.zoom && debugChartInstance.options.plugins.zoom.limits) {
+                        debugChartInstance.options.plugins.zoom.limits.x.max = extendedMax;
+                    }
                     debugChartInstance.update('none'); // Update without animation for smooth transition
                 }
             } else {
@@ -441,8 +443,10 @@
                     const now = new Date();
                     debugChartInstance.options.scales.x.max = now;
                     
-                    // Reset zoom limits to current time
-                    debugChartInstance.options.plugins.zoom.limits.x.max = now;
+                    // Reset zoom limits to current time (if zoom plugin exists)
+                    if (debugChartInstance.options.plugins.zoom && debugChartInstance.options.plugins.zoom.limits) {
+                        debugChartInstance.options.plugins.zoom.limits.x.max = now;
+                    }
                     debugChartInstance.update('none'); // Update without animation for smooth transition
                 }
             }
@@ -463,7 +467,9 @@
                     const isForecastVisible = forecastButton.textContent === 'Hide Forecast';
                     const maxTime = isForecastVisible ? new Date(now.getTime() + (24 * 60 * 60 * 1000)) : now;
                     debugChartInstance.options.scales.x.max = maxTime;
-                    debugChartInstance.options.plugins.zoom.limits.x.max = maxTime;
+                    if (debugChartInstance.options.plugins.zoom && debugChartInstance.options.plugins.zoom.limits) {
+                        debugChartInstance.options.plugins.zoom.limits.x.max = maxTime;
+                    }
                     debugChartInstance.update();
                 }
             });
@@ -479,7 +485,9 @@
                     const isForecastVisible = forecastButton.textContent === 'Hide Forecast';
                     const maxTime = isForecastVisible ? new Date(now.getTime() + (24 * 60 * 60 * 1000)) : now;
                     debugChartInstance.options.scales.x.max = maxTime;
-                    debugChartInstance.options.plugins.zoom.limits.x.max = maxTime;
+                    if (debugChartInstance.options.plugins.zoom && debugChartInstance.options.plugins.zoom.limits) {
+                        debugChartInstance.options.plugins.zoom.limits.x.max = maxTime;
+                    }
                     debugChartInstance.update();
                 }
             });
