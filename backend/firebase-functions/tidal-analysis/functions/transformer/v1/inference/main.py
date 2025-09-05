@@ -119,11 +119,17 @@ class TransformerInferencer:
             # Handle missing/invalid values
             validated_sequence = []
             for val in input_sequence:
-                if not np.isfinite(val) or np.isnan(val):
-                    print(f"Invalid input value: {val}, replacing with -1")
+                try:
+                    # Ensure val is numeric before using numpy functions
+                    numeric_val = float(val)
+                    if not np.isfinite(numeric_val) or np.isnan(numeric_val):
+                        print(f"Invalid input value: {val}, replacing with -1")
+                        validated_sequence.append(-1)
+                    else:
+                        validated_sequence.append(numeric_val)
+                except (ValueError, TypeError):
+                    print(f"Non-numeric input value: {val}, replacing with -1")
                     validated_sequence.append(-1)
-                else:
-                    validated_sequence.append(val)
             
             # Normalize input
             normalized_input = self.normalize_data(torch.FloatTensor(validated_sequence))
@@ -150,13 +156,18 @@ class TransformerInferencer:
             # Handle invalid predictions
             predictions = []
             for pred in raw_predictions:
-                if not np.isfinite(pred) or np.isnan(pred):
-                    print(f"Invalid prediction: {pred}, replacing with -999")
-                    predictions.append(-999)
-                else:
-                    predictions.append(pred)
+                try:
+                    numeric_pred = float(pred)
+                    if not np.isfinite(numeric_pred) or np.isnan(numeric_pred):
+                        print(f"Invalid prediction: {pred}, replacing with -1")
+                        predictions.append(-1)
+                    else:
+                        predictions.append(numeric_pred)
+                except (ValueError, TypeError):
+                    print(f"Non-numeric prediction: {pred}, replacing with -1")
+                    predictions.append(-1)
             
-            valid_predictions = [p for p in predictions if p != -999]
+            valid_predictions = [p for p in predictions if p != -1]
             error_count = len(predictions) - len(valid_predictions)
             
             print(f"Valid predictions: {len(valid_predictions)}, errors: {error_count}")
@@ -169,15 +180,8 @@ class TransformerInferencer:
             timestamped_predictions = []
             
             for i, prediction in enumerate(predictions):
-                # 10-minute intervals starting from next 10-minute mark
-                prediction_time = current_time.replace(
-                    minute=(current_time.minute // 10 + 1 + i) * 10 % 60,
-                    second=0,
-                    microsecond=0
-                )
-                # Handle hour rollover
-                if prediction_time <= current_time:
-                    prediction_time = prediction_time.replace(hour=prediction_time.hour + 1)
+                # 1-minute intervals starting from next minute
+                prediction_time = current_time.replace(second=0, microsecond=0) + timedelta(minutes=i + 1)
                 
                 timestamped_predictions.append({
                     'timestamp': prediction_time.isoformat(),
@@ -252,10 +256,20 @@ def run_transformer_v1_analysis(req):
             if 'w' in value and 't' in value:
                 try:
                     # Convert to float and handle various input types
-                    water_level = float(value['w']) if value['w'] is not None else None
+                    raw_value = value['w']
+                    if raw_value is None:
+                        continue
+                    
+                    # Handle string conversion and ensure numeric type
+                    if isinstance(raw_value, str):
+                        if raw_value.strip() == '' or raw_value == '-999':
+                            continue
+                        water_level = float(raw_value)
+                    else:
+                        water_level = float(raw_value)
                     
                     # Check if conversion was successful and value is finite
-                    if water_level is not None and not (np.isnan(water_level) or np.isinf(water_level)):
+                    if not (np.isnan(water_level) or np.isinf(water_level)):
                         water_level_data.append({
                             'timestamp': value['t'],
                             'waterLevel': water_level
