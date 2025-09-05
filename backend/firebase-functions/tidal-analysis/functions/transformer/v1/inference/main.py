@@ -5,7 +5,7 @@ Uses raw PyTorch model for zero conversion overhead and perfect quality.
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 import torch
 import numpy as np
 
@@ -38,7 +38,7 @@ class TransformerInferencer:
             )
             
             if not os.path.exists(checkpoint_path):
-                raise FileNotFoundError(f"Model checkpoint not found: {checkpoint_path}")
+                raise FileNotFoundError(f"Model checkpoint not found: {checkpoint_path} (main.py:41)")
             
             print(f"Loading PyTorch model from {checkpoint_path}")
             
@@ -62,7 +62,7 @@ class TransformerInferencer:
             return True
             
         except Exception as e:
-            print(f"Failed to initialize model: {e}")
+            print(f"Failed to initialize model: {e} (main.py:65)")
             return False
     
     def normalize_data(self, water_levels):
@@ -104,10 +104,10 @@ class TransformerInferencer:
         
         return input_sequence
     
-    def predict_24_hours(self, water_levels):
+    def predict_24_hours(self, water_levels, last_data_timestamp=None):
         """Generate 24-hour predictions using the transformer model"""
         if self.model is None:
-            raise RuntimeError("Model not initialized")
+            raise RuntimeError("Model not initialized (main.py:110)")
         
         try:
             print("Starting transformer prediction...")
@@ -122,13 +122,15 @@ class TransformerInferencer:
                 try:
                     # Ensure val is numeric before using numpy functions
                     numeric_val = float(val)
-                    if not np.isfinite(numeric_val) or np.isnan(numeric_val):
-                        print(f"Invalid input value: {val}, replacing with -1")
+                    # Convert to numpy array to safely use numpy functions
+                    np_val = np.array(numeric_val)
+                    if not np.isfinite(np_val) or np.isnan(np_val):
+                        print(f"Invalid input value: {val}, replacing with -1 (main.py:125)")
                         validated_sequence.append(-1)
                     else:
                         validated_sequence.append(numeric_val)
                 except (ValueError, TypeError):
-                    print(f"Non-numeric input value: {val}, replacing with -1")
+                    print(f"Non-numeric input value: {val}, replacing with -1 (main.py:130)")
                     validated_sequence.append(-1)
             
             # Normalize input
@@ -158,13 +160,15 @@ class TransformerInferencer:
             for pred in raw_predictions:
                 try:
                     numeric_pred = float(pred)
-                    if not np.isfinite(numeric_pred) or np.isnan(numeric_pred):
-                        print(f"Invalid prediction: {pred}, replacing with -1")
+                    # Convert to numpy array to safely use numpy functions
+                    np_pred = np.array(numeric_pred)
+                    if not np.isfinite(np_pred) or np.isnan(np_pred):
+                        print(f"Invalid prediction: {pred}, replacing with -1 (main.py:161)")
                         predictions.append(-1)
                     else:
                         predictions.append(numeric_pred)
                 except (ValueError, TypeError):
-                    print(f"Non-numeric prediction: {pred}, replacing with -1")
+                    print(f"Non-numeric prediction: {pred}, replacing with -1 (main.py:166)")
                     predictions.append(-1)
             
             valid_predictions = [p for p in predictions if p != -1]
@@ -176,12 +180,23 @@ class TransformerInferencer:
                 print(f"Range: {min(valid_predictions):.1f} - {max(valid_predictions):.1f} mm")
             
             # Create timestamped predictions
-            current_time = datetime.now()
+            if last_data_timestamp:
+                # Parse the last data timestamp and use it as starting point
+                try:
+                    base_time = datetime.fromisoformat(last_data_timestamp.replace('Z', '+00:00'))
+                except ValueError:
+                    # Fallback to current time if timestamp parsing fails
+                    base_time = datetime.now()
+                    print(f"Failed to parse timestamp {last_data_timestamp}, using current time (main.py:185)")
+            else:
+                base_time = datetime.now()
+                print("No last data timestamp provided, using current time (main.py:188)")
+            
             timestamped_predictions = []
             
             for i, prediction in enumerate(predictions):
-                # 10-minute intervals starting from next 10-minute mark
-                prediction_time = current_time.replace(second=0, microsecond=0) + timedelta(minutes=(i + 1) * 10)
+                # 10-minute intervals starting from the last data point
+                prediction_time = base_time + timedelta(minutes=(i + 1) * 10)
                 
                 timestamped_predictions.append({
                     'timestamp': prediction_time.isoformat(),
@@ -204,7 +219,7 @@ class TransformerInferencer:
             }
             
         except Exception as e:
-            print(f"Prediction error: {e}")
+            print(f"Prediction error: {e} (main.py:211)")
             raise
 
 
@@ -217,7 +232,7 @@ def get_inferencer():
     if inferencer is None:
         inferencer = TransformerInferencer()
         if not inferencer.initialize():
-            raise RuntimeError("Failed to initialize transformer inferencer")
+            raise RuntimeError("Failed to initialize transformer inferencer (main.py:224)")
     return inferencer
 
 
@@ -269,13 +284,16 @@ def run_transformer_v1_analysis(req):
                         water_level = float(raw_value)
                     
                     # Check if conversion was successful and value is finite
-                    if not (np.isnan(water_level) or np.isinf(water_level)):
+                    # Convert to numpy array to safely use numpy functions
+                    np_water_level = np.array(water_level)
+                    if not (np.isnan(np_water_level) or np.isinf(np_water_level)):
                         water_level_data.append({
                             'timestamp': value['t'],
                             'waterLevel': water_level
                         })
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as e:
                     # Skip entries that can't be converted to float
+                    print(f"Skipping invalid water level value: {raw_value}, error: {e} (main.py:277)")
                     continue
         
         print(f"After filtering: {len(water_level_data)} valid data points")
@@ -312,8 +330,11 @@ def run_transformer_v1_analysis(req):
         water_level_values = [r['waterLevel'] for r in downsampled_data[-433:]]
         print(f"Prepared {len(water_level_values)} downsampled readings for prediction")
         
+        # Get the timestamp of the last data point for accurate forecast timing
+        last_data_timestamp = downsampled_data[-1]['timestamp'] if downsampled_data else None
+        
         # Generate 24-hour forecast
-        forecast_result = inferencer_instance.predict_24_hours(water_level_values)
+        forecast_result = inferencer_instance.predict_24_hours(water_level_values, last_data_timestamp)
         
         # Prepare forecast data for storage
         forecast_data = {
@@ -340,7 +361,7 @@ def run_transformer_v1_analysis(req):
         print(f"Total time: {(datetime.now() - start_time).total_seconds() * 1000:.1f}ms")
         
     except Exception as e:
-        print(f"Transformer v1 prediction error: {e}")
+        print(f"Transformer v1 prediction error: {e} (main.py:350)")
         
         # Store current error information (overwrites previous)
         error_data = {
@@ -353,6 +374,6 @@ def run_transformer_v1_analysis(req):
         error_ref = db.reference('/tidal-analysis/transformer-v1-error')
         error_ref.set(error_data)
         
-        print("Error information stored")
+        print("Error information stored (main.py:363)")
 
 

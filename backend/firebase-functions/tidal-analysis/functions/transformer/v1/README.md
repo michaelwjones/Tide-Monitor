@@ -197,20 +197,20 @@ python test_model.py --input file.json  # Test with custom data
    - Check Python dependencies in Firebase Functions
    - Monitor function logs
 
-5. **Data Type Errors (NumPy casting)**
+5. **Data Type Errors (NumPy casting)** ✅ **FIXED**
    - Error: `ufunc 'isnan' not supported for the input types`
    - Cause: Firebase data contains mixed types (strings, null values)
-   - Solution: Code includes robust type conversion and error handling:
-     - Proper string validation before float conversion
-     - Try-catch blocks around numpy operations
+   - Solution: Wrap values in `np.array()` before using numpy functions
+     - Fixed in main.py lines 125, 161, 272 with proper type casting
+     - Added comprehensive error handling with filename/line numbers
      - Uses -1 for missing values (model expectation)
    - Check logs for "Insufficient data points" if filtering is too aggressive
 
-6. **Forecast Timestamp Issues**
-   - Issue: X-axis values incorrect on debug dashboard
-   - Cause: Prediction timestamps must use 10-minute intervals
-   - Solution: Use `(i + 1) * 10` minutes for proper spacing
-   - Debug page uses timestamps directly from Firebase
+6. **Forecast Timestamp Issues** ✅ **FIXED**
+   - Issue: Forecasts were offset 4 hours into the future
+   - Cause: Using current processing time instead of last data point timestamp
+   - Solution: Pass `last_data_timestamp` and start predictions from last sensor reading
+   - Fixed in main.py with proper timestamp parsing and error handling
 
 ### Performance Optimization
 
