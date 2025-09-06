@@ -161,9 +161,13 @@ deploy-transformer-v1.bat          # Deploy to Firebase Functions (Python runtim
 ### Data Flow
 1. **Scheduled Trigger**: Cloud Scheduler runs every 5 minutes
 2. **Data Fetching**: Last 4320 readings from Firebase (3 days, 1-minute data)
-3. **Downsampling**: Convert to 433 readings (10-minute intervals)
-4. **Processing**: Seq2seq transformer inference with native PyTorch
-5. **Validation**: Convert NaN/infinite to -999 (error values)
+3. **Training-Aligned Processing**: Uses identical preprocessing pipeline as training
+   - Chronological sorting with timestamp parsing
+   - Training-style downsampling (every 10th + last reading)
+   - Preserves -999 synthetic values (no filtering)
+   - Validates data sufficiency (≥200 real readings required)
+4. **Seq2Seq Inference**: Native PyTorch transformer with perfect training/inference sync
+5. **Quality Assurance**: Converts NaN/infinite predictions to -999 (error values)
 6. **Storage**: Timestamped forecast with 144 predictions (10-minute intervals)
 
 ## Testing and Validation
@@ -281,13 +285,15 @@ python test_model.py --input file.json  # Test with custom data
 7. **Augment**: Apply real-time data augmentation during training (missing values, gaps, noise)
 
 ### Input Processing
-- **Data Source**: 4320 1-minute readings from Firebase downsampled to 433 10-minute intervals
-- **Type Safety**: Robust conversion of Firebase data (strings, numbers, null) to float with error handling
-- **Data Filtering**: Filters out NaN, infinite, and non-convertible values automatically
-- **Missing Values**: Invalid/NaN inputs converted to -999 (consistent with data pipeline)
-- **Normalization**: Z-score using training statistics (mean=1014.54, std=531.14)
-- **Sequence Length**: Fixed 433-point input required (72 hours @ 10-minute intervals)
-- **Padding Strategy**: Mean-value padding for insufficient data
+- **Training/Inference Sync**: Identical preprocessing pipeline ensures no quality loss during inference
+- **Data Source**: 4320 1-minute readings from Firebase, chronologically sorted
+- **Downsampling**: Training-style method (every 10th reading + last reading) → 433 10-minute intervals  
+- **Synthetic Value Handling**: Preserves -999 values from gap-filling, feeds directly to model
+- **Data Sufficiency**: Requires ≥200 real readings (46% minimum) for reliable prediction
+- **Type Safety**: Robust Firebase data conversion with comprehensive error handling
+- **Normalization**: Z-score using training statistics loaded from checkpoint
+- **Sequence Length**: Fixed 433-point input (72 hours @ 10-minute intervals)
+- **Padding Strategy**: Mean-value padding for insufficient data (rare with 3-day fetch window)
 
 ### Output Processing
 - **Direct Prediction**: Full 144-point sequence in single pass (24 hours @ 10-minute intervals)

@@ -265,73 +265,95 @@ def run_transformer_v1_analysis(req):
             sample_value = readings[sample_key]
             print(f"Sample reading {sample_key}: {sample_value}")
         
-        # Convert to array format with filtering (similar to Matrix Pencil approach)
-        water_level_data = []
+        # Parse readings with timestamps and handle -999 values (same as training)
+        readings_with_timestamps = []
         for key, value in readings.items():
             if 'w' in value and 't' in value:
                 try:
-                    # Convert to float and handle various input types
+                    # Convert water level, allowing -999 synthetic values
                     raw_value = value['w']
                     if raw_value is None:
                         continue
                     
-                    # Handle string conversion and ensure numeric type
                     if isinstance(raw_value, str):
-                        if raw_value.strip() == '' or raw_value == '-999':
+                        if raw_value.strip() == '':
                             continue
                         water_level = float(raw_value)
                     else:
                         water_level = float(raw_value)
                     
-                    # Check if conversion was successful and value is finite
-                    # Convert to numpy array to safely use numpy functions
-                    np_water_level = np.array(water_level)
-                    if not (np.isnan(np_water_level) or np.isinf(np_water_level)):
-                        water_level_data.append({
-                            'timestamp': value['t'],
-                            'waterLevel': water_level
-                        })
+                    # Parse timestamp
+                    timestamp = datetime.fromisoformat(value['t'].replace('Z', '+00:00'))
+                    
+                    # Include all values, including -999 synthetic ones
+                    readings_with_timestamps.append({
+                        'water_level': water_level,
+                        'timestamp': timestamp
+                    })
                 except (ValueError, TypeError) as e:
-                    # Skip entries that can't be converted to float
-                    print(f"Skipping invalid water level value: {raw_value}, error: {e} (main.py:277)")
+                    print(f"Skipping invalid reading: {raw_value}, error: {e}")
                     continue
         
-        print(f"After filtering: {len(water_level_data)} valid data points")
-        
-        # Sort by timestamp
-        water_level_data.sort(key=lambda x: x['timestamp'])
-        
-        if len(water_level_data) < 100:
-            print(f"Insufficient data points: {len(water_level_data)} (need at least 100)")
+        if len(readings_with_timestamps) < 4320:  # Need 72 hours minimum
+            print(f"Insufficient data points: {len(readings_with_timestamps)} (need at least 4320 for 72 hours)")
             return
         
-        print(f"Processing {len(water_level_data)} data points")
-        print(f"Time range: {water_level_data[0]['timestamp']} to {water_level_data[-1]['timestamp']}")
+        # Sort by timestamp to ensure chronological order
+        readings_with_timestamps.sort(key=lambda x: x['timestamp'])
         
-        # Downsample to 10-minute intervals (433 readings)
-        print("Downsampling to 10-minute intervals...")
-        downsampled_data = []
+        print(f"Processing {len(readings_with_timestamps)} chronologically sorted readings")
+        print(f"Time range: {readings_with_timestamps[0]['timestamp']} to {readings_with_timestamps[-1]['timestamp']}")
         
-        if len(water_level_data) >= 4320:
-            # Take every 10th reading
-            for i in range(0, len(water_level_data), 10):
-                if len(downsampled_data) >= 433:
-                    break
-                downsampled_data.append(water_level_data[i])
-        elif len(water_level_data) >= 433:
-            # Space evenly across available data
-            indices = [int(i * (len(water_level_data) - 1) / 432) for i in range(433)]
-            downsampled_data = [water_level_data[idx] for idx in indices]
-        else:
-            print(f"Insufficient data for prediction: {len(water_level_data)} readings")
+        # Take the most recent 4320 readings (72 hours)
+        recent_readings = readings_with_timestamps[-4320:]
+        
+        # Apply training-style downsampling: every 10th reading + last reading
+        print("Applying training-style downsampling to 10-minute intervals...")
+        downsampled_readings = []
+        
+        # Every 10th reading
+        for i in range(0, len(recent_readings), 10):
+            downsampled_readings.append(recent_readings[i])
+        
+        # Always add the very last reading
+        if len(recent_readings) > 0 and recent_readings[-1] not in downsampled_readings:
+            downsampled_readings.append(recent_readings[-1])
+        
+        # Take exactly 433 readings (consistent with training)
+        if len(downsampled_readings) > 433:
+            downsampled_readings = downsampled_readings[-433:]
+        
+        # Log timing information for diagnostics
+        time_gaps = []
+        for i in range(1, len(downsampled_readings)):
+            time_diff = (downsampled_readings[i]['timestamp'] - downsampled_readings[i-1]['timestamp']).total_seconds() / 60
+            time_gaps.append(time_diff)
+        
+        avg_interval = sum(time_gaps) / len(time_gaps) if time_gaps else 0
+        max_gap = max(time_gaps) if time_gaps else 0
+        
+        # Extract water level values, preserving -999 synthetic values
+        water_level_values = [r['water_level'] for r in downsampled_readings]
+        
+        print(f"Prepared {len(water_level_values)} readings for prediction")
+        synthetic_count = sum(1 for val in water_level_values if val == -999)
+        if synthetic_count > 0:
+            print(f"Input includes {synthetic_count} synthetic values (-999) - consistent with training data")
+        
+        # Check if we have sufficient real data for reliable prediction
+        real_values = [v for v in water_level_values if v != -999]
+        real_data_percentage = len(real_values) / len(water_level_values) * 100
+        
+        if len(real_values) < 200:  # Need at least 200 real readings (~33 hours at 10min intervals)
+            print(f"Insufficient real data: {len(real_values)} readings ({real_data_percentage:.1f}% real data)")
+            print(f"Need at least 200 real readings for reliable prediction")
             return
         
-        # Extract water level values
-        water_level_values = [r['waterLevel'] for r in downsampled_data[-433:]]
-        print(f"Prepared {len(water_level_values)} downsampled readings for prediction")
+        print(f"Data quality: {real_data_percentage:.1f}% real data, avg interval: {avg_interval:.1f}min, max gap: {max_gap:.1f}min")
+        print(f"Water level range: {min(real_values):.1f} - {max(real_values):.1f} mm")
         
         # Get the timestamp of the last data point for accurate forecast timing
-        last_data_timestamp = downsampled_data[-1]['timestamp'] if downsampled_data else None
+        last_data_timestamp = downsampled_readings[-1]['timestamp'] if downsampled_readings else None
         
         # Generate 24-hour forecast
         forecast_result = inferencer_instance.predict_24_hours(water_level_values, last_data_timestamp)
@@ -343,8 +365,8 @@ def run_transformer_v1_analysis(req):
             'model_architecture': 'seq2seq_transformer_pytorch',
             'input_data_count': len(water_level_values),
             'input_time_range': {
-                'start': water_level_data[0]['timestamp'],
-                'end': water_level_data[-1]['timestamp']
+                'start': readings_with_timestamps[0]['timestamp'],
+                'end': readings_with_timestamps[-1]['timestamp']
             },
             'forecast': forecast_result['predictions'],
             'forecast_count': len(forecast_result['predictions']),
