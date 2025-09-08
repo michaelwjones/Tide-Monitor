@@ -20,7 +20,7 @@ This is a **Tide Monitor** project that measures water levels and wave heights u
    - Auto-refreshes every 2 minutes
 
 3. **Debug dashboard** (`debug/index.html`) - Additional interface for:
-   - Raw data inspection and debugging with all measurement methods
+   - Raw data inspection and debugging with selected measurement methods
    - NOAA environmental data visualization (wind, water level)
    - System status monitoring
    - Same clean layout as main dashboard for consistency
@@ -82,7 +82,7 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Cloud F
 - **Default view**: 24 hours with zoom capability to full 72-hour dataset
 - **Time controls**: Dedicated 24-hour and 72-hour buttons for quick navigation
 - **Advanced zoom**: Click-and-drag selection and Ctrl+mouse wheel functionality
-- **Data visualization**: All 6 data fields on multi-axis chart
+- **Data visualization**: Selected data fields on multi-axis chart
 - **Layout**: Clean design matching main dashboard (no containers/borders)
 - **Navigation**: Link back to main dashboard in top-right corner
 - **Async loading**: Chart displays immediately, tidal analysis runs in background
@@ -90,8 +90,7 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Cloud F
 - **Signal analysis**: Matrix Pencil method for non-periodic tidal data analysis
 - **Chart axes**: 
   - Left Y-axis: Water level measurements (0-6 feet)
-  - Right Y-axis: Wave height measurements (0-2 feet)
-  - Hidden Y-axis: Valid sample count (0-512)
+  - Right Y-axis: Wave height measurements (0-1 feet)
 - **Transformer Forecasting**: 24-hour water level predictions from transformer v1 model
   - **Smart button**: "Show Forecast" button appears only when recent forecast available (< 10 minutes old)
   - **Point display**: Forecast shown as individual points at 10-minute intervals extending 24 hours into future
@@ -100,8 +99,8 @@ Ultrasonic Sensor → Particle Boron → Particle Cloud → Firebase → Cloud F
   - **Integration**: Fetches from `/tidal-analysis/transformer-v1-forecast` Firebase path
 
 ### Debug Dashboard (`debug/index.html`)
-- **Multi-axis charts**: Displays all measurement methods and NOAA environmental data
-- **Y-axes**: Water level (0-6 ft), Wave height (0-2 ft), Wind speed (0-30 knots)
+- **Multi-axis charts**: Displays selected measurement methods and NOAA environmental data
+- **Y-axes**: Water level (0-6 ft), Wave height (0-1 ft), Wind speed (0-40 knots)
 - **NOAA integration**: Real-time wind and water level from Duke Marine Lab station 8656483
 - **Transformer forecasting**: 24-hour predictions displayed as points when recent forecast available
 - **Time range controls**: 24h/72h buttons automatically extend for forecast (48h/96h total)
