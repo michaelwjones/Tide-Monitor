@@ -6,11 +6,11 @@ import os
 import random
 
 def load_firebase_data():
-    """Load and parse Firebase data (preferring enriched data if available)"""
-    # Try to load enriched data first
+    """Load and parse Firebase data (preferring processed data if available)"""
+    # Try to load processed data first
     try:
         with open('data/firebase_enriched_data.json', 'r') as f:
-            print("Loading enriched Firebase data...")
+            print("Loading processed Firebase data...")
             return json.load(f)
     except FileNotFoundError:
         pass
@@ -21,7 +21,7 @@ def load_firebase_data():
             print("Loading raw Firebase data...")
             return json.load(f)
     except FileNotFoundError:
-        print("Error: No Firebase data found. Run fetch_firebase_data.py first, then enrich_firebase_data.py.")
+        print("Error: No Firebase data found. Run fetch_firebase_data.py first, then process_raw_data.py.")
         return None
 
 def parse_readings(raw_data):
@@ -79,7 +79,9 @@ def generate_sequences_with_random_offsets(readings, total_hours=96, random_seed
         sequence = readings[start_idx:start_idx + sequence_length]
         sequences.append({
             'data': sequence,
-            'start_idx': start_idx
+            'start_idx': start_idx,
+            'start_timestamp': sequence[0]['timestamp'],
+            'end_timestamp': sequence[-1]['timestamp']
         })
         
         sequence_count += 1
@@ -216,10 +218,11 @@ def process_sequences(raw_sequences):
     """
     Process sequences: downsample each individually, filter out sequences 
     with 6+ consecutive synthetic readings or 15+ minute time gaps, and interpolate remaining synthetic values in outputs.
-    Returns arrays of training data.
+    Returns arrays of training data and sequence metadata with timestamps.
     """
     sequences = []
     targets = []
+    sequence_metadata = []
     filtered_synthetic = 0
     filtered_time_gaps = 0
     interpolated_sequences = 0
@@ -255,6 +258,13 @@ def process_sequences(raw_sequences):
         sequences.append(input_seq)
         targets.append(output_seq)
         
+        # Store sequence metadata with timestamps
+        sequence_metadata.append({
+            'start_timestamp': seq_info['start_timestamp'],
+            'end_timestamp': seq_info['end_timestamp'],
+            'sequence_index': len(sequences) - 1
+        })
+        
         # Progress indicator
         if (i + 1) % 1000 == 0:
             print(f"  Processed {i + 1}/{len(raw_sequences)} sequences...")
@@ -270,7 +280,7 @@ def process_sequences(raw_sequences):
     print(f"  Total synthetic values interpolated: {total_interpolated_values}")
     print(f"  Retention rate: {len(sequences) / len(raw_sequences) * 100:.1f}%")
     
-    return np.array(sequences), np.array(targets)
+    return np.array(sequences), np.array(targets), sequence_metadata
 
 def normalize_data(data):
     """Z-score normalization for transformer training"""
@@ -291,24 +301,68 @@ def normalize_data(data):
     print(f"Normalization parameters saved: mean={mean:.2f}, std={std:.2f}")
     return normalized, norm_params
 
-def create_train_val_split(X, y, val_split=0.2, random_seed=42):
+def create_train_val_split(X, y, sequence_metadata, val_split=0.2, random_seed=42):
     """
-    Create train/validation split for transformer training.
-    Uses time-based split to avoid data leakage.
+    Create train/validation split for transformer training with proper temporal gap.
+    Uses timestamps to ensure no data leakage between overlapping sequences.
     """
     np.random.seed(random_seed)
     
-    # Time-based split: use last 20% of sequences for validation
-    split_idx = int(len(X) * (1 - val_split))
+    total_sequences = len(X)
+    target_val_size = int(total_sequences * val_split)
     
-    X_train = X[:split_idx]
-    X_val = X[split_idx:]
-    y_train = y[:split_idx]
-    y_val = y[split_idx:]
+    # Find the 80% cutoff point based on sequence count
+    potential_train_end = total_sequences - target_val_size
     
-    print(f"Train/validation split:")
+    # Get the end timestamp of the last training sequence
+    last_train_end_time = sequence_metadata[potential_train_end - 1]['end_timestamp']
+    
+    print(f"Last training sequence ends at: {last_train_end_time}")
+    
+    # Find first validation sequence that starts AFTER the last training sequence ends
+    actual_val_start = None
+    for i in range(potential_train_end, total_sequences):
+        val_start_time = sequence_metadata[i]['start_timestamp']
+        if val_start_time >= last_train_end_time:
+            actual_val_start = i
+            print(f"First validation sequence starts at: {val_start_time}")
+            break
+    
+    if actual_val_start is None:
+        raise ValueError("Cannot create non-overlapping split - insufficient temporal separation")
+    
+    # Calculate the gap
+    gap_sequences = actual_val_start - potential_train_end
+    
+    # Create the splits
+    X_train = X[:potential_train_end]
+    X_val = X[actual_val_start:]
+    y_train = y[:potential_train_end]
+    y_val = y[actual_val_start:]
+    
+    # Calculate actual temporal span of discarded sequences
+    if gap_sequences > 0:
+        first_discarded_start = sequence_metadata[potential_train_end]['start_timestamp'] 
+        last_discarded_end = sequence_metadata[actual_val_start - 1]['end_timestamp']
+        discarded_timespan_hours = (last_discarded_end - first_discarded_start).total_seconds() / 3600
+        
+        # Also calculate boundary gap for reference
+        boundary_gap_start = sequence_metadata[potential_train_end - 1]['end_timestamp']
+        boundary_gap_end = sequence_metadata[actual_val_start]['start_timestamp']  
+        boundary_gap_hours = (boundary_gap_end - boundary_gap_start).total_seconds() / 3600
+    else:
+        discarded_timespan_hours = 0
+        boundary_gap_hours = 0
+    
+    print(f"Train/validation split with temporal gap:")
     print(f"  Training: {len(X_train)} sequences")
+    if gap_sequences > 0:
+        print(f"  Gap (discarded): {gap_sequences} sequences spanning {discarded_timespan_hours:.1f} hours")
+        print(f"  Boundary gap: {boundary_gap_hours:.1f} hours between last training and first validation")
+    else:
+        print(f"  Gap (discarded): 0 sequences (perfect temporal alignment)")
     print(f"  Validation: {len(X_val)} sequences")
+    print(f"  Temporal separation ensured: No data leakage between train/val")
     
     return X_train, X_val, y_train, y_val
 
@@ -335,7 +389,7 @@ def main():
     raw_sequences = generate_sequences_with_random_offsets(readings, total_hours=96)
     
     # Process sequences: downsample each individually and validate timing
-    X, y = process_sequences(raw_sequences)
+    X, y, sequence_metadata = process_sequences(raw_sequences)
     
     if len(X) == 0:
         print("Error: No valid sequences found after temporal validation")
@@ -345,16 +399,18 @@ def main():
     print(f"Input shape: {X.shape} (72-hour sequences at 10-min intervals)")
     print(f"Output shape: {y.shape} (24-hour sequences at 10-min intervals)")
     
-    # Normalize data (flatten all sequences for global statistics)
+    # Normalize data (flatten all sequences for global statistics, excluding synthetic values)
     all_values = np.concatenate([X.flatten(), y.flatten()])
-    normalized_all, norm_params = normalize_data(all_values)
+    real_values = all_values[all_values != -999]  # Exclude synthetic values from normalization
+    print(f"Normalization: Using {len(real_values)} real values, excluding {len(all_values) - len(real_values)} synthetic (-999) values")
+    normalized_all, norm_params = normalize_data(real_values)
     
     # Split back into X and y with same normalization
     X_normalized = (X - norm_params['mean']) / norm_params['std']
     y_normalized = (y - norm_params['mean']) / norm_params['std']
     
-    # Create train/validation split
-    X_train, X_val, y_train, y_val = create_train_val_split(X_normalized, y_normalized)
+    # Create train/validation split with proper temporal gap
+    X_train, X_val, y_train, y_val = create_train_val_split(X_normalized, y_normalized, sequence_metadata)
     
     print(f"Final dataset shapes:")
     print(f"  X_train: {X_train.shape}")

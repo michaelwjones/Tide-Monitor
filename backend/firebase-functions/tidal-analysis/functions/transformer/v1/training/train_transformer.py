@@ -414,7 +414,7 @@ class TransformerTrainer:
 def get_default_config():
     """Get default training configuration"""
     return {
-        'batch_size': 8,  # Increased due to 10-minute interval memory savings
+        'batch_size': 8,
         'learning_rate': 1e-4,
         'weight_decay': 1e-5,
         'num_epochs': 100,

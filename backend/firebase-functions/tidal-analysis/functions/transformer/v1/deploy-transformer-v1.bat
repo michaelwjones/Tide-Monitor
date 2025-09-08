@@ -51,7 +51,7 @@ echo Installing Python dependencies...
 call pip install -r requirements.txt
 
 echo Deploying to Firebase (Python runtime)...
-firebase deploy --only functions
+firebase deploy --only functions:run_transformer_v1_analysis
 set DEPLOY_RESULT=%ERRORLEVEL%
 
 cd /d "%ORIGINAL_DIR%"

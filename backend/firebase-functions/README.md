@@ -22,7 +22,16 @@ The `runTidalAnalysis` function runs every 5 minutes via Cloud Scheduler to perf
 The `runLSTMv1Prediction` function runs every 6 hours to generate 24-hour water level forecasts using iterative neural network prediction. Uses the last 72 hours of data to produce 1,440 future predictions, stored in `/tidal-analysis/lstm-v1-forecasts/` for debug dashboard visualization.
 
 #### Transformer v1 (`transformer/v1/`)
-The `run_transformer_v1_analysis` function runs every 5 minutes via Cloud Scheduler to generate 24-hour water level forecasts using sequence-to-sequence transformer architecture. Uses Python runtime with 1GB memory allocation. Features direct prediction (single forward pass) with the last 433 readings (72 hours @ 10-minute intervals) to produce 144 future predictions (24 hours @ 10-minute intervals), stored in `/tidal-analysis/transformer-v1-forecast/`. Includes robust data type handling for Firebase data conversion with proper numpy type casting and uses -1 for missing values per model expectations. Forecast timestamps are aligned with sensor data timeline by using the last data point timestamp as the starting reference. Debug dashboard automatically displays forecasts when updated within last 10 minutes with interactive "Show/Hide Forecast" button that extends chart timeline by 24 hours.
+The `run_transformer_v1_analysis` function runs every 5 minutes via Cloud Scheduler to generate 24-hour water level forecasts using sequence-to-sequence transformer architecture. Uses Python runtime with 1GB memory allocation for native PyTorch inference. Features direct prediction (single forward pass) with the last 433 readings (72 hours @ 10-minute intervals) to produce 144 future predictions (24 hours @ 10-minute intervals), stored in `/tidal-analysis/transformer-v1-forecast/`. 
+
+**Critical Improvements:**
+- **Fixed normalization contamination**: Training now excludes -999 synthetic values from mean/std calculation 
+- **Temporal gap enforcement**: Prevents data leakage between training and validation sets using actual timestamps
+- **Robust data handling**: Type casting with comprehensive error handling for Firebase data conversion
+- **Direct model input**: Bypasses redundant preprocessing to preserve carefully constructed temporal sequences
+- **Proper timestamp alignment**: Uses last real data timestamp as forecast base (not synthetic values)
+
+Debug dashboard automatically displays forecasts when updated within last 10 minutes with interactive "Show/Hide Forecast" button that extends chart timeline by 24 hours.
 
 See `analysis-functions.csv` for a complete list of available analysis methods, versions, and deployment history.
 

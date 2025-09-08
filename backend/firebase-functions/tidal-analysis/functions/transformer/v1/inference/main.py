@@ -5,6 +5,7 @@ Uses raw PyTorch model for zero conversion overhead and perfect quality.
 import json
 import os
 import sys
+import traceback
 from datetime import datetime, timedelta
 import torch
 import numpy as np
@@ -104,6 +105,128 @@ class TransformerInferencer:
         
         return input_sequence
     
+    def predict_24_hours_direct(self, water_levels, last_data_timestamp=None):
+        """Generate 24-hour predictions with pre-processed 433-value input (skip prepare_input_sequence)"""
+        if self.model is None:
+            raise RuntimeError("Model not initialized")
+        
+        try:
+            print("Starting transformer prediction with direct input...")
+            start_time = datetime.now()
+            
+            # Verify we have exactly 433 values
+            if len(water_levels) != 433:
+                raise ValueError(f"Expected exactly 433 input values, got {len(water_levels)}")
+            
+            # Handle missing/invalid values (keep -999 as-is since model expects them)
+            validated_sequence = []
+            for val in water_levels:
+                if val == -999:
+                    # Keep -999 values as-is (model was trained with them)
+                    validated_sequence.append(-999)
+                else:
+                    try:
+                        # Ensure val is numeric
+                        numeric_val = float(val)
+                        np_val = np.array(numeric_val)
+                        if not np.isfinite(np_val) or np.isnan(np_val):
+                            print(f"Invalid input value: {val}, replacing with -999")
+                            validated_sequence.append(-999)
+                        else:
+                            validated_sequence.append(numeric_val)
+                    except (ValueError, TypeError):
+                        print(f"Non-numeric input value: {val}, replacing with -999")
+                        validated_sequence.append(-999)
+            
+            # Normalize input (including -999 values as model expects)
+            normalized_input = self.normalize_data(torch.FloatTensor(validated_sequence))
+            
+            # Create input tensor (shape: [1, 433, 1])
+            input_tensor = normalized_input.view(1, 433, 1)
+            
+            print(f"Input tensor shape: {list(input_tensor.shape)}")
+            synthetic_count = sum(1 for val in validated_sequence if val == -999)
+            print(f"Input contains {synthetic_count} synthetic values (-999)")
+            
+            # Run inference
+            with torch.no_grad():
+                output_tensor = self.model(input_tensor)
+            
+            inference_time = (datetime.now() - start_time).total_seconds() * 1000
+            print(f"Inference completed in {inference_time:.1f}ms")
+            
+            # Get predictions and denormalize
+            normalized_predictions = output_tensor.squeeze().cpu().numpy()
+            raw_predictions = self.denormalize_data(torch.FloatTensor(normalized_predictions)).tolist()
+            
+            print(f"Output tensor shape: {list(output_tensor.shape)}")
+            print(f"Generated {len(raw_predictions)} predictions")
+            
+            # Handle invalid predictions
+            predictions = []
+            for pred in raw_predictions:
+                try:
+                    numeric_pred = float(pred)
+                    np_pred = np.array(numeric_pred)
+                    if not np.isfinite(np_pred) or np.isnan(np_pred):
+                        print(f"Invalid prediction: {pred}, replacing with -999")
+                        predictions.append(-999)
+                    else:
+                        predictions.append(numeric_pred)
+                except (ValueError, TypeError):
+                    print(f"Non-numeric prediction: {pred}, replacing with -999")
+                    predictions.append(-999)
+            
+            valid_predictions = [p for p in predictions if p != -999]
+            error_count = len(predictions) - len(valid_predictions)
+            
+            print(f"Valid predictions: {len(valid_predictions)}, errors: {error_count}")
+            
+            if valid_predictions:
+                print(f"Prediction range: {min(valid_predictions):.1f} - {max(valid_predictions):.1f} mm")
+            
+            # Create timestamped predictions
+            if last_data_timestamp:
+                try:
+                    base_time = datetime.fromisoformat(last_data_timestamp.replace('Z', '+00:00'))
+                except ValueError:
+                    base_time = datetime.now()
+                    print(f"Failed to parse timestamp {last_data_timestamp}, using current time")
+            else:
+                base_time = datetime.now()
+                print("No last data timestamp provided, using current time")
+            
+            timestamped_predictions = []
+            
+            for i, prediction in enumerate(predictions):
+                # 10-minute intervals starting from the last data point
+                prediction_time = base_time + timedelta(minutes=(i + 1) * 10)
+                
+                timestamped_predictions.append({
+                    'timestamp': prediction_time.isoformat(),
+                    'prediction': prediction,
+                    'step': i + 1
+                })
+            
+            return {
+                'predictions': timestamped_predictions,
+                'metadata': {
+                    'inference_time_ms': inference_time,
+                    'input_length': len(validated_sequence),
+                    'output_length': len(predictions),
+                    'model_architecture': 'seq2seq_transformer_pytorch',
+                    'model_version': 'transformer-v1-pytorch',
+                    'normalization': self.normalization_params,
+                    'training_loss': self.training_loss,
+                    'error_predictions': error_count,
+                    'input_synthetic_count': synthetic_count
+                }
+            }
+            
+        except Exception as e:
+            print(f"Direct prediction error: {e}")
+            raise
+    
     def predict_24_hours(self, water_levels, last_data_timestamp=None):
         """Generate 24-hour predictions using the transformer model"""
         if self.model is None:
@@ -125,12 +248,12 @@ class TransformerInferencer:
                     # Convert to numpy array to safely use numpy functions
                     np_val = np.array(numeric_val)
                     if not np.isfinite(np_val) or np.isnan(np_val):
-                        print(f"Invalid input value: {val}, replacing with -999 (main.py:128)")
+                        print(f"Invalid input value: {val}, replacing with -999")
                         validated_sequence.append(-999)
                     else:
                         validated_sequence.append(numeric_val)
                 except (ValueError, TypeError):
-                    print(f"Non-numeric input value: {val}, replacing with -999 (main.py:133)")
+                    print(f"Non-numeric input value: {val}, replacing with -999")
                     validated_sequence.append(-999)
             
             # Normalize input
@@ -163,12 +286,12 @@ class TransformerInferencer:
                     # Convert to numpy array to safely use numpy functions
                     np_pred = np.array(numeric_pred)
                     if not np.isfinite(np_pred) or np.isnan(np_pred):
-                        print(f"Invalid prediction: {pred}, replacing with -999 (main.py:166)")
+                        print(f"Invalid prediction: {pred}, replacing with -999")
                         predictions.append(-999)
                     else:
                         predictions.append(numeric_pred)
                 except (ValueError, TypeError):
-                    print(f"Non-numeric prediction: {pred}, replacing with -999 (main.py:171)")
+                    print(f"Non-numeric prediction: {pred}, replacing with -999")
                     predictions.append(-999)
             
             valid_predictions = [p for p in predictions if p != -999]
@@ -187,10 +310,10 @@ class TransformerInferencer:
                 except ValueError:
                     # Fallback to current time if timestamp parsing fails
                     base_time = datetime.now()
-                    print(f"Failed to parse timestamp {last_data_timestamp}, using current time (main.py:185)")
+                    print(f"Failed to parse timestamp {last_data_timestamp}, using current time")
             else:
                 base_time = datetime.now()
-                print("No last data timestamp provided, using current time (main.py:188)")
+                print("No last data timestamp provided, using current time")
             
             timestamped_predictions = []
             
@@ -219,7 +342,7 @@ class TransformerInferencer:
             }
             
         except Exception as e:
-            print(f"Prediction error: {e} (main.py:211)")
+            print(f"Prediction error: {e}")
             raise
 
 
@@ -232,7 +355,7 @@ def get_inferencer():
     if inferencer is None:
         inferencer = TransformerInferencer()
         if not inferencer.initialize():
-            raise RuntimeError("Failed to initialize transformer inferencer (main.py:224)")
+            raise RuntimeError("Failed to initialize transformer inferencer")
     return inferencer
 
 
@@ -294,8 +417,8 @@ def run_transformer_v1_analysis(req):
                     print(f"Skipping invalid reading: {raw_value}, error: {e}")
                     continue
         
-        if len(readings_with_timestamps) < 4320:  # Need 72 hours minimum
-            print(f"Insufficient data points: {len(readings_with_timestamps)} (need at least 4320 for 72 hours)")
+        if len(readings_with_timestamps) < 100:  # Need minimum viable data for prediction
+            print(f"Insufficient data points: {len(readings_with_timestamps)} (need at least 100 readings for prediction)")
             return
         
         # Sort by timestamp to ensure chronological order
@@ -304,24 +427,68 @@ def run_transformer_v1_analysis(req):
         print(f"Processing {len(readings_with_timestamps)} chronologically sorted readings")
         print(f"Time range: {readings_with_timestamps[0]['timestamp']} to {readings_with_timestamps[-1]['timestamp']}")
         
-        # Take the most recent 4320 readings (72 hours)
-        recent_readings = readings_with_timestamps[-4320:]
+        # Create 433-point sequence starting from current time, working backwards at 10-minute intervals
+        print(f"Creating 433-point sequence from current time backwards...")
         
-        # Apply training-style downsampling: every 10th reading + last reading
-        print("Applying training-style downsampling to 10-minute intervals...")
+        # 1) Get the current time
+        if readings_with_timestamps:
+            # Use timezone from the data
+            current_time = datetime.now().replace(tzinfo=readings_with_timestamps[0]['timestamp'].tzinfo)
+        else:
+            from datetime import timezone
+            current_time = datetime.now().replace(tzinfo=timezone.utc)
+        
+        # 2) Find the closest reading to current time to establish our starting point
+        closest_to_now = None
+        min_diff = float('inf')
+        for reading in readings_with_timestamps:
+            time_diff = abs((reading['timestamp'] - current_time).total_seconds())
+            if time_diff < min_diff:
+                min_diff = time_diff
+                closest_to_now = reading
+        
+        # Use the timestamp of the closest reading as our reference point
+        if closest_to_now:
+            reference_time = closest_to_now['timestamp']
+            print(f"Reference time (closest to now): {reference_time}")
+        else:
+            reference_time = current_time
+            print(f"No readings found, using current time: {reference_time}")
+        
+        # 3 & 4) Count backwards in 10-minute intervals, finding closest readings
         downsampled_readings = []
         
-        # Every 10th reading
-        for i in range(0, len(recent_readings), 10):
-            downsampled_readings.append(recent_readings[i])
+        for i in range(433):
+            # Calculate target time (going backwards from reference time)
+            target_time = reference_time - timedelta(minutes=i * 10)
+            
+            # Find closest reading within ±5 minutes of this target time
+            closest_reading = None
+            min_diff = float('inf')
+            
+            for reading in readings_with_timestamps:
+                time_diff = abs((reading['timestamp'] - target_time).total_seconds())
+                if time_diff <= 300 and time_diff < min_diff:  # Within ±5 minutes
+                    min_diff = time_diff
+                    closest_reading = reading
+            
+            # Use closest reading if found, otherwise -999
+            if closest_reading:
+                water_level = closest_reading['water_level']
+            else:
+                water_level = -999
+            
+            downsampled_readings.append({
+                'water_level': water_level,
+                'timestamp': target_time
+            })
         
-        # Always add the very last reading
-        if len(recent_readings) > 0 and recent_readings[-1] not in downsampled_readings:
-            downsampled_readings.append(recent_readings[-1])
+        # Reverse to get chronological order (oldest to newest)
+        downsampled_readings.reverse()
         
-        # Take exactly 433 readings (consistent with training)
-        if len(downsampled_readings) > 433:
-            downsampled_readings = downsampled_readings[-433:]
+        synthetic_count = sum(1 for r in downsampled_readings if r['water_level'] == -999)
+        print(f"Created 433-point sequence with {synthetic_count} missing data points (-999)")
+        print(f"Time range: {downsampled_readings[0]['timestamp']} to {downsampled_readings[-1]['timestamp']}")
         
         # Log timing information for diagnostics
         time_gaps = []
@@ -340,23 +507,30 @@ def run_transformer_v1_analysis(req):
         if synthetic_count > 0:
             print(f"Input includes {synthetic_count} synthetic values (-999) - consistent with training data")
         
-        # Check if we have sufficient real data for reliable prediction
+        # Log data quality info (model can handle synthetic data)
         real_values = [v for v in water_level_values if v != -999]
         real_data_percentage = len(real_values) / len(water_level_values) * 100
         
-        if len(real_values) < 200:  # Need at least 200 real readings (~33 hours at 10min intervals)
-            print(f"Insufficient real data: {len(real_values)} readings ({real_data_percentage:.1f}% real data)")
-            print(f"Need at least 200 real readings for reliable prediction")
-            return
-        
         print(f"Data quality: {real_data_percentage:.1f}% real data, avg interval: {avg_interval:.1f}min, max gap: {max_gap:.1f}min")
-        print(f"Water level range: {min(real_values):.1f} - {max(real_values):.1f} mm")
+        if real_values:
+            print(f"Water level range: {min(real_values):.1f} - {max(real_values):.1f} mm")
+        else:
+            print("No real water level data available - using all synthetic values")
         
-        # Get the timestamp of the last data point for accurate forecast timing
-        last_data_timestamp = downsampled_readings[-1]['timestamp'] if downsampled_readings else None
+        # Get the timestamp of the last REAL data point (not synthetic) for accurate forecast timing
+        last_real_timestamp = None
+        for reading in reversed(downsampled_readings):  # Search backwards
+            if reading['water_level'] != -999:
+                last_real_timestamp = reading['timestamp'].isoformat()
+                break
         
-        # Generate 24-hour forecast
-        forecast_result = inferencer_instance.predict_24_hours(water_level_values, last_data_timestamp)
+        if not last_real_timestamp:
+            # Fallback: use the last reading from original data
+            last_real_timestamp = readings_with_timestamps[-1]['timestamp'].isoformat() if readings_with_timestamps else None
+            print("Warning: No real data in downsampled sequence, using last original timestamp")
+        
+        # Generate 24-hour forecast (bypass prepare_input_sequence since we already have exactly 433 values)
+        forecast_result = inferencer_instance.predict_24_hours_direct(water_level_values, last_real_timestamp)
         
         # Prepare forecast data for storage
         forecast_data = {
@@ -365,8 +539,8 @@ def run_transformer_v1_analysis(req):
             'model_architecture': 'seq2seq_transformer_pytorch',
             'input_data_count': len(water_level_values),
             'input_time_range': {
-                'start': readings_with_timestamps[0]['timestamp'],
-                'end': readings_with_timestamps[-1]['timestamp']
+                'start': readings_with_timestamps[0]['timestamp'].isoformat(),
+                'end': readings_with_timestamps[-1]['timestamp'].isoformat()
             },
             'forecast': forecast_result['predictions'],
             'forecast_count': len(forecast_result['predictions']),
@@ -383,19 +557,26 @@ def run_transformer_v1_analysis(req):
         print(f"Total time: {(datetime.now() - start_time).total_seconds() * 1000:.1f}ms")
         
     except Exception as e:
-        print(f"Transformer v1 prediction error: {e} (main.py:350)")
+        # Get simple error location info
+        tb = traceback.extract_tb(e.__traceback__)
+        error_location = tb[-1]  # Get the last frame (where error occurred)
+        
+        # Create simple error summary
+        error_summary = f"{os.path.basename(error_location.filename)}:{error_location.lineno} - {type(e).__name__}: {str(e)}"
+        
+        print(f"Transformer v1 prediction error: {error_summary}")
         
         # Store current error information (overwrites previous)
         error_data = {
             'generated_at': int(datetime.now().timestamp() * 1000),
             'model_version': 'transformer-v1-pytorch',
-            'error': str(e),
+            'error_summary': error_summary,
             'timestamp': datetime.now().isoformat()
         }
         
         error_ref = db.reference('/tidal-analysis/transformer-v1-error')
         error_ref.set(error_data)
         
-        print("Error information stored (main.py:363)")
+        print("Error information stored")
 
 

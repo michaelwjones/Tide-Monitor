@@ -13,11 +13,11 @@ echo   Setup Options
 echo ========================================================
 echo 1. Install PyTorch (CPU version)
 echo 2. Install PyTorch (CUDA version - requires NVIDIA GPU)
-echo 3. Fetch data, fill gaps, and create training dataset
+echo 3. Fetch data, process with filtering, and create training dataset
 echo 4. Train transformer model
 echo 5. Test model locally (PyTorch web server)
 echo 6. Deploy to Firebase Functions (PyTorch runtime)
-echo 7. Run complete pipeline (3-6)
+echo 7. Run complete pipeline (3-5)
 echo 8. Exit
 echo.
 
@@ -53,8 +53,8 @@ if "%choice%"=="3" (
     echo Fetching Firebase data...
     python fetch_firebase_data.py
     if not errorlevel 1 (
-        echo Enriching data with gap filling...
-        python enrich_firebase_data.py
+        echo Processing data with filtering and gap filling...
+        python process_raw_data.py
         if not errorlevel 1 (
             echo Creating training dataset...
             python create_training_data.py
@@ -102,44 +102,61 @@ if "%choice%"=="7" (
     echo.
     echo Step 1: Data Preparation
     cd data-preparation
+    if errorlevel 1 goto :error
     python fetch_firebase_data.py
-    if errorlevel 1 goto :error
-    python enrich_firebase_data.py
-    if errorlevel 1 goto :error
+    if errorlevel 1 (
+        cd ..
+        goto :error
+    )
+    python process_raw_data.py
+    if errorlevel 1 (
+        cd ..
+        goto :error
+    )
     python create_training_data.py
-    if errorlevel 1 goto :error
+    if errorlevel 1 (
+        cd ..
+        goto :error
+    )
     cd ..
     echo.
     
     echo Step 2: Training
     cd training
-    echo Warning: This may take several hours!
-    set /p confirm=Continue with training? (y/n): 
-    if /i "%confirm%"=="y" (
-        python train_transformer.py
-        if errorlevel 1 goto :error
-    ) else (
-        echo Skipping training. Make sure you have a trained model before continuing.
+    if errorlevel 1 goto :error
+    echo Starting transformer training (may take several hours)
+    python train_transformer.py
+    if errorlevel 1 (
+        cd ..
+        goto :error
     )
     cd ..
     echo.
     
     echo Step 3: Local Testing
-    echo Starting PyTorch model server for validation...
+    echo Starting PyTorch model server for validation
     cd training
+    if errorlevel 1 goto :error
+    if not exist "checkpoints\best.pth" (
+        echo ERROR: No trained model found! Training may have failed.
+        cd ..
+        goto :error
+    )
     start /min python model_server.py
+    if errorlevel 1 (
+        echo ERROR: Failed to start model server
+        cd ..
+        goto :error
+    )
     timeout /t 3 >nul
     cd ..
     echo.
     
-    echo Step 4: Firebase Deployment
-    call deploy-transformer-v1.bat
-    
     echo.
     echo ========== Pipeline Complete ==========
-    echo Your Transformer v1 model is now ready for production!
-    echo - Local server: http://localhost:8000 (if still running)
-    echo - Firebase Functions: Check Firebase Console for deployment status
+    echo Your Transformer v1 model training and testing is complete
+    echo - Local server at http://localhost port 8000 (if still running)
+    echo - Use option 6 separately to deploy to Firebase Functions when ready
     goto :success
 )
 

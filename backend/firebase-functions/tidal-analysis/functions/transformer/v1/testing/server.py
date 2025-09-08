@@ -17,13 +17,13 @@ from datetime import datetime, timedelta
 from firebase_fetch import get_transformer_input_sequence, create_sample_data
 
 # Add parent directories to path for imports
-sys.path.append(str(Path(__file__).parent.parent / 'training'))
+sys.path.append(str(Path(__file__).parent.parent / 'inference'))
 
 try:
     from model import TidalTransformer, create_model
-    print("✅ Transformer model imported successfully")
+    print("[OK] Transformer model imported successfully")
 except ImportError as e:
-    print(f"❌ Error importing model: {e}")
+    print(f"[ERROR] Error importing model: {e}")
     sys.exit(1)
 
 class TransformerHandler(BaseHTTPRequestHandler):
@@ -38,13 +38,13 @@ class TransformerHandler(BaseHTTPRequestHandler):
         if cls.model is not None:
             return True
             
-        model_path = '../training/checkpoints/best.pth'
+        model_path = '../inference/best.pth'
         
         try:
             # Load model
             if not os.path.exists(model_path):
-                print(f"⚠️  Model not found at {model_path}")
-                print("📝 Creating dummy model for testing interface...")
+                print(f"[WARN]  Model not found at {model_path}")
+                print("[INFO] Creating dummy model for testing interface...")
                 
                 # Create dummy model for interface testing
                 cls.model = create_model()
@@ -68,13 +68,13 @@ class TransformerHandler(BaseHTTPRequestHandler):
             cls.model_info['validation_loss'] = float(checkpoint['loss'])
             cls.model_info['training_epoch'] = checkpoint['epoch']
             
-            print("✅ Transformer model loaded successfully")
+            print("[OK] Transformer model loaded successfully")
             print(f"   Validation loss: {checkpoint['loss']:.6f}")
             print(f"   Parameters: {cls.model_info['total_parameters']:,}")
             return True
             
         except Exception as e:
-            print(f"❌ Error loading model: {e}")
+            print(f"[ERROR] Error loading model: {e}")
             traceback.print_exc()
             return False
     
@@ -132,7 +132,7 @@ class TransformerHandler(BaseHTTPRequestHandler):
     def fetch_firebase_data(self):
         """Fetch real data from Firebase"""
         try:
-            print("📡 Fetching Firebase data...")
+            print("[INFO] Fetching Firebase data...")
             water_levels, timestamps = get_transformer_input_sequence()
             
             if not water_levels:
@@ -159,7 +159,7 @@ class TransformerHandler(BaseHTTPRequestHandler):
             })
             
         except Exception as e:
-            print(f"❌ Firebase fetch error: {e}")
+            print(f"[ERROR] Firebase fetch error: {e}")
             self.send_json_response({
                 'error': str(e),
                 'success': False
@@ -168,7 +168,7 @@ class TransformerHandler(BaseHTTPRequestHandler):
     def generate_sample_data(self):
         """Generate sample tidal data"""
         try:
-            print("🧪 Generating sample data...")
+            print("[INFO] Generating sample data...")
             water_levels, timestamps = create_sample_data()
             
             # Format timestamps for JSON
@@ -189,7 +189,7 @@ class TransformerHandler(BaseHTTPRequestHandler):
             })
             
         except Exception as e:
-            print(f"❌ Sample generation error: {e}")
+            print(f"[ERROR] Sample generation error: {e}")
             self.send_json_response({
                 'error': str(e),
                 'success': False
@@ -198,7 +198,7 @@ class TransformerHandler(BaseHTTPRequestHandler):
     def serve_training_info(self):
         """Serve training dataset information"""
         try:
-            print("📊 Loading training dataset info...")
+            print("[INFO] Loading training dataset info...")
             
             # Load training data files
             data_dir = Path(__file__).parent.parent / 'data-preparation' / 'data'
@@ -269,7 +269,7 @@ class TransformerHandler(BaseHTTPRequestHandler):
             })
             
         except Exception as e:
-            print(f"❌ Training info error: {e}")
+            print(f"[ERROR] Training info error: {e}")
             traceback.print_exc()
             self.send_json_response({
                 'error': str(e),
@@ -279,7 +279,7 @@ class TransformerHandler(BaseHTTPRequestHandler):
     def serve_random_training_sequence(self):
         """Serve a random training sequence with timestamps"""
         try:
-            print("🎲 Loading random training sequence...")
+            print("[INFO] Loading random training sequence...")
             
             # Load training data files
             data_dir = Path(__file__).parent.parent / 'data-preparation' / 'data'
@@ -354,7 +354,7 @@ class TransformerHandler(BaseHTTPRequestHandler):
             })
             
         except Exception as e:
-            print(f"❌ Random training sequence error: {e}")
+            print(f"[ERROR] Random training sequence error: {e}")
             traceback.print_exc()
             self.send_json_response({
                 'error': str(e),
@@ -382,7 +382,7 @@ class TransformerHandler(BaseHTTPRequestHandler):
                 }, 400)
                 return
             
-            print(f"🔮 Making prediction with {len(input_data)} input points...")
+            print(f"[INFO] Making prediction with {len(input_data)} input points...")
             
             # Make prediction
             predictions = self.predict_sequence(input_data)
@@ -394,7 +394,7 @@ class TransformerHandler(BaseHTTPRequestHandler):
                 }, 500)
                 return
             
-            print(f"✅ Generated {len(predictions)} predictions")
+            print(f"[OK] Generated {len(predictions)} predictions")
             
             self.send_json_response({
                 'predictions': predictions,
@@ -410,7 +410,7 @@ class TransformerHandler(BaseHTTPRequestHandler):
             })
             
         except Exception as e:
-            print(f"❌ Prediction error: {e}")
+            print(f"[ERROR] Prediction error: {e}")
             traceback.print_exc()
             self.send_json_response({
                 'error': str(e),
@@ -422,7 +422,7 @@ class TransformerHandler(BaseHTTPRequestHandler):
         try:
             # Handle dummy model case
             if self.model_info.get('status') == 'dummy_model':
-                print("⚠️  Using dummy model - generating synthetic predictions")
+                print("[WARN]  Using dummy model - generating synthetic predictions")
                 # Generate realistic tidal pattern for next 24 hours
                 t = np.linspace(0, 24, 144)
                 base_level = np.mean(input_data)
@@ -451,7 +451,7 @@ class TransformerHandler(BaseHTTPRequestHandler):
                 output_tensor = self.model(input_tensor)  # (1, 144, 1)
             inference_time = time.time() - start_time
             
-            print(f"⚡ Inference completed in {inference_time*1000:.1f} ms")
+            print(f"[OK] Inference completed in {inference_time*1000:.1f} ms")
             
             # Denormalize output
             normalized_predictions = output_tensor.squeeze().numpy()  # (144,)
@@ -460,7 +460,7 @@ class TransformerHandler(BaseHTTPRequestHandler):
             return predictions.tolist()
             
         except Exception as e:
-            print(f"❌ Prediction error: {e}")
+            print(f"[ERROR] Prediction error: {e}")
             traceback.print_exc()
             return None
     
@@ -491,29 +491,29 @@ class TransformerHandler(BaseHTTPRequestHandler):
 def main():
     port = 8000
     
-    print("🚀 Transformer v1 Testing Server")
+    print("[START] Transformer v1 Testing Server")
     print("=" * 40)
     
     # Load model on startup
     if not TransformerHandler.load_model():
-        print("❌ Failed to load model, exiting...")
+        print("[ERROR] Failed to load model, exiting...")
         return 1
     
     try:
         server = HTTPServer(('localhost', port), TransformerHandler)
-        print(f"🌐 Server running at http://localhost:{port}")
-        print(f"🧠 Model status: {TransformerHandler.model_info.get('status', 'unknown')}")
-        print("📱 Open your browser to test the model!")
+        print(f"[OK] Server running at http://localhost:{port}")
+        print(f"[INFO] Model status: {TransformerHandler.model_info.get('status', 'unknown')}")
+        print("[INFO] Open your browser to test the model!")
         print("Press Ctrl+C to stop server")
         print("-" * 40)
         
         server.serve_forever()
         
     except KeyboardInterrupt:
-        print("\n👋 Server stopped by user")
+        print("\n[INFO] Server stopped by user")
         return 0
     except Exception as e:
-        print(f"❌ Server error: {e}")
+        print(f"[ERROR] Server error: {e}")
         return 1
 
 if __name__ == '__main__':

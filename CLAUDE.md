@@ -29,7 +29,7 @@ This is a **Tide Monitor** project that measures water levels and wave heights u
    - **Data Enrichment** (`tide-enrichment/`): Automatically triggers when new readings arrive
    - **Tidal Analysis Functions** (`tidal-analysis/functions/`): Multiple analysis methods for advanced signal processing
    - **LSTM Forecasting** (`tidal-analysis/functions/lstm/v1/`): Neural network-powered 24-hour water level predictions
-   - **Transformer Forecasting** (`tidal-analysis/functions/transformer/v1/`): Advanced sequence-to-sequence 24-hour predictions with gap-filled training data
+   - **Transformer Forecasting** (`tidal-analysis/functions/transformer/v1/`): Advanced sequence-to-sequence 24-hour predictions with real-time temporal alignment
    - Fetch real-time wind and water level data from NOAA station 8656483 (Duke Marine Lab)
    - Enrich each reading with environmental conditions
    - Perform strict data validation requiring at least 1 data point (uses last element)
@@ -131,7 +131,7 @@ This project uses minimal build tools. Development involves:
    - **Enrichment only**: `deploy-enrichment.bat` (NOAA data enrichment, always safe)
    - **Matrix Pencil v1**: `deploy-matrix-pencil-v1.bat` (tidal analysis with cost control)
    - **LSTM v1 Forecasting**: `tidal-analysis/functions/lstm/v1/deploy-lstm-v1.bat` (requires trained model)
-   - **Transformer v1 Forecasting**: `tidal-analysis/functions/transformer/v1/deploy-transformer-v1.bat` (requires trained model)
+   - **Transformer v1 Forecasting**: `tidal-analysis/functions/transformer/v1/deploy-transformer-v1.bat` (requires trained model, deploys specific function only)
    - **Manual CLI**: `firebase deploy --only functions --source tide-enrichment` or `--source tidal-analysis/functions/matrix-pencil/v1` or `--source tidal-analysis/functions/lstm/v1/inference` or `--source tidal-analysis/functions/transformer/v1/inference`
    - **Prerequisites**: Run `npm install` in each function directory before first deployment
    - **Logs**: `firebase functions:log`
@@ -191,7 +191,7 @@ Tide-Monitor/
     │                   ├── README.md    # Transformer setup and deployment guide
     │                   ├── data-preparation/  # Enhanced data pipeline with gap filling
     │                   │   ├── fetch_firebase_data.py     # Raw data fetching
-    │                   │   ├── enrich_firebase_data.py    # Gap filling and enrichment
+    │                   │   ├── process_raw_data.py        # Data filtering and gap filling
     │                   │   └── create_training_data.py    # Quality filtering and processing
     │                   ├── training/    # PyTorch transformer training pipeline
     │                   ├── testing/     # Model validation and testing interface
@@ -264,7 +264,8 @@ Readings are stored with auto-generated keys containing:
 ### Transformer v1 Data Preparation
 The transformer v1 system introduces advanced data preprocessing to handle sensor gaps and ensure high-quality training data:
 
-#### Gap Filling and Enrichment (`enrich_firebase_data.py`)
+#### Data Processing and Gap Filling (`process_raw_data.py`)
+- **Data Filtering**: Removes physically impossible water levels (< -200mm) before processing
 - **Temporal Continuity**: Fills missing minute-by-minute readings with -999 synthetic values
 - **Complete Day Processing**: Only processes complete days (midnight to midnight) with sufficient coverage  
 - **Large Gap Preservation**: Doesn't fill gaps >1 hour, preserves natural outage patterns
@@ -286,6 +287,29 @@ The transformer v1 system introduces advanced data preprocessing to handle senso
 - **File Size**: 68.1 MB of high-quality training data
 
 ## Technical Notes
+
+### Transformer v1 Inference Improvements (Recent)
+
+**Real-Time Temporal Alignment** - The transformer inference system now uses sophisticated temporal alignment:
+- **Current Time Reference**: Uses actual inference time to create proper 72-hour timeline
+- **Backwards Timeline Generation**: Creates 433 target times at 10-minute intervals going back from now
+- **Smart Data Matching**: Maps each target time to closest available reading (±5 minute tolerance)
+- **Minimal Synthetic Data**: Only uses -999 when genuinely no data available in time slots
+- **Chronological Preservation**: Maintains proper oldest-to-newest order for model input
+
+**Direct Model Input** - New `predict_24_hours_direct()` method:
+- **Bypasses Input Preparation**: Prevents double processing and data corruption 
+- **Preserves Synthetic Values**: Maintains exact -999 values as model expects
+- **No Mean Contamination**: Eliminates incorrect mean calculations that include -999 values
+- **Pre-Validated Sequences**: Feeds exactly 433 points directly to model without modification
+- **Enhanced Error Reporting**: Concise file:line - ErrorType: message format in Firebase
+
+**Robust Data Requirements**:
+- **Minimum Threshold**: Only 100 readings required (vs previous 4300+ requirement)  
+- **Proper Timestamp Base**: Uses last real data timestamp (not synthetic) for prediction alignment
+- **Deployment Precision**: Uses `--only functions:run_transformer_v1_analysis` to avoid orphaned function prompts
+
+These improvements fix uniform prediction outputs and ensure natural tidal variations in forecasts.
 
 - **Deployment**: Hosted on GitHub Pages with Netlify-style headers
 - **Security**: Content Security Policy prevents XSS attacks

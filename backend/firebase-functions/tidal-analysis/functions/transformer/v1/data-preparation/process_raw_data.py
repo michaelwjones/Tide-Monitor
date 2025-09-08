@@ -13,10 +13,11 @@ def load_firebase_data():
         return None
 
 def parse_and_sort_readings(raw_data):
-    """Parse readings and sort by timestamp, removing wildly out-of-range timestamps"""
+    """Parse readings and sort by timestamp, removing wildly out-of-range timestamps and invalid water levels"""
     readings = []
     current_year = datetime.now().year
     skipped_timestamps = 0
+    skipped_water_levels = 0
     
     print("Parsing and filtering readings...")
     
@@ -32,6 +33,11 @@ def parse_and_sort_readings(raw_data):
                 
                 water_level = float(reading['w'])
                 
+                # Filter out physically impossible water levels (allow -200mm or greater)
+                if water_level < -200:
+                    skipped_water_levels += 1
+                    continue
+                
                 readings.append({
                     'timestamp': timestamp,
                     'water_level': water_level,
@@ -46,6 +52,8 @@ def parse_and_sort_readings(raw_data):
     print(f"Parsed {len(readings)} valid readings")
     if skipped_timestamps > 0:
         print(f"Skipped {skipped_timestamps} readings with out-of-range timestamps")
+    if skipped_water_levels > 0:
+        print(f"Skipped {skipped_water_levels} readings with invalid water levels (< -200mm)")
     
     return readings
 
@@ -174,9 +182,9 @@ def find_gaps_and_fill(day_readings, date_key):
     
     return filled_readings, filled_count, len(large_gaps), target_readings
 
-def enrich_firebase_data():
-    """Main function to enrich Firebase data with gap filling"""
-    print("Transformer v1 Data Enrichment - Gap Filling")
+def process_raw_data():
+    """Main function to process raw Firebase data with filtering and gap filling"""
+    print("Transformer v1 Data Processing - Filtering & Gap Filling")
     print("=" * 50)
     
     # Load raw data
@@ -288,9 +296,9 @@ def enrich_firebase_data():
         json.dump(stats_copy, f, indent=2, default=str)
     
     print(f"\nStatistics saved to data/enrichment_statistics.json")
-    print(f"\nNext step: Run create_training_data.py with the enriched dataset")
+    print(f"\nNext step: Run create_training_data.py with the processed dataset")
     
     return enriched_data
 
 if __name__ == "__main__":
-    enrich_firebase_data()
+    process_raw_data()

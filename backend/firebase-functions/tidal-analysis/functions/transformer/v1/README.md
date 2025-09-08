@@ -34,7 +34,7 @@ This implementation uses a modern transformer architecture to predict tidal patt
 transformer/v1/
 ├── data-preparation/          # Firebase data fetching and processing
 │   ├── fetch_firebase_data.py
-│   ├── enrich_firebase_data.py
+│   ├── process_raw_data.py
 │   └── create_training_data.py
 ├── training/                  # Model training and local server
 │   ├── dataset.py            # PyTorch data loading
@@ -79,7 +79,7 @@ setup-complete-transformer-v1.bat
 ```bash
 cd data-preparation
 python fetch_firebase_data.py      # Fetch Firebase data
-python enrich_firebase_data.py     # Fill gaps and enrich data
+python process_raw_data.py         # Filter invalid data and fill gaps
 python create_training_data.py     # Create training sequences
 ```
 
@@ -109,7 +109,7 @@ deploy-transformer-v1.bat          # Deploy to Firebase Functions (Python runtim
 
 ### Default Hyperparameters
 - **Learning Rate**: 1e-4 with cosine annealing
-- **Batch Size**: 8 (adjust based on GPU memory)
+- **Batch Size**: 4 (reduced for GPU memory constraints)
 - **Optimizer**: AdamW with weight decay 1e-5
 - **Scheduler**: Cosine annealing with warm restarts
 - **Dropout**: 0.1 for regularization
@@ -160,15 +160,21 @@ deploy-transformer-v1.bat          # Deploy to Firebase Functions (Python runtim
 
 ### Data Flow
 1. **Scheduled Trigger**: Cloud Scheduler runs every 5 minutes
-2. **Data Fetching**: Last 4320 readings from Firebase (3 days, 1-minute data)
-3. **Training-Aligned Processing**: Uses identical preprocessing pipeline as training
-   - Chronological sorting with timestamp parsing
-   - Training-style downsampling (every 10th + last reading)
-   - Preserves -999 synthetic values (no filtering)
-   - Validates data sufficiency (≥200 real readings required)
-4. **Seq2Seq Inference**: Native PyTorch transformer with perfect training/inference sync
-5. **Quality Assurance**: Converts NaN/infinite predictions to -999 (error values)
-6. **Storage**: Timestamped forecast with 144 predictions (10-minute intervals)
+2. **Data Fetching**: Last 4320 readings from Firebase (1-minute resolution data)
+3. **Real-Time Downsampling**: Creates 433-point sequence using current time as reference
+   - Finds closest reading to current time as starting point
+   - Works backwards in 10-minute intervals for 72 hours (433 points)
+   - Maps each target time to closest reading within ±5 minutes
+   - Uses -999 for missing time slots (model trained to handle these)
+   - Preserves chronological order (oldest to newest for model input)
+4. **Direct Model Input**: Bypasses input preparation to avoid data corruption
+   - Pre-validated 433-point sequence fed directly to model
+   - Preserves -999 synthetic values exactly as model expects
+   - No additional padding or mean calculations that could distort data
+5. **Inference**: Native PyTorch transformer generates 144 predictions in single pass
+6. **Timestamp Alignment**: Uses last real data timestamp (not synthetic) as prediction base
+7. **Quality Assurance**: Converts NaN/infinite predictions to -999 (error values)
+8. **Storage**: Complete forecast with metadata and error tracking
 
 ## Testing and Validation
 
@@ -233,6 +239,56 @@ python test_model.py --input file.json  # Test with custom data
    - Solution: Pass `last_data_timestamp` and start predictions from last sensor reading
    - Implementation in main.py with proper timestamp parsing and error handling
 
+8. **Uniform/Flat Predictions Issue** ✅ **FIXED**
+   - Issue: Model outputting same value for all predictions (no variation)
+   - Root Causes:
+     - **Contaminated normalization**: Mean/std calculation included -999 values
+     - Double processing in `prepare_input_sequence` corrupted carefully crafted data
+     - Using synthetic timestamp as base for predictions
+   - Solution: Multiple critical fixes applied
+     - **Fixed normalization**: Exclude -999 synthetic values from mean/std calculation
+     - **Temporal gap enforcement**: Prevent data leakage between train/validation sets
+     - New `predict_24_hours_direct()` method bypasses redundant processing
+     - Uses last real data timestamp for prediction base
+   - Result: Natural tidal variations restored in predictions
+
+9. **Data Leakage in Train/Validation Split** ✅ **FIXED**
+   - Issue: Training and validation sequences had massive temporal overlap
+   - Root Cause: Random 1-9 minute offsets + 96-hour sequences = 95+ hours overlap
+   - Impact: Artificially inflated validation performance, unrealistic loss metrics
+   - Solution: Timestamp-based temporal gap enforcement
+     - Track actual start/end timestamps for each sequence
+     - Find last training sequence end time
+     - Start validation sequences after training data ends
+     - Calculate real temporal gap based on actual timestamps
+   - Result: True validation performance on genuinely unseen future data
+
+10. **Deployment Orphaned Functions Prompt**
+   - Issue: Firebase asks about deployed functions not in local source
+   - Cause: Other analysis functions exist in Firebase but not current directory
+   - Solution: Updated deployment script uses `--only functions:run_transformer_v1_analysis`
+   - Result: Clean deployments without prompts about unrelated functions
+
+11. **Invalid Water Level Data Contamination** ✅ **FIXED**
+   - Issue: Negative water levels (e.g., -2582mm) corrupting training data
+   - Root Cause: No physical validity checking in data pipeline
+   - Impact: 4,107 invalid readings (4.1% of data) treated as valid training data
+   - Solution: Added water level filtering in `process_raw_data.py`
+     - Filters out readings < -200mm (physically impossible)
+     - Preserves minor sensor calibration variations (-200mm to 0mm)
+     - Reports filtered readings for monitoring
+   - Result: Clean training data with only physically possible water levels
+
+12. **Misleading Temporal Gap Logging** ✅ **FIXED**
+   - Issue: Train/validation gap reported as 0.1 hours despite discarding 1159 sequences
+   - Root Cause: Logging calculated boundary gap, not total discarded timespan
+   - Impact: Misleading metrics about actual temporal separation
+   - Solution: Enhanced logging in `create_training_data.py`
+     - Shows actual timespan of discarded sequences (e.g., 96 hours)
+     - Displays boundary gap between last training and first validation
+     - Clear distinction between discarded data span and sequence boundary gap
+   - Result: Accurate reporting of temporal separation for data leakage prevention
+
 ### Performance Optimization
 
 1. **Training Speed**
@@ -255,7 +311,8 @@ python test_model.py --input file.json  # Test with custom data
 
 ### Data Preparation Pipeline
 
-#### Gap Filling and Enrichment (`enrich_firebase_data.py`)
+#### Data Processing and Gap Filling (`process_raw_data.py`)
+- **Data Filtering**: Removes physically impossible water levels (< -200mm) before processing
 - **Data Continuity**: Fills missing readings with -999 water level for temporal consistency
 - **Complete Days**: Processes only complete days with sufficient data coverage
 - **Gap Detection**: Identifies and handles gaps larger than 1 hour (doesn't fill large outages)
@@ -277,30 +334,36 @@ python test_model.py --input file.json  # Test with custom data
 
 #### Processing Pipeline
 1. **Fetch**: Download raw Firebase data
-2. **Enrich**: Fill small gaps, preserve large outage periods
+2. **Process**: Filter invalid readings (< -200mm) and fill small gaps, preserve large outage periods
 3. **Generate**: Create 96-hour sequences with random offsets
 4. **Filter**: Remove sequences with timing issues or excessive synthetic data
 5. **Interpolate**: Replace remaining -999 values in outputs with realistic interpolated values
-6. **Normalize**: Apply z-score normalization for training
+6. **Normalize**: Apply z-score normalization excluding -999 synthetic values (prevents contaminated statistics)
 7. **Augment**: Apply real-time data augmentation during training (missing values, gaps, noise)
 
 ### Input Processing
-- **Training/Inference Sync**: Identical preprocessing pipeline ensures no quality loss during inference
-- **Data Source**: 4320 1-minute readings from Firebase, chronologically sorted
-- **Downsampling**: Training-style method (every 10th reading + last reading) → 433 10-minute intervals  
-- **Synthetic Value Handling**: Preserves -999 values from gap-filling, feeds directly to model
-- **Data Sufficiency**: Requires ≥200 real readings (46% minimum) for reliable prediction
-- **Type Safety**: Robust Firebase data conversion with comprehensive error handling
-- **Normalization**: Z-score using training statistics loaded from checkpoint
-- **Sequence Length**: Fixed 433-point input (72 hours @ 10-minute intervals)
-- **Padding Strategy**: Mean-value padding for insufficient data (rare with 3-day fetch window)
+- **Real-Time Temporal Alignment**: Uses current inference time to create proper 72-hour timeline
+  - Current time → find closest real reading as reference point
+  - Generate 433 target times at 10-minute intervals going backwards
+  - Match each target time to closest available reading (±5 minute tolerance)
+  - Minimal synthetic data (-999) only when genuinely no data available
+- **Data Quality Threshold**: Minimum 100 readings required (vs previous 4300+ requirement)
+- **Direct Model Input**: `predict_24_hours_direct()` method bypasses input preparation
+  - Prevents double processing and data corruption from mean calculations
+  - Preserves carefully constructed 433-point temporal sequence
+  - Maintains exact -999 synthetic values as model expects
+- **Robust Data Handling**: Type safety with comprehensive error handling
+- **Normalization**: Z-score using exact training statistics from model checkpoint
+- **No Redundant Processing**: Eliminates padding/truncation since sequence is pre-constructed
 
 ### Output Processing
 - **Direct Prediction**: Full 144-point sequence in single pass (24 hours @ 10-minute intervals)
+- **Proper Timestamp Base**: Uses last real data timestamp (not synthetic -999 values)
 - **Error Handling**: NaN/infinite predictions converted to -999 (consistent error format)
 - **Denormalization**: Convert back to original water level scale (mm)
-- **Timestamping**: 10-minute interval predictions with ISO timestamps
-- **Quality Metrics**: Count of error predictions and valid range validation
+- **Timestamping**: 10-minute interval predictions starting from last real data point
+- **Quality Metrics**: Count of error predictions, synthetic input values, and range validation
+- **Enhanced Error Reporting**: Concise error summaries with file:line - ErrorType: message format
 
 ### Attention Patterns
 - **Temporal Focus**: Multi-head attention captures various tidal cycles
