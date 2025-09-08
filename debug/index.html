@@ -235,6 +235,26 @@
                         tension: 0.6,
                         order: 1
                     }, {
+                        label: 'Water Level (Percentile)',
+                        data: readings.map(r => ({x: r.rawTimestamp, y: r.waterLevelPercentileRaw})).filter(p => p.y !== null),
+                        borderColor: 'cyan',
+                        backgroundColor: 'rgba(0, 255, 255, 0.1)',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        tension: 0.6,
+                        order: 2
+                    }, {
+                        label: 'Water Level (Envelope)',
+                        data: readings.map(r => ({x: r.rawTimestamp, y: r.waterLevelEnvelopeRaw})).filter(p => p.y !== null),
+                        borderColor: 'magenta',
+                        backgroundColor: 'rgba(255, 0, 255, 0.1)',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        tension: 0.6,
+                        order: 3
+                    }, {
                         label: 'Waves (ft)',
                         data: readings.map(r => ({x: r.rawTimestamp, y: r.waveHeightPercentileRaw})).filter(p => p.y !== null),
                         borderColor: 'red',
@@ -243,8 +263,31 @@
                         pointRadius: 0,
                         pointHoverRadius: 0,
                         tension: 0.5,
-                        order: 2,
+                        order: 4,
                         yAxisID: 'waveHeight'
+                    }, {
+                        label: 'Wave Height (Envelope)',
+                        data: readings.map(r => ({x: r.rawTimestamp, y: r.waveHeightEnvelopeRaw})).filter(p => p.y !== null),
+                        borderColor: 'orange',
+                        backgroundColor: 'rgba(255, 165, 0, 0.1)',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        tension: 0.6,
+                        order: 5,
+                        yAxisID: 'waveHeight'
+                    }, {
+                        label: 'Valid Samples',
+                        data: readings.map(r => ({x: r.rawTimestamp, y: r.validSamplesRaw})),
+                        borderColor: 'gray',
+                        backgroundColor: 'rgba(128, 128, 128, 0.1)',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        tension: 0.6,
+                        order: 6,
+                        yAxisID: 'samples',
+                        hidden: true
                     }, {
                         label: 'Wind Speed (knots)',
                         data: readings.map(r => ({x: r.rawTimestamp, y: r.windSpeedRaw})).filter(p => p.y !== null),
@@ -254,8 +297,29 @@
                         pointRadius: 0,
                         pointHoverRadius: 0,
                         tension: 0.5,
-                        order: 3,
+                        order: 7,
                         yAxisID: 'windSpeed'
+                    }, {
+                        label: 'Gust Speed',
+                        data: readings.map(r => ({x: r.rawTimestamp, y: r.gustSpeedRaw})).filter(p => p.y !== null),
+                        borderColor: 'darkgreen',
+                        backgroundColor: 'rgba(0, 100, 0, 0.1)',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        tension: 0.6,
+                        order: 8,
+                        yAxisID: 'windSpeed'
+                    }, {
+                        label: 'Duke Water Level',
+                        data: readings.map(r => ({x: r.rawTimestamp, y: r.dukeWaterLevelRaw})).filter(p => p.y !== null),
+                        borderColor: 'darkblue',
+                        backgroundColor: 'rgba(0, 0, 139, 0.1)',
+                        borderWidth: 1,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        tension: 0.6,
+                        order: 9
                     }, {
                         label: 'Reference Line',
                         data: [{x: twentyFourHoursAgo, y: 2.5}, {x: now, y: 2.5}],
@@ -308,6 +372,12 @@
                             },
                             offset: true
                         },
+                        samples: {
+                            type: 'linear',
+                            min: 0,
+                            max: 512,
+                            display: false
+                        },
                         x: {
                             type: 'time',
                             min: twentyFourHoursAgo,
@@ -343,8 +413,14 @@
 
             const legendItems = [
                 { label: 'Water Level (ft)', color: 'blue' },
+                { label: 'Water Level (Percentile)', color: 'cyan' },
+                { label: 'Water Level (Envelope)', color: 'magenta' },
                 { label: 'Waves (ft)', color: 'red' },
+                { label: 'Wave Height (Envelope)', color: 'orange' },
+                { label: 'Valid Samples', color: 'gray' },
                 { label: 'Wind Speed (knots)', color: 'purple' },
+                { label: 'Gust Speed', color: 'darkgreen' },
+                { label: 'Duke Water Level', color: 'darkblue' },
                 { label: 'Reference Line', color: 'green' }
             ];
 
