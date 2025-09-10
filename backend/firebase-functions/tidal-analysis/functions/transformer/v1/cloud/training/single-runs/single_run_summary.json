@@ -1,0 +1,16 @@
+{
+  "best_val_loss": 0.04861796391196549,
+  "total_epochs": 21,
+  "config": {
+    "d_model": 512,
+    "nhead": 16,
+    "num_layers": 4,
+    "dropout": 0.17305796046740565,
+    "learning_rate": 5.845165970318201e-05,
+    "batch_size": 32,
+    "weight_decay": 2.0160787083950938e-06,
+    "num_epochs": 150
+  },
+  "model_parameters": 12906128,
+  "final_lr": 5.571773780584649e-05
+}

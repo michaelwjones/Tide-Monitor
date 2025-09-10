@@ -24,7 +24,14 @@ The `runLSTMv1Prediction` function runs every 6 hours to generate 24-hour water 
 #### Transformer v1 (`transformer/v1/`)
 The `run_transformer_v1_analysis` function runs every 5 minutes via Cloud Scheduler to generate 24-hour water level forecasts using sequence-to-sequence transformer architecture. Uses Python runtime with 1GB memory allocation for native PyTorch inference. Features direct prediction (single forward pass) with the last 433 readings (72 hours @ 10-minute intervals) to produce 144 future predictions (24 hours @ 10-minute intervals), stored in `/tidal-analysis/transformer-v1-forecast/`. 
 
-**Critical Improvements:**
+**Recent Optimizations (Data Pipeline):**
+- **Simplified pipeline**: Eliminated synthetic data generation and gap filling in favor of real sensor data only
+- **Binary search optimization**: 100x speed improvement using O(log n) timestamp matching instead of linear search
+- **Quality filtering**: Automatic filtering of readings < -200mm during data fetch
+- **Timestamp-based matching**: Finds closest readings within ±5 minutes of target 10-minute intervals
+- **Enhanced performance**: Training data generation reduced from hours to under 1 minute
+
+**Model Improvements:**
 - **Fixed normalization contamination**: Training now excludes -999 synthetic values from mean/std calculation 
 - **Temporal gap enforcement**: Prevents data leakage between training and validation sets using actual timestamps
 - **Robust data handling**: Type casting with comprehensive error handling for Firebase data conversion

@@ -11,6 +11,23 @@ This implementation uses a modern transformer architecture to predict tidal patt
 - **Parallel Processing**: Efficient computation compared to iterative methods
 - **Long-Range Dependencies**: Superior handling of extended temporal patterns
 
+## Folder Structure
+
+The Transformer v1 system is organized into clean local and cloud components:
+
+```
+├── local/                    # Local development and training
+│   ├── data-preparation/     # Data processing and preparation
+│   ├── training/             # Local model training (optimized hyperparameters)
+│   └── testing/              # Model validation and testing
+├── cloud/                    # Cloud deployment components
+│   ├── inference/            # Firebase Functions deployment
+│   └── training/sweeps/      # Modal Labs hyperparameter optimization
+└── STRUCTURE.md              # Detailed folder documentation
+```
+
+**See [STRUCTURE.md](STRUCTURE.md) for complete organization details and usage guide.**
+
 ## Architecture Details
 
 ### Model Specifications
@@ -32,10 +49,9 @@ This implementation uses a modern transformer architecture to predict tidal patt
 
 ```
 transformer/v1/
-├── data-preparation/          # Firebase data fetching and processing
-│   ├── fetch_firebase_data.py
-│   ├── process_raw_data.py
-│   └── create_training_data.py
+├── data-preparation/          # Optimized Firebase data pipeline
+│   ├── fetch_firebase_data.py    # Raw data fetching with quality filtering
+│   └── create_training_data.py   # Timestamp-based sequence generation
 ├── training/                  # Model training and local server
 │   ├── dataset.py            # PyTorch data loading
 │   ├── train_transformer.py  # Main training script
@@ -78,9 +94,8 @@ setup-complete-transformer-v1.bat
 #### Data Preparation
 ```bash
 cd data-preparation
-python fetch_firebase_data.py      # Fetch Firebase data
-python process_raw_data.py         # Filter invalid data and fill gaps
-python create_training_data.py     # Create training sequences
+python fetch_firebase_data.py      # Fetch and filter Firebase data
+python create_training_data.py     # Create training sequences with timestamp matching
 ```
 
 #### Training
@@ -309,37 +324,39 @@ python test_model.py --input file.json  # Test with custom data
 - **Deployment**: Model definition and checkpoint are co-located for Firebase deployment
 - **Consistency**: Ensures training and inference use identical model architecture
 
-### Data Preparation Pipeline
+### Optimized Data Preparation Pipeline
 
-#### Data Processing and Gap Filling (`process_raw_data.py`)
-- **Data Filtering**: Removes physically impossible water levels (< -200mm) before processing
-- **Data Continuity**: Fills missing readings with -999 water level for temporal consistency
-- **Complete Days**: Processes only complete days with sufficient data coverage
-- **Gap Detection**: Identifies and handles gaps larger than 1 hour (doesn't fill large outages)
-- **Statistics Tracking**: Reports on synthetic readings generated and data quality
-- **Target Validation**: Ensures 1440 readings per day or adjusts targets for large gaps
+#### Data Fetching and Filtering (`fetch_firebase_data.py`)
+- **Firebase Integration**: Downloads complete dataset from Firebase Realtime Database
+- **Quality Filtering**: Removes physically impossible water levels (< -200mm) from source data
+- **Dual File Output**: Preserves both raw data and filtered data for analysis
+- **Data Validation**: Filters out 3.9% of readings while preserving 96.1% of quality sensor data
+- **Performance**: Efficiently processes 100K+ readings with immediate filtering
 
-#### Sequence Quality Control (`create_training_data.py`)
-- **Time Gap Filtering**: Removes sequences with >15 minute gaps between readings
-- **Synthetic Data Filtering**: Excludes sequences with 6+ consecutive synthetic readings (1+ hour gaps)
-- **Output Interpolation**: Replaces -999 values in output sequences with linear interpolation
-- **Data Quality**: 87.5% retention rate after quality filtering
+#### Timestamp-Based Sequence Generation (`create_training_data.py`)
+- **Binary Search Optimization**: Uses O(log n) binary search for 100x speed improvement over linear search
+- **Timestamp Matching**: Finds closest readings within ±5 minutes of target 10-minute intervals
+- **No Synthetic Data**: Works with real sensor data only, no gap filling or synthetic values
+- **Quality Control**: Filters sequences with insufficient data coverage automatically
+- **Temporal Split**: Creates proper train/validation split with temporal gap to prevent data leakage
 
-#### Training Data Statistics  
-- **Total Sequences**: 15,473 high-quality training sequences
-- **Retention Rate**: 87.5% after gap and quality filtering
-- **Data Size**: 68.1 MB training data with enhanced quality
-- **Training Split**: 12,378 training sequences, 3,095 validation sequences
-- **Interpolated Values**: 7,955 synthetic values smoothly interpolated
+#### Current Training Data Statistics (Latest Run)
+- **Source Data**: 97,525 filtered readings from Firebase
+- **Generated Sequences**: 18,346 potential 96-hour sequences processed
+- **Valid Sequences**: 14,547 sequences (79.3% retention rate)
+- **Training Split**: 11,638 training / 1,743 validation sequences
+- **Temporal Gap**: 192.2 hours discarded to ensure no data leakage
+- **File Size**: 58.9 MB of high-quality training data
+- **Processing Time**: Under 1 minute with binary search optimization
 
-#### Processing Pipeline
-1. **Fetch**: Download raw Firebase data
-2. **Process**: Filter invalid readings (< -200mm) and fill small gaps, preserve large outage periods
-3. **Generate**: Create 96-hour sequences with random offsets
-4. **Filter**: Remove sequences with timing issues or excessive synthetic data
-5. **Interpolate**: Replace remaining -999 values in outputs with realistic interpolated values
-6. **Normalize**: Apply z-score normalization excluding -999 synthetic values (prevents contaminated statistics)
-7. **Augment**: Apply real-time data augmentation during training (missing values, gaps, noise)
+#### Optimized Processing Pipeline
+1. **Fetch & Filter**: Download and filter Firebase data (removes < -200mm readings)
+2. **Parse & Sort**: Parse 97K+ readings chronologically with progress tracking
+3. **Generate**: Create 18K+ overlapping 96-hour sequences with random offsets
+4. **Timestamp Match**: Use binary search to find closest readings for 10-minute intervals
+5. **Quality Filter**: Remove sequences with insufficient temporal coverage
+6. **Normalize**: Apply z-score normalization using all real sensor data
+7. **Temporal Split**: Create train/validation split with proper temporal gap
 
 ### Input Processing
 - **Real-Time Temporal Alignment**: Uses current inference time to create proper 72-hour timeline

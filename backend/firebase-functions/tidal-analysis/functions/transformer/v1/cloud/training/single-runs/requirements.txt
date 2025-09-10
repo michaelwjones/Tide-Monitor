@@ -1,0 +1,5 @@
+# Modal Single Training Run Requirements
+modal>=0.56.0
+torch>=2.0.0
+numpy>=1.21.0
+scikit-learn>=1.0.0

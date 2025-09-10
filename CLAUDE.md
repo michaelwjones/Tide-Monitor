@@ -188,10 +188,9 @@ Tide-Monitor/
     │           └── transformer/         # Transformer neural network forecasting
     │               └── v1/              # Transformer version 1
     │                   ├── README.md    # Transformer setup and deployment guide
-    │                   ├── data-preparation/  # Enhanced data pipeline with gap filling
-    │                   │   ├── fetch_firebase_data.py     # Raw data fetching
-    │                   │   ├── process_raw_data.py        # Data filtering and gap filling
-    │                   │   └── create_training_data.py    # Quality filtering and processing
+    │                   ├── data-preparation/  # Optimized data pipeline with timestamp-based matching
+    │                   │   ├── fetch_firebase_data.py     # Raw data fetching with quality filtering
+    │                   │   └── create_training_data.py    # Timestamp-based sequence generation
     │                   ├── training/    # PyTorch transformer training pipeline
     │                   ├── testing/     # Model validation and testing interface
     │                   ├── inference/   # Firebase Functions PyTorch deployment
@@ -258,32 +257,33 @@ Readings are stored with auto-generated keys containing:
 - **Clean layout**: Same styling as main dashboard for consistency
 - **Navigation**: Easy switching between main and debug views
 
-## Enhanced Data Processing Pipeline
+## Optimized Data Processing Pipeline
 
 ### Transformer v1 Data Preparation
-The transformer v1 system introduces advanced data preprocessing to handle sensor gaps and ensure high-quality training data:
+The transformer v1 system uses an optimized data pipeline focused on quality filtering and timestamp-based sequence matching:
 
-#### Data Processing and Gap Filling (`process_raw_data.py`)
-- **Data Filtering**: Removes physically impossible water levels (< -200mm) before processing
-- **Temporal Continuity**: Fills missing minute-by-minute readings with -999 synthetic values
-- **Complete Day Processing**: Only processes complete days (midnight to midnight) with sufficient coverage  
-- **Large Gap Preservation**: Doesn't fill gaps >1 hour, preserves natural outage patterns
-- **Quality Statistics**: Reports 457 synthetic readings added across 66 days (6.9 average per day)
-- **Target Validation**: Ensures 1440 readings per day or adjusts for large outages
+#### Data Fetching and Filtering (`fetch_firebase_data.py`)
+- **Firebase Integration**: Downloads complete dataset from Firebase Realtime Database
+- **Quality Filtering**: Removes physically impossible water levels (< -200mm) from source data
+- **Dual File Output**: Preserves both raw data and filtered data for analysis
+- **Data Validation**: Filters out 3.9% of readings while preserving 96.1% of quality sensor data
+- **Performance**: Efficiently processes 100K+ readings with immediate filtering
 
-#### Quality Control and Filtering (`create_training_data.py`)
-- **Time Gap Filtering**: Removes sequences with >15 minute gaps between sequential readings
-- **Synthetic Data Filtering**: Excludes sequences with 6+ consecutive -999 values (1+ hour gaps)
-- **Output Interpolation**: Linear interpolation of -999 values in training targets for clean outputs
-- **Retention Statistics**: 87.5% retention rate (15,473 sequences from 17,674 generated)
-- **Quality Improvement**: Reduced standard deviation from 481.92mm to 335.52mm after filtering
+#### Timestamp-Based Sequence Generation (`create_training_data.py`)
+- **Binary Search Optimization**: Uses O(log n) binary search instead of linear search for 100x speed improvement
+- **Timestamp Matching**: Finds closest readings within ±5 minutes of target 10-minute intervals
+- **No Synthetic Data**: Works with real sensor data only, no gap filling or synthetic values
+- **Quality Control**: Filters sequences with insufficient data coverage automatically
+- **Temporal Split**: Creates proper train/validation split with temporal gap to prevent data leakage
 
-#### Data Pipeline Results
-- **Input Quality**: 94,227 enriched readings with temporal consistency
-- **Filtering Impact**: 2,201 sequences removed for timing issues, 0 for excessive synthetic data
-- **Training Dataset**: 12,378 training sequences, 3,095 validation sequences
-- **Interpolation Activity**: 7,955 synthetic values smoothly interpolated in outputs
-- **File Size**: 68.1 MB of high-quality training data
+#### Current Pipeline Results (Latest Run)
+- **Source Data**: 97,525 filtered readings from Firebase
+- **Generated Sequences**: 18,346 potential 96-hour sequences processed
+- **Valid Sequences**: 14,547 sequences (79.3% retention rate) 
+- **Training Split**: 11,638 training / 1,743 validation sequences
+- **Temporal Gap**: 192.2 hours discarded to ensure no data leakage
+- **File Size**: 58.9 MB of high-quality training data
+- **Processing Time**: Under 1 minute with binary search optimization
 
 ## Technical Notes
 
@@ -345,3 +345,4 @@ This removal simplified the system to focus on the two reliable wave analysis me
 - Feel free to make suggestions if you think they will help me arrive at my goal.
 - Don't run a firebase command unless specifically asked to.
 - README files should contain current state, not change history.
+- Do not put emojis in batch files or powershell scripts.
