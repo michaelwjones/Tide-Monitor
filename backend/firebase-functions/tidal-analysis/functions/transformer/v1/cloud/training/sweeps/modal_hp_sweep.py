@@ -7,9 +7,11 @@ Clean, serverless GPU hyperparameter sweep with Ray Tune integration
 import modal
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 import json
 import os
+import math
 from pathlib import Path
 from ray import tune
 from ray.tune.schedulers import ASHAScheduler
@@ -37,62 +39,281 @@ image = (
 volume = modal.Volume.from_name("tide-training-data", create_if_missing=True)
 
 class TidalDataset:
-    """Simplified dataset class for Modal"""
+    """
+    High-quality PyTorch Dataset for tidal prediction with seq2seq transformer.
+    Matches local training implementation exactly for consistent hyperparameter optimization.
+    """
     
-    def __init__(self, X, y, sequence_length=433):
-        self.X = torch.FloatTensor(X)
-        self.y = torch.FloatTensor(y)
-        self.sequence_length = sequence_length
+    def __init__(self, X, y, norm_params, split='train', augment=True, 
+                 missing_prob=0.02, gap_prob=0.05, noise_std=0.1, missing_value=-999):
+        """
+        Initialize the dataset with full augmentation capabilities.
+        
+        Args:
+            X: Input sequences array (num_sequences, 433)
+            y: Target sequences array (num_sequences, 144)  
+            norm_params: Normalization parameters dict with 'mean' and 'std'
+            split: 'train' or 'val' for training/validation split
+            augment: Whether to apply data augmentation (only for training)
+            missing_prob: Probability of replacing individual values with missing_value
+            gap_prob: Probability of creating gaps (consecutive missing values)
+            noise_std: Standard deviation for value perturbation (in normalized space)
+            missing_value: Value to use for simulated missing data (-999)
+        """
+        self.X = X
+        self.y = y
+        self.norm_params = norm_params
+        self.split = split
+        self.augment = augment and (split == 'train')  # Only augment training data
+        self.missing_prob = missing_prob
+        self.gap_prob = gap_prob
+        self.noise_std = noise_std
+        self.missing_value = missing_value
+        
+        if split == 'train' and augment:
+            print(f"Dataset: {split} (augmented: missing={missing_prob}, gap={gap_prob}, noise={noise_std})")
+        else:
+            print(f"Dataset: {split} (clean data)")
         
     def __len__(self):
         return len(self.X)
     
-    def __getitem__(self, idx):
-        return self.X[idx], self.y[idx]
-
-class TransformerModel(nn.Module):
-    """Transformer model for tidal prediction"""
+    def apply_missing_value_augmentation(self, sequence):
+        """Apply missing value augmentation to input sequence."""
+        seq_len = sequence.shape[0]
+        augmented = sequence.clone()
+        
+        # Random individual missing values
+        if self.missing_prob > 0:
+            missing_mask = torch.rand(seq_len) < self.missing_prob
+            augmented[missing_mask] = self.missing_value
+        
+        # Random gaps (consecutive missing values)
+        if self.gap_prob > 0 and torch.rand(1).item() < self.gap_prob:
+            # Create 1-3 gaps per sequence
+            num_gaps = torch.randint(1, 4, (1,)).item()
+            for _ in range(num_gaps):
+                # Gap length: 1-10 time steps (10-100 minutes)
+                gap_length = torch.randint(1, 11, (1,)).item()
+                gap_start = torch.randint(0, max(1, seq_len - gap_length + 1), (1,)).item()
+                augmented[gap_start:gap_start + gap_length] = self.missing_value
+        
+        return augmented
     
-    def __init__(self, input_dim=1, d_model=512, nhead=8, num_layers=6, 
-                 output_dim=144, dropout=0.1, max_seq_length=433):
-        super().__init__()
+    def apply_noise_augmentation(self, sequence):
+        """Apply value perturbation to sequence (in normalized space)."""
+        if self.noise_std <= 0:
+            return sequence
+            
+        # Add Gaussian noise (only to non-missing values)
+        noise = torch.normal(0, self.noise_std, sequence.shape)
+        noisy_sequence = sequence + noise
+        
+        # Preserve missing values
+        missing_mask = (sequence == self.missing_value)
+        noisy_sequence[missing_mask] = self.missing_value
+        
+        return noisy_sequence
+    
+    def __getitem__(self, idx):
+        """Get a single sequence pair with optional augmentation."""
+        # Convert to tensors and add feature dimension
+        src = torch.from_numpy(self.X[idx]).float().unsqueeze(-1)  # (433, 1)
+        tgt = torch.from_numpy(self.y[idx]).float().unsqueeze(-1)  # (144, 1)
+        
+        # Apply augmentation to input sequence only (during training)
+        if self.augment:
+            # Apply noise perturbation first
+            src = self.apply_noise_augmentation(src)
+            
+            # Then apply missing value simulation
+            src = self.apply_missing_value_augmentation(src)
+        
+        return src, tgt
+
+class PositionalEncoding(nn.Module):
+    """
+    Sinusoidal positional encoding for transformer sequences.
+    Adds positional information to embeddings without learnable parameters.
+    """
+    
+    def __init__(self, d_model, max_seq_length=5000):
+        super(PositionalEncoding, self).__init__()
+        
+        # Create positional encoding matrix
+        pe = torch.zeros(max_seq_length, d_model)
+        position = torch.arange(0, max_seq_length, dtype=torch.float).unsqueeze(1)
+        
+        # Create div_term for sinusoidal pattern
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * 
+                           (-math.log(10000.0) / d_model))
+        
+        # Apply sine to even indices, cosine to odd indices
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        
+        # Add batch dimension and register as buffer (not a parameter)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer('pe', pe)
+    
+    def forward(self, x):
+        # Add positional encoding to input embeddings
+        # x shape: (seq_len, batch_size, d_model)
+        return x + self.pe[:x.size(0), :]
+
+class TidalTransformer(nn.Module):
+    """
+    Sequence-to-sequence transformer for tidal prediction with 10-minute intervals.
+    
+    Architecture:
+    - Configurable encoder/decoder layers
+    - Configurable attention heads and dimensions  
+    - Input: 433 time steps (72 hours at 10-minute intervals)
+    - Output: 144 time steps (24 hours at 10-minute intervals)
+    """
+    
+    def __init__(self, 
+                 input_dim=1,
+                 d_model=512,
+                 nhead=16, 
+                 num_encoder_layers=3,
+                 num_decoder_layers=1,
+                 dim_feedforward=2048,
+                 dropout=0.1,
+                 max_seq_length=5000):
+        super(TidalTransformer, self).__init__()
         
         self.d_model = d_model
-        self.input_projection = nn.Linear(input_dim, d_model)
-        self.positional_encoding = nn.Parameter(torch.randn(max_seq_length, d_model))
+        self.input_dim = input_dim
+        self.nhead = nhead
+        self.num_encoder_layers = num_encoder_layers
+        self.num_decoder_layers = num_decoder_layers
+        self.dropout = dropout
         
-        encoder_layer = nn.TransformerEncoderLayer(
+        # Input projection: map from input_dim to d_model
+        self.input_projection = nn.Linear(input_dim, d_model)
+        
+        # Output projection: map from d_model back to input_dim
+        self.output_projection = nn.Linear(d_model, input_dim)
+        
+        # Positional encoding
+        self.pos_encoder = PositionalEncoding(d_model, max_seq_length)
+        
+        # Transformer architecture
+        self.transformer = nn.Transformer(
             d_model=d_model,
-            nhead=nhead, 
-            dim_feedforward=d_model * 4,
+            nhead=nhead,
+            num_encoder_layers=num_encoder_layers,
+            num_decoder_layers=num_decoder_layers,
+            dim_feedforward=dim_feedforward,
             dropout=dropout,
-            activation='relu',
-            batch_first=True
+            batch_first=True  # (batch_size, seq_len, d_model) for better performance
         )
         
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        self.output_projection = nn.Linear(d_model, output_dim)
-        self.dropout = nn.Dropout(dropout)
+        # Enable gradient checkpointing to save memory
+        if hasattr(self.transformer, 'enable_nested_tensor'):
+            self.transformer.enable_nested_tensor = False
         
-    def forward(self, x):
-        # x shape: (batch_size, seq_length, input_dim)
-        seq_length = x.size(1)
+        # Initialize weights
+        self.init_weights()
+    
+    def init_weights(self):
+        """Initialize model weights using Xavier uniform initialization"""
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight)
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
+    
+    def generate_square_subsequent_mask(self, sz: int):
+        """Generate causal mask for decoder to prevent looking at future tokens"""
+        mask = torch.triu(torch.ones(sz, sz), diagonal=1)
+        return mask.masked_fill(mask == 1, float('-inf'))
+    
+    def forward(self, src, tgt=None, teacher_forcing_ratio=1.0):
+        """
+        Forward pass through the transformer.
         
-        # Project input to d_model dimensions
-        x = self.input_projection(x)
+        Args:
+            src: Source sequence (batch_size, input_seq_len, input_dim)
+            tgt: Target sequence for teacher forcing (batch_size, output_seq_len, input_dim)
+            teacher_forcing_ratio: Probability of using teacher forcing vs autoregressive
+            
+        Returns:
+            output: Predicted sequence (batch_size, output_seq_len, input_dim)
+        """
+        batch_size, src_seq_len, _ = src.shape
         
-        # Add positional encoding
-        x = x + self.positional_encoding[:seq_length].unsqueeze(0)
-        x = self.dropout(x)
+        # Project input to model dimension (batch_first=True, no transpose needed)
+        src = self.input_projection(src)  # (batch_size, seq_len, d_model)
         
-        # Apply transformer
-        x = self.transformer(x)
+        # Add positional encoding (need to transpose for pos_encoder, then back)
+        src = src.transpose(0, 1)         # (seq_len, batch_size, d_model) for pos_encoder
+        src = self.pos_encoder(src)
+        src = src.transpose(0, 1)         # (batch_size, seq_len, d_model) for transformer
+
+        if self.training and tgt is not None and torch.rand(1).item() < teacher_forcing_ratio:
+            # Training with teacher forcing
+            tgt = self.input_projection(tgt)  # (batch_size, seq_len, d_model)
+            
+            # Add positional encoding (transpose for pos_encoder, then back)
+            tgt = tgt.transpose(0, 1)         # (seq_len, batch_size, d_model) for pos_encoder
+            tgt = self.pos_encoder(tgt)
+            tgt = tgt.transpose(0, 1)         # (batch_size, seq_len, d_model) for transformer
+            
+            # Create causal mask for decoder
+            tgt_seq_len = tgt.size(1)  # seq_len dimension is now index 1
+            tgt_mask = self.generate_square_subsequent_mask(tgt_seq_len).to(src.device)
+            
+            # Transformer forward pass
+            output = self.transformer(src, tgt, tgt_mask=tgt_mask)
+            
+        else:
+            # Inference or training without teacher forcing (autoregressive)
+            output_seq_len = 144  # 24 hours at 10-minute intervals
+            
+            # Start with encoder output
+            memory = self.transformer.encoder(src)
+            
+            # Memory-efficient autoregressive generation with sliding window
+            max_context = 72  # Keep only last 72 tokens for context
+            decoder_input = torch.zeros(batch_size, 1, self.d_model).to(src.device)  # (batch_size, 1, d_model)
+            outputs = []
+            
+            # Autoregressive generation
+            for i in range(output_seq_len):
+                # Always slice to max_context to avoid conditional logic during tracing
+                # This is safe even when current_len <= max_context
+                decoder_input = decoder_input[:, -max_context:, :]
+                current_len = decoder_input.size(1)
+                
+                # Use fixed window size to avoid dynamic operations during tracing
+                # Use current_len directly since it's now bounded by max_context
+                tgt_mask = self.generate_square_subsequent_mask(current_len).to(src.device)
+                
+                # Decoder forward pass with full decoder input (already windowed above)
+                decoder_output = self.transformer.decoder(
+                    decoder_input, memory, tgt_mask=tgt_mask
+                )
+                
+                # Take the last output token
+                current_output = decoder_output[:, -1:, :]  # (batch_size, 1, d_model)
+                outputs.append(current_output.clone())  # Clone to avoid memory references
+                
+                # Append current output to decoder input
+                decoder_input = torch.cat([decoder_input, current_output], dim=1)  # Concat along seq_len
+                
+                # Clear cache periodically during inference
+                if i % 100 == 0 and not torch.jit.is_tracing():
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+            
+            # Concatenate all outputs
+            output = torch.cat(outputs, dim=1)  # (batch_size, output_seq_len, d_model)
         
-        # Use last token for prediction
-        x = x[:, -1, :]  # (batch_size, d_model)
+        # Project back to input dimension (already in batch_first format)
+        output = self.output_projection(output)  # (batch_size, seq_len, input_dim)
         
-        # Project to output
-        output = self.output_projection(x)
         return output
 
 def train_model(config, data_dir="/data"):
@@ -136,9 +357,27 @@ def train_model(config, data_dir="/data"):
     with open(f"{data_dir}/normalization_params.json", 'r') as f:
         norm_params = json.load(f)
     
-    # Create datasets
-    train_dataset = TidalDataset(X_train, y_train)
-    val_dataset = TidalDataset(X_val, y_val)
+    # Add augmentation parameters to config if not present (for compatibility)
+    if 'augment' not in config:
+        config['augment'] = True
+        config['missing_prob'] = 0.02
+        config['gap_prob'] = 0.05
+        config['noise_std'] = 0.1
+    
+    # Create high-quality datasets with full augmentation
+    train_dataset = TidalDataset(
+        X_train, y_train, norm_params,
+        split='train',
+        augment=config['augment'],
+        missing_prob=config['missing_prob'],
+        gap_prob=config['gap_prob'],
+        noise_std=config['noise_std']
+    )
+    val_dataset = TidalDataset(
+        X_val, y_val, norm_params,
+        split='val',
+        augment=False  # No augmentation during validation
+    )
     
     # Create data loaders - disable pin_memory since GPU not detected properly
     train_loader = torch.utils.data.DataLoader(
@@ -157,13 +396,18 @@ def train_model(config, data_dir="/data"):
         pin_memory=False
     )
     
-    # Initialize model
-    model = TransformerModel(
+    # Split layers for seq2seq (encoder gets more layers)
+    num_encoder_layers = max(1, (config["num_layers"] * 2) // 3)  # ~67% to encoder
+    num_decoder_layers = max(1, config["num_layers"] - num_encoder_layers)  # remainder to decoder
+    
+    # Initialize seq2seq model
+    model = TidalTransformer(
         input_dim=1,
         d_model=config["d_model"],
         nhead=config["nhead"], 
-        num_layers=config["num_layers"],
-        output_dim=144,  # 24 hours * 6 (10-minute intervals)
+        num_encoder_layers=num_encoder_layers,
+        num_decoder_layers=num_decoder_layers,
+        dim_feedforward=config["d_model"] * 4,
         dropout=config["dropout"]
     ).to(device)
     
@@ -177,15 +421,15 @@ def train_model(config, data_dir="/data"):
     
     # Learning rate scheduler
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=50, eta_min=1e-6
+        optimizer, T_max=10, eta_min=1e-6  # Match max epochs
     )
     
     # Training loop
     best_val_loss = float('inf')
     patience_counter = 0
-    patience = 10
+    patience = 5  # Reduced for testing
     
-    for epoch in range(50):  # Max epochs
+    for epoch in range(10):  # Max epochs (reduced for testing)
         # Training
         model.train()
         train_loss = 0.0
@@ -196,7 +440,10 @@ def train_model(config, data_dir="/data"):
             batch_y = batch_y.to(device)
             
             optimizer.zero_grad()
-            outputs = model(batch_x.unsqueeze(-1))
+            
+            # Use teacher forcing during training (80% chance)
+            # batch_x and batch_y already have shape (batch_size, seq_len, 1) from dataset
+            outputs = model(batch_x, batch_y, teacher_forcing_ratio=0.8)
             loss = criterion(outputs, batch_y)
             loss.backward()
             
@@ -218,7 +465,9 @@ def train_model(config, data_dir="/data"):
                 batch_x = batch_x.to(device)
                 batch_y = batch_y.to(device)
                 
-                outputs = model(batch_x.unsqueeze(-1))
+                # No teacher forcing during validation
+                # batch_x and batch_y already have shape (batch_size, seq_len, 1) from dataset
+                outputs = model(batch_x)
                 loss = criterion(outputs, batch_y)
                 
                 val_loss += loss.item()
@@ -284,40 +533,46 @@ def run_hyperparameter_sweep():
     print("✅ Training data found")
     print()
     
-    # Define hyperparameter search space
+    # Define hyperparameter search space (MINIMAL TEST - 4 trials total)
     search_space = {
-        # Model architecture (Conservative H100 testing: moderate models)
-        # Valid combinations ensuring d_model is divisible by nhead  
-        "d_model": tune.choice([256, 384, 512]),  # Conservative sizes for testing
-        "nhead": tune.choice([8, 12, 16]),  # Reasonable attention heads
-        "num_layers": tune.choice([4, 6, 8]),  # Conservative depth for testing
-        "dropout": tune.uniform(0.1, 0.3),
+        # Only 2 parameters with 2 values each = 2x2 = 4 total trials
+        "batch_size": tune.choice([16, 32]),        # Test 2 batch sizes
+        "learning_rate": tune.choice([1e-4, 5e-5]), # Test 2 learning rates
         
-        # Training hyperparameters (Moderate H100 batch sizes)
-        "learning_rate": tune.loguniform(1e-5, 1e-3),
-        "batch_size": tune.choice([16, 32, 48, 64]), # Moderate batches for testing
-        "weight_decay": tune.loguniform(1e-6, 1e-4),
+        # Fixed parameters (use proven defaults)
+        "d_model": 256,        # Small, fast model for testing
+        "nhead": 8,           # Divisible by d_model
+        "num_layers": 4,      # Minimal depth
+        "dropout": 0.1,       # Standard dropout
+        "weight_decay": 1e-5, # Standard weight decay
+        
+        # Fixed augmentation (use local training defaults)  
+        "augment": True,
+        "missing_prob": 0.02,
+        "gap_prob": 0.05,
+        "noise_std": 0.1,
     }
     
-    # Configure scheduler for early stopping
+    # Configure scheduler for early stopping (reduced for testing)
     scheduler = ASHAScheduler(
         metric="val_loss",
         mode="min",
-        max_t=50,  # Max epochs
-        grace_period=10,  # Min epochs before stopping
+        max_t=10,  # Max epochs (reduced for testing)
+        grace_period=5,   # Min epochs before stopping (reduced)
         reduction_factor=2,
         brackets=1
     )
     
-    print("🎯 Hyperparameter Search Configuration:")
-    print(f"   Search algorithm: Grid/Random Search")
+    print("🎯 Hyperparameter Search Configuration (MINIMAL TEST):")
+    print(f"   Search algorithm: Grid Search")
     print(f"   Early stopping: ASHA Scheduler")  
-    print(f"   Max trials: 20")
-    print(f"   Max epochs per trial: 50")
-    print(f"   Early stopping patience: 10 epochs")
+    print(f"   Max trials: 4 (2 batch_size × 2 learning_rate)")
+    print(f"   Max epochs per trial: 10 (reduced for testing)")
+    print(f"   Early stopping patience: 5 epochs")
     print(f"   GPU: NVIDIA H100 (80GB VRAM)")
-    print(f"   Conservative testing: up to 512 d_model, 8 layers") 
-    print(f"   Moderate batches: up to 64 batch size")
+    print(f"   Model: d_model=256, nhead=8, layers=4 (small & fast)")
+    print(f"   Batch sizes: [16, 32]")
+    print(f"   Learning rates: [1e-4, 5e-5]")
     print()
     
     # Configure Ray to use GPU properly
@@ -331,18 +586,18 @@ def run_hyperparameter_sweep():
         param_space=search_space,
         tune_config=tune.TuneConfig(
             scheduler=scheduler,
-            num_samples=20,  # Number of hyperparameter combinations to try
+            num_samples=4,   # Only 4 trials (2×2 grid)
             max_concurrent_trials=1,  # Run one trial at a time on single GPU
         ),
         run_config=tune.RunConfig(
             name="tide_transformer_v1_hp_sweep",
-            stop={"training_iteration": 50},
+            stop={"training_iteration": 10},  # Match max epochs
         )
     )
     
-    print("🔄 Starting hyperparameter optimization...")
-    print("   H100 timing TBD - will measure actual performance")
-    print("   12-hour timeout to ensure completion")
+    print("🔄 Starting minimal hyperparameter sweep...")
+    print("   Testing 4 trials × max 10 epochs = ~30-60 minutes total")
+    print("   This validates the entire pipeline before production runs")
     print()
     
     results = tuner.fit()
@@ -440,31 +695,5 @@ def upload_training_data():
         print(f"❌ Upload failed: {e}")
         return False
 
-# Local entry point
-@app.local_entrypoint()
-def main(
-    upload_data: bool = False,
-    run_sweep: bool = False
-):
-    """
-    Main entry point for hyperparameter optimization
-    
-    Usage:
-        modal run modal_hp_sweep.py --upload-data
-        modal run modal_hp_sweep.py --run-sweep
-    """
-    
-    if upload_data:
-        return upload_training_data()
-    
-    if run_sweep:
-        print("🚀 Starting hyperparameter optimization...")
-        results = run_hyperparameter_sweep.remote()
-        print("=" * 60)
-        print("🏆 HYPERPARAMETER OPTIMIZATION COMPLETE!")
-        print("=" * 60)
-        return results
-    
-    print("Usage:")
-    print("  1. Upload data: modal run modal_hp_sweep.py --upload-data")
-    print("  2. Run sweep:   modal run modal_hp_sweep.py --run-sweep")
+# Note: Functions can be called directly via modal run file.py::function_name
+# No main entrypoint needed - Modal will call functions directly

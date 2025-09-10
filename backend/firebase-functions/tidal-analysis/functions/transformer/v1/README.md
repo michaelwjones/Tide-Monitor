@@ -69,12 +69,28 @@ transformer/v1/
 │   ├── best.pth              # Trained model checkpoint
 │   ├── requirements.txt      # Python dependencies
 │   └── firebase.json         # Configuration (512MB memory)
+├── cloud/                     # Cloud training on Modal (serverless GPUs)
+│   └── training/
+│       ├── sweeps/            # Hyperparameter optimization
+│       │   ├── login.ps1      # Modal authentication (one-time)
+│       │   ├── setup.ps1      # Dependencies + data upload
+│       │   ├── run.ps1        # Start hyperparameter sweep
+│       │   └── modal_hp_sweep.py    # Ray Tune optimization
+│       └── single-runs/       # Single training runs
+│           ├── login.ps1      # Modal authentication (one-time)
+│           ├── setup.ps1      # Dependencies + data upload
+│           ├── run.ps1        # Start single training
+│           └── modal_single_run_seq2seq.py
 └── batch files and utilities
 ```
 
 ## Quick Start
 
-### 1. Environment Setup
+Choose between local or cloud training:
+
+### Option A: Local Training
+
+#### 1. Environment Setup
 ```bash
 # Install PyTorch (choose CPU or GPU version)
 install-pytorch-transformer.bat
@@ -83,10 +99,28 @@ install-pytorch-transformer.bat
 pip install -r requirements.txt
 ```
 
-### 2. Complete Pipeline
+#### 2. Complete Pipeline
 ```bash
 # Run complete setup and training pipeline
 setup-complete-transformer-v1.bat
+```
+
+### Option B: Cloud Training (Recommended)
+
+#### 1. Hyperparameter Optimization
+```bash
+cd cloud/training/sweeps
+.\login.ps1      # One-time Modal authentication
+.\setup.ps1      # Install dependencies + upload data
+.\run.ps1        # Start hyperparameter sweep
+```
+
+#### 2. Single Training Run
+```bash
+cd cloud/training/single-runs
+.\login.ps1      # One-time Modal authentication (if not done)
+.\setup.ps1      # Install dependencies + upload data
+.\run.ps1        # Start single training run
 ```
 
 ### 3. Step-by-Step Process

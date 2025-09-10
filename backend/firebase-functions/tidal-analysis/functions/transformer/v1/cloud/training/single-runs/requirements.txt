@@ -1,5 +1,7 @@
 # Modal Single Training Run Requirements
-modal>=0.56.0
+modal>=0.65.0
 torch>=2.0.0
+torchvision>=0.15.0
 numpy>=1.21.0
 scikit-learn>=1.0.0
+tensorboard>=2.12.0

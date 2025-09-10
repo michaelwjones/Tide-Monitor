@@ -4,21 +4,34 @@ Serverless GPU hyperparameter optimization using Modal and Ray Tune.
 
 ## Quick Start
 
-### 1. Install Modal
+### 1. Authenticate (First Time Only)
 ```bash
-pip install -r requirements.txt
-modal token new
+.\login.ps1
 ```
 
-### 2. Upload Training Data
+### 2. Setup Dependencies & Upload Data
 ```bash
-modal run modal_hp_sweep.py --upload-data E:\Projects\Tide-Monitor\backend\firebase-functions\tidal-analysis\functions\transformer\v1\data-preparation\data
+.\setup.ps1
 ```
 
 ### 3. Run Hyperparameter Sweep
 ```bash
-modal run modal_hp_sweep.py --run-sweep
+.\run.ps1
 ```
+
+Or manually:
+```bash
+# 1. Login
+modal token new   # Only needed once
+
+# 2. Setup
+pip install -r requirements.txt
+modal run modal_hp_sweep.py::upload_training_data
+
+# 3. Run
+modal run modal_hp_sweep.py::run_hyperparameter_sweep
+```
+
 
 ## What It Does
 

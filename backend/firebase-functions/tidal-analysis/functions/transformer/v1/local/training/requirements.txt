@@ -1,4 +1,7 @@
-# PyTorch model server requirements
+# Local training requirements (production quality)
 torch>=2.0.0
-flask>=2.0.0
+torchvision>=0.15.0
+tensorboard>=2.12.0
 numpy>=1.21.0
+scikit-learn>=1.0.0
+flask>=2.0.0

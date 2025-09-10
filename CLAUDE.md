@@ -345,4 +345,4 @@ This removal simplified the system to focus on the two reliable wave analysis me
 - Feel free to make suggestions if you think they will help me arrive at my goal.
 - Don't run a firebase command unless specifically asked to.
 - README files should contain current state, not change history.
-- Do not put emojis in batch files or powershell scripts.
+- Do not put emojis or unicode in batch files or powershell scripts.

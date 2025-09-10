@@ -36,18 +36,143 @@ image = (
 volume = modal.Volume.from_name("tide-training-data", create_if_missing=True)
 
 class TidalDataset:
-    """Simplified dataset class for Modal"""
+    """
+    High-quality PyTorch Dataset for tidal prediction with seq2seq transformer.
+    Matches local training implementation exactly for consistent hyperparameter optimization.
+    """
     
-    def __init__(self, X, y, sequence_length=433):
-        self.X = torch.FloatTensor(X)
-        self.y = torch.FloatTensor(y)
-        self.sequence_length = sequence_length
+    def __init__(self, X, y, norm_params, split='train', augment=True, 
+                 missing_prob=0.02, gap_prob=0.05, noise_std=0.1, missing_value=-999):
+        """
+        Initialize the dataset with full augmentation capabilities.
+        
+        Args:
+            X: Input sequences array (num_sequences, 433)
+            y: Target sequences array (num_sequences, 144)  
+            norm_params: Normalization parameters dict with 'mean' and 'std'
+            split: 'train' or 'val' for training/validation split
+            augment: Whether to apply data augmentation (only for training)
+            missing_prob: Probability of replacing individual values with missing_value
+            gap_prob: Probability of creating gaps (consecutive missing values)
+            noise_std: Standard deviation for value perturbation (in normalized space)
+            missing_value: Value to use for simulated missing data (-999)
+        """
+        self.X = X
+        self.y = y
+        self.norm_params = norm_params
+        self.split = split
+        self.augment = augment and (split == 'train')  # Only augment training data
+        self.missing_prob = missing_prob
+        self.gap_prob = gap_prob
+        self.noise_std = noise_std
+        self.missing_value = missing_value
+        
+        print(f"Dataset initialized: {split}")
+        print(f"  Sequences: {len(self.X)}")
+        print(f"  Input shape: {self.X.shape}")
+        print(f"  Target shape: {self.y.shape}")
+        print(f"  Normalization: mean={self.norm_params['mean']:.2f}, std={self.norm_params['std']:.2f}")
+        if self.augment:
+            print(f"  Augmentation enabled:")
+            print(f"    Missing prob: {self.missing_prob}")
+            print(f"    Gap prob: {self.gap_prob}")
+            print(f"    Noise std: {self.noise_std}")
         
     def __len__(self):
         return len(self.X)
     
+    def apply_missing_value_augmentation(self, sequence):
+        """
+        Apply missing value augmentation to input sequence.
+        
+        Args:
+            sequence: Input sequence tensor (seq_len, 1)
+            
+        Returns:
+            Augmented sequence with simulated missing values
+        """
+        seq_len = sequence.shape[0]
+        augmented = sequence.clone()
+        
+        # Random individual missing values
+        if self.missing_prob > 0:
+            missing_mask = torch.rand(seq_len) < self.missing_prob
+            augmented[missing_mask] = self.missing_value
+        
+        # Random gaps (consecutive missing values)
+        if self.gap_prob > 0 and torch.rand(1).item() < self.gap_prob:
+            # Create 1-3 gaps per sequence
+            num_gaps = torch.randint(1, 4, (1,)).item()
+            for _ in range(num_gaps):
+                # Gap length: 1-10 time steps (10-100 minutes)
+                gap_length = torch.randint(1, 11, (1,)).item()
+                gap_start = torch.randint(0, max(1, seq_len - gap_length + 1), (1,)).item()
+                augmented[gap_start:gap_start + gap_length] = self.missing_value
+        
+        return augmented
+    
+    def apply_noise_augmentation(self, sequence):
+        """
+        Apply value perturbation to sequence (in normalized space).
+        
+        Args:
+            sequence: Input sequence tensor (seq_len, 1)
+            
+        Returns:
+            Sequence with added noise
+        """
+        if self.noise_std <= 0:
+            return sequence
+            
+        # Add Gaussian noise (only to non-missing values)
+        noise = torch.normal(0, self.noise_std, sequence.shape)
+        noisy_sequence = sequence + noise
+        
+        # Preserve missing values
+        missing_mask = (sequence == self.missing_value)
+        noisy_sequence[missing_mask] = self.missing_value
+        
+        return noisy_sequence
+    
     def __getitem__(self, idx):
-        return self.X[idx], self.y[idx]
+        """
+        Get a single sequence pair with optional augmentation.
+        
+        Returns:
+            src: Input sequence tensor (433, 1) - possibly augmented
+            tgt: Target sequence tensor (144, 1) - always clean
+        """
+        # Convert to tensors and add feature dimension
+        src = torch.from_numpy(self.X[idx]).float().unsqueeze(-1)  # (433, 1)
+        tgt = torch.from_numpy(self.y[idx]).float().unsqueeze(-1)  # (144, 1)
+        
+        # Apply augmentation to input sequence only (during training)
+        if self.augment:
+            # Apply noise perturbation first
+            src = self.apply_noise_augmentation(src)
+            
+            # Then apply missing value simulation
+            src = self.apply_missing_value_augmentation(src)
+        
+        return src, tgt
+    
+    def denormalize(self, normalized_data):
+        """
+        Denormalize data back to original scale.
+        
+        Args:
+            normalized_data: Normalized tensor or numpy array
+            
+        Returns:
+            Denormalized data in mm units
+        """
+        mean = self.norm_params['mean']
+        std = self.norm_params['std']
+        
+        if isinstance(normalized_data, torch.Tensor):
+            return normalized_data * std + mean
+        else:
+            return normalized_data * std + mean
 
 class PositionalEncoding(nn.Module):
     """
@@ -299,6 +424,12 @@ def run_single_training():
         "batch_size": 32,
         "weight_decay": 2.0160787083950938e-06,
         "num_epochs": 150,  # More epochs for single run
+        
+        # Data augmentation parameters (match local training exactly)
+        "augment": True,
+        "missing_prob": 0.02,  # 2% chance of individual missing values
+        "gap_prob": 0.05,      # 5% chance of creating gaps per sequence
+        "noise_std": 0.1,      # Noise standard deviation in normalized space
     }
     
     # Split layers for seq2seq (encoder gets more layers)
@@ -316,9 +447,20 @@ def run_single_training():
     print(f"   Epochs: {config['num_epochs']}")
     print()
     
-    # Create datasets
-    train_dataset = TidalDataset(X_train, y_train)
-    val_dataset = TidalDataset(X_val, y_val)
+    # Create high-quality datasets with full augmentation
+    train_dataset = TidalDataset(
+        X_train, y_train, norm_params, 
+        split='train', 
+        augment=config["augment"],
+        missing_prob=config["missing_prob"],
+        gap_prob=config["gap_prob"], 
+        noise_std=config["noise_std"]
+    )
+    val_dataset = TidalDataset(
+        X_val, y_val, norm_params,
+        split='val', 
+        augment=False  # No augmentation during validation
+    )
     
     # Create data loaders
     train_loader = torch.utils.data.DataLoader(
@@ -392,8 +534,9 @@ def run_single_training():
             optimizer.zero_grad()
             
             # Use teacher forcing during training (80% chance)
-            outputs = model(batch_x.unsqueeze(-1), batch_y.unsqueeze(-1), teacher_forcing_ratio=0.8)
-            loss = criterion(outputs.squeeze(-1), batch_y)
+            # batch_x and batch_y already have shape (batch_size, seq_len, 1) from dataset
+            outputs = model(batch_x, batch_y, teacher_forcing_ratio=0.8)
+            loss = criterion(outputs, batch_y)
             loss.backward()
             
             # Gradient clipping
@@ -415,8 +558,9 @@ def run_single_training():
                 batch_y = batch_y.to(device)
                 
                 # No teacher forcing during validation
-                outputs = model(batch_x.unsqueeze(-1))
-                loss = criterion(outputs.squeeze(-1), batch_y)
+                # batch_x and batch_y already have shape (batch_size, seq_len, 1) from dataset
+                outputs = model(batch_x)
+                loss = criterion(outputs, batch_y)
                 
                 val_loss += loss.item()
                 val_batches += 1
@@ -532,31 +676,5 @@ def upload_training_data():
         print(f"❌ Upload failed: {e}")
         return False
 
-# Local entry point
-@app.local_entrypoint()
-def main(
-    upload_data: bool = False,
-    run_training: bool = False
-):
-    """
-    Main entry point for seq2seq single training run
-    
-    Usage:
-        modal run modal_single_run_seq2seq.py --upload-data
-        modal run modal_single_run_seq2seq.py --run-training
-    """
-    
-    if upload_data:
-        return upload_training_data()
-    
-    if run_training:
-        print("🚀 Starting seq2seq single training run...")
-        results = run_single_training.remote()
-        print("=" * 60)
-        print("🏆 SEQ2SEQ SINGLE TRAINING RUN COMPLETE!")
-        print("=" * 60)
-        return results
-    
-    print("Usage:")
-    print("  1. Upload data: modal run modal_single_run_seq2seq.py --upload-data")
-    print("  2. Run training: modal run modal_single_run_seq2seq.py --run-training")
+# Note: Functions can be called directly via modal run file.py::function_name
+# No main entrypoint needed - Modal will call functions directly

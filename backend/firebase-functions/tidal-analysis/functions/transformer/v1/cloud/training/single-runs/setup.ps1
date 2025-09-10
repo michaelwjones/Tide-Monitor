@@ -1,22 +1,38 @@
-# Tide Transformer v1 - Single Run Setup Script
-Write-Host "Tide Transformer v1 - Single Training Run Setup" -ForegroundColor Cyan
+# Tide Transformer v1 - Dependencies and Data Setup
+Write-Host "Tide Transformer v1 - Setup (Dependencies & Data)" -ForegroundColor Cyan
 Write-Host ""
 
 # Install dependencies
 Write-Host "Installing dependencies..." -ForegroundColor Yellow
-py -3.11 -m pip install modal torch numpy scikit-learn --upgrade
+py -3.11 -m pip install modal torch torchvision numpy scikit-learn tensorboard --upgrade
 
-# Authenticate with Modal
-Write-Host "Setting up Modal authentication..." -ForegroundColor Yellow
-Write-Host "A browser window will open for GitHub authentication." -ForegroundColor Cyan
+# Check if authenticated (don't try to authenticate)
 Write-Host ""
+Write-Host "Checking Modal authentication..." -ForegroundColor Yellow
+$authOutput = py -3.11 -m modal token list 2>&1
 
-py -3.11 -m modal token new
+if ($authOutput -match "No token found" -or $LASTEXITCODE -ne 0) {
+    Write-Host "Not authenticated with Modal." -ForegroundColor Red
+    Write-Host "Please run .\login.ps1 first to authenticate." -ForegroundColor Yellow
+    Write-Host ""
+    Read-Host "Press Enter to exit"
+    exit 1
+}
+
+Write-Host "Modal authentication OK" -ForegroundColor Green
 
 # Upload training data
+Write-Host ""
 Write-Host "Uploading training data..." -ForegroundColor Yellow
 py -3.11 -m modal run modal_single_run_seq2seq.py::upload_training_data
 
+if ($LASTEXITCODE -eq 0) {
+    Write-Host ""
+    Write-Host "Setup complete! Run .\run.ps1 to start single training run." -ForegroundColor Green
+} else {
+    Write-Host ""
+    Write-Host "Data upload failed. Check the error messages above." -ForegroundColor Red
+}
+
 Write-Host ""
-Write-Host "Setup complete! Run .\run.ps1 to start single training run." -ForegroundColor Green
 Read-Host "Press Enter to exit"
