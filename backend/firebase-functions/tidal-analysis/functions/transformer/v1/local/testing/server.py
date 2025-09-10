@@ -92,6 +92,10 @@ class TransformerHandler(BaseHTTPRequestHandler):
             self.serve_training_info()
         elif self.path == '/random-training':
             self.serve_random_training_sequence()
+        elif self.path == '/raw-data':
+            self.serve_raw_data()
+        elif self.path == '/filtered-data':
+            self.serve_filtered_data()
         else:
             self.send_error(404)
     
@@ -459,6 +463,129 @@ class TransformerHandler(BaseHTTPRequestHandler):
             print(f"[ERROR] Prediction error: {e}")
             traceback.print_exc()
             return None
+    
+    def serve_raw_data(self):
+        """Serve raw Firebase data for visualization"""
+        try:
+            print("[INFO] Loading raw Firebase data...")
+            
+            from firebase_fetch import fetch_all_firebase_data
+            
+            # Get all raw Firebase data
+            raw_data = fetch_all_firebase_data()
+            
+            if not raw_data:
+                self.send_json_response({
+                    'error': 'No raw data available',
+                    'success': False
+                }, 404)
+                return
+            
+            # Extract water levels and timestamps
+            water_levels = []
+            timestamps = []
+            
+            for reading in raw_data:
+                if 'w' in reading and 't' in reading:
+                    try:
+                        water_levels.append(float(reading['w']))
+                        timestamps.append(reading['t'])
+                    except (ValueError, TypeError):
+                        continue
+            
+            if not water_levels:
+                self.send_json_response({
+                    'error': 'No valid water level data found',
+                    'success': False
+                }, 404)
+                return
+            
+            self.send_json_response({
+                'water_levels': water_levels,
+                'timestamps': timestamps,
+                'count': len(water_levels),
+                'success': True,
+                'type': 'raw',
+                'start_time': timestamps[0] if timestamps else None,
+                'end_time': timestamps[-1] if timestamps else None,
+                'stats': {
+                    'min': float(min(water_levels)),
+                    'max': float(max(water_levels)),
+                    'mean': float(np.mean(water_levels)),
+                    'std': float(np.std(water_levels))
+                }
+            })
+            
+        except Exception as e:
+            print(f"[ERROR] Raw data error: {e}")
+            traceback.print_exc()
+            self.send_json_response({
+                'error': str(e),
+                'success': False
+            }, 500)
+    
+    def serve_filtered_data(self):
+        """Serve filtered Firebase data for visualization"""
+        try:
+            print("[INFO] Loading filtered Firebase data...")
+            
+            from firebase_fetch import fetch_all_firebase_data
+            
+            # Get all Firebase data and apply filtering
+            raw_data = fetch_all_firebase_data()
+            
+            if not raw_data:
+                self.send_json_response({
+                    'error': 'No raw data available',
+                    'success': False
+                }, 404)
+                return
+            
+            # Apply filtering logic (same as data preparation)
+            water_levels = []
+            timestamps = []
+            
+            for reading in raw_data:
+                if 'w' in reading and 't' in reading:
+                    try:
+                        water_level = float(reading['w'])
+                        # Apply filtering: remove physically impossible readings
+                        if water_level >= -200.0:  # Same filter as data preparation
+                            water_levels.append(water_level)
+                            timestamps.append(reading['t'])
+                    except (ValueError, TypeError):
+                        continue
+            
+            if not water_levels:
+                self.send_json_response({
+                    'error': 'No valid filtered data found',
+                    'success': False
+                }, 404)
+                return
+            
+            self.send_json_response({
+                'water_levels': water_levels,
+                'timestamps': timestamps,
+                'count': len(water_levels),
+                'success': True,
+                'type': 'filtered',
+                'start_time': timestamps[0] if timestamps else None,
+                'end_time': timestamps[-1] if timestamps else None,
+                'stats': {
+                    'min': float(min(water_levels)),
+                    'max': float(max(water_levels)),
+                    'mean': float(np.mean(water_levels)),
+                    'std': float(np.std(water_levels))
+                }
+            })
+            
+        except Exception as e:
+            print(f"[ERROR] Filtered data error: {e}")
+            traceback.print_exc()
+            self.send_json_response({
+                'error': str(e),
+                'success': False
+            }, 500)
     
     def send_json_response(self, data, status_code=200):
         """Send JSON response"""

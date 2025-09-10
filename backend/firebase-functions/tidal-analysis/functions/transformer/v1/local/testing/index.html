@@ -7,6 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/date-fns@3.3.1/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -251,6 +252,37 @@
             <div id="predictionMetrics" class="metrics"></div>
         </div>
         
+        <!-- Raw Data Visualization Section -->
+        <div class="section">
+            <h3>📊 Raw Data Visualization</h3>
+            <p style="margin-bottom: 15px; color: #7f8c8d; font-style: italic;">
+                Explore the complete raw dataset with zooming and panning capabilities
+            </p>
+            <div class="button-group">
+                <button onclick="loadRawData()">
+                    📡 Load Raw Firebase Data
+                </button>
+                <button onclick="loadFilteredData()">
+                    🔍 Load Filtered Training Data
+                </button>
+                <button onclick="resetRawDataZoom()" id="resetZoomBtn" disabled>
+                    🔄 Reset Zoom
+                </button>
+            </div>
+            <div id="rawDataStatus" style="margin-top: 15px;"></div>
+            <div id="rawDataMetrics" class="metrics"></div>
+            
+            <!-- Raw Data Chart Container -->
+            <div id="rawDataChartContainer" class="chart-container" style="display: none;">
+                <canvas id="rawDataChart"></canvas>
+            </div>
+            <div id="rawDataChartCaption" style="text-align: center; margin-top: 10px; display: none;">
+                <small style="color: #7f8c8d;">
+                    Mouse wheel to zoom • Click and drag to pan • Double-click to reset zoom
+                </small>
+            </div>
+        </div>
+
         <!-- Chart Section -->
         <div class="section">
             <h3>📈 Visualization</h3>
@@ -272,12 +304,15 @@
         let modelInfo = null;
         let trainingChart = null;
         let currentTrainingSequence = null;
+        let rawDataChart = null;
+        let currentRawData = null;
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadModelInfo();
             initializeChart();
             initializeTrainingChart();
+            initializeRawDataChart();
         });
 
         async function loadModelInfo() {
@@ -807,6 +842,202 @@
 
             chart.data.datasets = datasets;
             chart.update();
+        }
+
+        // Raw Data Visualization Functions
+        async function loadRawData() {
+            updateRawDataStatus('info', '📡 Loading raw Firebase data...');
+            
+            try {
+                const response = await fetch('/raw-data');
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentRawData = data;
+                    
+                    updateRawDataStatus('success', `✅ Loaded ${data.count} raw readings from Firebase`);
+                    displayRawDataMetrics(data.stats, 'Raw Firebase Data');
+                    updateRawDataChart();
+                    
+                    // Show chart and enable reset button
+                    document.getElementById('rawDataChartContainer').style.display = 'block';
+                    document.getElementById('rawDataChartCaption').style.display = 'block';
+                    document.getElementById('resetZoomBtn').disabled = false;
+                } else {
+                    updateRawDataStatus('error', `❌ Failed to load raw data: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Raw data fetch error:', error);
+                updateRawDataStatus('error', '❌ Network error while fetching raw data');
+            }
+        }
+
+        async function loadFilteredData() {
+            updateRawDataStatus('info', '🔍 Loading filtered training data...');
+            
+            try {
+                const response = await fetch('/filtered-data');
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentRawData = data;
+                    
+                    updateRawDataStatus('success', `✅ Loaded ${data.count} filtered readings`);
+                    displayRawDataMetrics(data.stats, 'Filtered Training Data');
+                    updateRawDataChart();
+                    
+                    // Show chart and enable reset button
+                    document.getElementById('rawDataChartContainer').style.display = 'block';
+                    document.getElementById('rawDataChartCaption').style.display = 'block';
+                    document.getElementById('resetZoomBtn').disabled = false;
+                } else {
+                    updateRawDataStatus('error', `❌ Failed to load filtered data: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Filtered data fetch error:', error);
+                updateRawDataStatus('error', '❌ Network error while fetching filtered data');
+            }
+        }
+
+        function resetRawDataZoom() {
+            if (rawDataChart) {
+                rawDataChart.resetZoom();
+            }
+        }
+
+        function updateRawDataStatus(type, message) {
+            document.getElementById('rawDataStatus').innerHTML = 
+                `<div class="status ${type}">${message}</div>`;
+        }
+
+        function displayRawDataMetrics(stats, title) {
+            const startTime = currentRawData.start_time ? new Date(currentRawData.start_time).toLocaleDateString() : 'Unknown';
+            const endTime = currentRawData.end_time ? new Date(currentRawData.end_time).toLocaleDateString() : 'Unknown';
+            
+            document.getElementById('rawDataMetrics').innerHTML = `
+                <h4 style="grid-column: 1/-1; margin: 0 0 10px 0;">${title}</h4>
+                <div class="metric-card">
+                    <div class="metric-value">${currentRawData.count.toLocaleString()}</div>
+                    <div class="metric-label">Total Points</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${startTime}</div>
+                    <div class="metric-label">Start Date</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${endTime}</div>
+                    <div class="metric-label">End Date</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${stats.min.toFixed(1)}</div>
+                    <div class="metric-label">Min (mm)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${stats.max.toFixed(1)}</div>
+                    <div class="metric-label">Max (mm)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${stats.mean.toFixed(1)}</div>
+                    <div class="metric-label">Mean (mm)</div>
+                </div>
+            `;
+        }
+
+        function initializeRawDataChart() {
+            const ctx = document.getElementById('rawDataChart').getContext('2d');
+            rawDataChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: []
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'day',
+                                displayFormats: {
+                                    day: 'MMM d'
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Water Level (mm)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        zoom: {
+                            pan: {
+                                enabled: true,
+                                mode: 'x'
+                            },
+                            zoom: {
+                                wheel: {
+                                    enabled: true
+                                },
+                                pinch: {
+                                    enabled: true
+                                },
+                                mode: 'x'
+                            }
+                        }
+                    },
+                    elements: {
+                        point: {
+                            radius: 0,
+                            hoverRadius: 2
+                        },
+                        line: {
+                            borderWidth: 1
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateRawDataChart() {
+            if (!rawDataChart || !currentRawData) return;
+
+            const chartData = currentRawData.water_levels.map((level, index) => ({
+                x: new Date(currentRawData.timestamps[index]),
+                y: level
+            }));
+
+            const datasets = [{
+                label: `Water Level (${currentRawData.count.toLocaleString()} points)`,
+                data: chartData,
+                borderColor: '#3498db',
+                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                fill: false,
+                tension: 0
+            }];
+
+            rawDataChart.data.datasets = datasets;
+            rawDataChart.update();
+            
+            // Reset zoom to show all data initially
+            rawDataChart.resetZoom();
         }
     </script>
 </body>

@@ -29,20 +29,30 @@ python server.py
 
 ### Real Data Integration
 - **Firebase Data Fetching**: Directly fetches 72 hours of real water level data (433 readings at 10-minute intervals)
+- **Raw Dataset Access**: Complete Firebase dataset visualization for exploration
 - **Sequence-to-Sequence**: Uses complete 72-hour input for direct 24-hour prediction
 - **No Iterative Processing**: Single forward pass generates all 144 predictions
+
+### Raw Data Visualization
+- **Complete Dataset**: Load and visualize entire Firebase dataset
+- **Interactive Exploration**: Mouse wheel zoom, click-and-drag pan
+- **Data Filtering**: Compare raw vs filtered training data
+- **Quality Analysis**: Statistics and date ranges for dataset inspection
 
 ### Testing Modes
 1. **Fetch Real Data**: Gets actual readings from Firebase database
 2. **Generate Sample Data**: Creates realistic tidal patterns for testing
 3. **Direct Prediction**: Single seq2seq forward pass for 24-hour forecast
-4. **Validation Comparison**: Compare predictions against actual data
+4. **Raw Data Analysis**: Explore complete dataset with interactive zoom/pan
+5. **Training Data Inspection**: View random training sequences with targets
+6. **Filtered Data Comparison**: Compare raw vs filtered training datasets
 
 ### Visualization
 - **Chart.js Integration**: Interactive time-series plotting
 - **Historical Context**: Shows full 72 hours of input data (blue line)
 - **Forecast Display**: 24-hour predictions as dashed orange line
-- **Attention Visualization**: Optional attention weights display
+- **Raw Data Exploration**: Complete Firebase dataset visualization with zoom/pan
+- **Training Data Viewer**: Random training sequence inspection
 - **Model Architecture**: Shows encoder/decoder layers and parameters
 
 ### Model Information
@@ -98,10 +108,11 @@ python test_model.py --model ../training/checkpoints/best.pth
 ### Complete Testing Process
 1. **Train Model**: Run `train_transformer.py` in the training folder
 2. **Start Server**: Double-click `start-server.bat` or run `python server.py`
-3. **Fetch Real Data**: Click "Fetch Last 72 Hours from Firebase" (10-minute intervals)
-4. **Generate Forecast**: Click "Predict Next 24 Hours" (single forward pass)
-5. **Analyze Results**: Review chart showing historical data vs predictions
-6. **Export Model**: Use `model_server.py` for deployment preparation
+3. **Explore Data**: Use "Raw Data Visualization" to examine complete dataset
+4. **Fetch Real Data**: Click "Fetch Last 72 Hours from Firebase" (10-minute intervals)
+5. **Generate Forecast**: Click "Predict Next 24 Hours" (single forward pass)
+6. **Analyze Results**: Review chart showing historical data vs predictions
+7. **Training Analysis**: Explore random training sequences and model performance
 
 ### Data Sources
 - **Real Firebase Data**: Direct connection to production database (433 readings at 10-minute intervals)

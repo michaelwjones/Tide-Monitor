@@ -198,3 +198,32 @@ def create_sample_data():
     print(f"🌊 Range: {min(water_levels):.1f} - {max(water_levels):.1f} mm")
     
     return water_levels.tolist(), timestamps
+
+def fetch_all_firebase_data():
+    """
+    Fetch ALL Firebase data for raw visualization (no downsampling)
+    Returns list of all readings for analysis
+    """
+    firebase_url = "https://tide-monitor-boron-default-rtdb.firebaseio.com/readings.json"
+    
+    try:
+        print("📡 Fetching ALL readings from Firebase...")
+        
+        response = requests.get(firebase_url, timeout=60)
+        response.raise_for_status()
+        
+        data = response.json()
+        if not data:
+            raise ValueError("No data received from Firebase")
+        
+        print(f"📦 Received {len(data)} total readings")
+        
+        # Return raw data for processing
+        return list(data.values())
+        
+    except requests.RequestException as e:
+        print(f"❌ Firebase request failed: {e}")
+        return None
+    except Exception as e:
+        print(f"❌ Data processing failed: {e}")
+        return None
