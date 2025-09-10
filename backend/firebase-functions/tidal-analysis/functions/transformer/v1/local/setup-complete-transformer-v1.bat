@@ -13,7 +13,7 @@ echo   Setup Options
 echo ========================================================
 echo 1. Install PyTorch (CPU version)
 echo 2. Install PyTorch (CUDA version - requires NVIDIA GPU)
-echo 3. Fetch filtered data and create training dataset
+echo 3. Fetch Firebase data and create training dataset
 echo 4. Train transformer model
 echo 5. Test model locally (PyTorch web server)
 echo 6. Deploy to Firebase Functions (PyTorch runtime)
@@ -89,7 +89,7 @@ if "%choice%"=="6" (
         echo Please train a model first using option 4
         goto :error
     )
-    call deploy-transformer-v1.bat
+    call ..\..\..\deploy-transformer-v1.bat
     goto :success
 )
 

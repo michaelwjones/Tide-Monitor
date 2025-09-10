@@ -13,6 +13,7 @@ Downloads and filters sensor data from Firebase Realtime Database.
 
 **Features:**
 - **Firebase Integration**: Downloads complete dataset from `https://tide-monitor-boron-default-rtdb.firebaseio.com/readings.json`
+- **Date Filtering**: Removes all data from July 6, 2025 and earlier (trash data period)
 - **Quality Filtering**: Removes physically impossible water levels (< -200mm)
 - **Dual File Output**: Creates both raw and filtered data files
 - **Progress Reporting**: Shows download and filtering statistics
@@ -20,6 +21,7 @@ Downloads and filters sensor data from Firebase Realtime Database.
 **Output Files:**
 - `data/firebase_raw_data.json` - Complete unfiltered data (for reference)
 - `data/firebase_filtered_data.json` - Clean data with invalid readings removed
+- `data/firebase_enriched_data.json` - **Note: Created but not used by any current processes**
 
 **Usage:**
 ```bash
@@ -71,6 +73,24 @@ python create_training_data.py
 - Temporal gap: 192.2 hours to prevent data leakage
 - Processing time: < 1 minute
 
+## Data Files Explained
+
+### File Usage Overview
+- **`firebase_raw_data.json`**: Complete Firebase download (39 MB) - used for reference/debugging only
+- **`firebase_filtered_data.json`**: Quality-filtered data (38 MB) - **actively used by `create_training_data.py`**
+- **`firebase_enriched_data.json`**: Includes NOAA weather data (37.5 MB) - **currently unused, orphaned file**
+
+### Why Enriched Data Isn't Used
+The enriched data file contains sensor readings plus NOAA environmental data (wind speed, direction, water levels from Duke Marine Lab). However:
+- **Transformer v1** only uses the `w` (water level) field from sensor data
+- **Web dashboards** read enriched data directly from Firebase in real-time
+- **Future models** could use this multi-variate data for weather-aware predictions
+
+### Data Sources
+- **Raw/Filtered**: Direct from Particle Boron sensor via Firebase
+- **Enriched**: Processed by `tide-enrichment` Cloud Function with NOAA APIs
+- **Training Pipeline**: Uses filtered data only (sensor readings without weather context)
+
 ## Data Format
 
 ### Sequence Structure
@@ -113,6 +133,7 @@ python create_training_data.py
 ## Quality Assurance
 
 ### Data Validation
+- **Date Limits**: Only data from July 7, 2025 onwards (filters out trash data period)
 - **Physical Limits**: Water levels must be ≥ -200mm
 - **Timestamp Coverage**: Sequences need readings within ±5 minutes of targets
 - **Temporal Separation**: Train/validation split with proper gap

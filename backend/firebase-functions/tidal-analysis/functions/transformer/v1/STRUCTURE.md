@@ -36,13 +36,8 @@ transformer/v1/
 │   ├── setup-complete-transformer-v1.bat # Complete local setup
 │   └── requirements.txt                # Local Python dependencies
 ├── cloud/                              # Cloud deployment components
-│   ├── inference/                      # Firebase Functions deployment
-│   │   ├── main.py                     # Firebase Functions entry point
-│   │   ├── model.py                    # Transformer model definition
-│   │   ├── deploy-transformer-v1.bat   # Firebase deployment script
-│   │   ├── firebase.json               # Firebase configuration
-│   │   ├── requirements.txt            # Cloud Functions dependencies
-│   │   └── best.pth                    # Deployed model checkpoint
+│   ├── inference/                      # Legacy deployment directory
+│   │   └── [Files moved to ../../../../../ (tidal-analysis root)]
 │   └── training/                       # Cloud training components
 │       ├── sweeps/                     # Hyperparameter optimization
 │       │   ├── modal_hp_sweep.py       # Modal Labs sweep script (H100 GPU)
@@ -116,13 +111,14 @@ deploy-transformer-v1.bat            # Deploy to Firebase
 
 ## Path Dependencies
 
-All relative paths have been updated for the new structure:
+Path dependencies updated after deployment restructuring:
 
-- **local/training/train_transformer.py** imports model from `../../cloud/inference/`
-- **local/testing/** scripts import model from `../../cloud/inference/`
+- **local/training/train_transformer.py** imports model from `../../../../..` (tidal-analysis root)
+- **local/testing/** scripts import model from `../../../../..` (tidal-analysis root)
 - **cloud/training/sweeps/modal_hp_sweep.py** uploads data from `../../../local/data-preparation/data/`
 - **cloud/training/single-runs/modal_single_run.py** uploads data from `../../../local/data-preparation/data/`
-- **cloud/inference/deploy-transformer-v1.bat** copies model from `../../local/training/checkpoints/`
+- **Deploy script**: `../../../../../deploy-transformer-v1.bat` (in firebase-functions root)
+- **Deployment files**: Located in tidal-analysis root (main.py, model.py, best.pth, requirements.txt)
 
 ## Key Features
 
@@ -141,6 +137,6 @@ All relative paths have been updated for the new structure:
 2. **Cloud Sweep**: `cloud/training/sweeps/setup.ps1` then `run.ps1`
 3. **Single Cloud Run**: `cloud/training/single-runs/setup.ps1` then `run.ps1`
 4. **Model Testing**: `local/testing/start-server.bat`
-5. **Firebase Deploy**: `cloud/inference/deploy-transformer-v1.bat`
+5. **Firebase Deploy**: `../../../../../deploy-transformer-v1.bat` (from firebase-functions root)
 
 All scripts include error checking, progress reporting, and clear next-step instructions.

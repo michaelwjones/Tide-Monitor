@@ -9,9 +9,9 @@ py -3.11 -m pip install modal torch torchvision numpy scikit-learn tensorboard -
 # Check if authenticated (don't try to authenticate)
 Write-Host ""
 Write-Host "Checking Modal authentication..." -ForegroundColor Yellow
-$authOutput = py -3.11 -m modal token list 2>&1
+$authOutput = py -3.11 -m modal app list 2>&1
 
-if ($authOutput -match "No token found" -or $LASTEXITCODE -ne 0) {
+if ($LASTEXITCODE -ne 0) {
     Write-Host "Not authenticated with Modal." -ForegroundColor Red
     Write-Host "Please run .\login.ps1 first to authenticate." -ForegroundColor Yellow
     Write-Host ""

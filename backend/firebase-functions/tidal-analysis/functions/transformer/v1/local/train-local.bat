@@ -46,7 +46,7 @@ if %ERRORLEVEL% equ 0 (
     echo.
     echo Next steps:
     echo 1. Test model: ..\testing\start-server.bat
-    echo 2. Deploy to Firebase: ..\..\cloud\inference\deploy-transformer-v1.bat
+    echo 2. Deploy to Firebase: ..\..\..\..\deploy-transformer-v1.bat
     echo.
 ) else (
     echo.

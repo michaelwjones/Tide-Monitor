@@ -82,10 +82,21 @@ class TransformerInferencer:
             return False
     
     def normalize_data(self, water_levels):
-        """Normalize water level data using training statistics"""
+        """Normalize water level data while preserving -999 missing values"""
         mean = self.normalization_params['mean']
         std = self.normalization_params['std']
-        return (water_levels - mean) / std
+        
+        # Handle both numpy arrays and torch tensors
+        if isinstance(water_levels, torch.Tensor):
+            normalized = water_levels.clone()
+            valid_mask = (water_levels != -999)
+            normalized[valid_mask] = (water_levels[valid_mask] - mean) / std
+        else:
+            normalized = np.array(water_levels, copy=True)
+            valid_mask = (normalized != -999)
+            normalized[valid_mask] = (normalized[valid_mask] - mean) / std
+            
+        return normalized
     
     def denormalize_data(self, normalized_predictions):
         """Denormalize model predictions back to water levels"""
@@ -153,7 +164,7 @@ class TransformerInferencer:
                         print(f"Non-numeric input value: {val}, replacing with -999")
                         validated_sequence.append(-999)
             
-            # Normalize input (including -999 values as model expects)
+            # Normalize input (preserving -999 values as missing data markers)
             normalized_input = self.normalize_data(torch.FloatTensor(validated_sequence))
             
             # Create input tensor (shape: [1, 433, 1])

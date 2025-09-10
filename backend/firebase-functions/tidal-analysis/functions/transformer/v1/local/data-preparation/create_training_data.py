@@ -226,10 +226,20 @@ def process_sequences(raw_sequences):
     
     return np.array(sequences), np.array(targets), sequence_metadata
 
-def normalize_data(data):
-    """Calculate and save normalization parameters for transformer training"""
-    mean = np.mean(data)
-    std = np.std(data)
+def calculate_normalization_params(data):
+    """Calculate normalization parameters excluding -999 missing values"""
+    # Filter out -999 missing values from normalization calculation
+    valid_data = data[data != -999]
+    
+    if len(valid_data) == 0:
+        raise ValueError("No valid data points found for normalization (all values are -999)")
+    
+    mean = np.mean(valid_data)
+    std = np.std(valid_data)
+    
+    if std == 0:
+        print("Warning: Standard deviation is 0, using std=1.0 to avoid division by zero")
+        std = 1.0
     
     # Save normalization parameters
     norm_params = {
@@ -240,8 +250,26 @@ def normalize_data(data):
     with open('data/normalization_params.json', 'w') as f:
         json.dump(norm_params, f, indent=2)
     
-    print(f"Normalization parameters saved: mean={mean:.2f}, std={std:.2f}")
+    total_values = len(data)
+    valid_values = len(valid_data)
+    missing_count = total_values - valid_values
+    
+    print(f"Normalization parameters (excluding {missing_count} missing values from {total_values} total):")
+    print(f"  Mean: {mean:.2f}")
+    print(f"  Std: {std:.2f}")
+    print(f"  Valid data: {valid_values} values ({valid_values/total_values*100:.1f}%)")
+    
     return norm_params
+
+def apply_normalization(data, mean, std):
+    """Apply normalization while preserving -999 missing values"""
+    normalized = data.copy()
+    
+    # Only normalize non-missing values
+    valid_mask = (data != -999)
+    normalized[valid_mask] = (data[valid_mask] - mean) / std
+    
+    return normalized
 
 def create_train_val_split(X, y, sequence_metadata, val_split=0.2, random_seed=42):
     """
@@ -344,13 +372,15 @@ def main():
     print(f"Output shape: {y.shape} (24-hour sequences at 10-min intervals)")
     
     # Calculate normalization parameters (flatten all sequences for global statistics)
+    # This happens BEFORE train/val split to ensure consistent normalization parameters
     print("Calculating normalization parameters...")
     all_values = np.concatenate([X.flatten(), y.flatten()])
-    norm_params = normalize_data(all_values)
+    norm_params = calculate_normalization_params(all_values)
     
-    # Apply normalization to sequences
-    X_normalized = (X - norm_params['mean']) / norm_params['std']
-    y_normalized = (y - norm_params['mean']) / norm_params['std']
+    # Apply normalization while preserving -999 missing values
+    print("Applying normalization (preserving -999 missing values)...")
+    X_normalized = apply_normalization(X, norm_params['mean'], norm_params['std'])
+    y_normalized = apply_normalization(y, norm_params['mean'], norm_params['std'])
     
     # Create train/validation split with proper temporal gap
     print("Creating train/validation split...")

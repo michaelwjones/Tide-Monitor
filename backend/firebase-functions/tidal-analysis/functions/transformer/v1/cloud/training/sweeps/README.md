@@ -4,6 +4,11 @@ Serverless GPU hyperparameter optimization using Modal and Ray Tune.
 
 ## Quick Start
 
+**Note**: For immediate inference needs, run the single training first:
+```bash
+cd ../single-runs && .\login.ps1 && .\setup.ps1 && .\run.ps1
+```
+
 ### 1. Authenticate (First Time Only)
 ```bash
 .\login.ps1
@@ -14,9 +19,9 @@ Serverless GPU hyperparameter optimization using Modal and Ray Tune.
 .\setup.ps1
 ```
 
-### 3. Run Hyperparameter Sweep
+### 3. Run Focused Hyperparameter Sweep
 ```bash
-.\run.ps1
+.\run.ps1     # ~3-4 days, $300-600, answers attention head question
 ```
 
 Or manually:

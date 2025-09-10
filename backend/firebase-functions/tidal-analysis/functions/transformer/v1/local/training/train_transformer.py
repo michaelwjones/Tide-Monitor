@@ -9,8 +9,8 @@ import sys
 import time
 from datetime import datetime, timedelta
 
-# Import model from cloud inference directory
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'cloud', 'inference'))
+# Import model from tidal-analysis root directory
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '..'))
 from model import TidalTransformer, create_model
 from dataset import create_data_loaders
 

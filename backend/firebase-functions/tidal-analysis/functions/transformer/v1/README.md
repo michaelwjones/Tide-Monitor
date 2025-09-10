@@ -63,12 +63,8 @@ transformer/v1/
 │   ├── test_model.py         # Command-line testing
 │   ├── firebase_fetch.py     # Firebase data utilities
 │   └── start-server.bat      # Windows server launcher
-├── inference/                 # Firebase Functions deployment (Python runtime)
-│   ├── main.py               # PyTorch-based Firebase Functions
-│   ├── model.py              # Transformer architecture (single source)
-│   ├── best.pth              # Trained model checkpoint
-│   ├── requirements.txt      # Python dependencies
-│   └── firebase.json         # Configuration (512MB memory)
+├── cloud/inference/           # Legacy deployment files (moved to tidal-analysis root)
+│   └── [deployment files moved to ../../../../../ (tidal-analysis root)]
 ├── cloud/                     # Cloud training on Modal (serverless GPUs)
 │   └── training/
 │       ├── sweeps/            # Hyperparameter optimization
@@ -107,20 +103,20 @@ setup-complete-transformer-v1.bat
 
 ### Option B: Cloud Training (Recommended)
 
-#### 1. Hyperparameter Optimization
-```bash
-cd cloud/training/sweeps
-.\login.ps1      # One-time Modal authentication
-.\setup.ps1      # Install dependencies + upload data
-.\run.ps1        # Start hyperparameter sweep
-```
-
-#### 2. Single Training Run
+#### 1. Quick Inference Model (Start Here)
 ```bash
 cd cloud/training/single-runs
-.\login.ps1      # One-time Modal authentication (if not done)
+.\login.ps1      # One-time Modal authentication
 .\setup.ps1      # Install dependencies + upload data
-.\run.ps1        # Start single training run
+.\run.ps1        # Train modest model for immediate inference (~1 hour, $6-8)
+```
+
+#### 2. Comprehensive Hyperparameter Optimization
+```bash
+cd cloud/training/sweeps
+.\login.ps1      # One-time Modal authentication (if not done)
+.\setup.ps1      # Install dependencies + upload data  
+.\run.ps1        # Optimize attention heads & parameters (~3-4 days, $300-600)
 ```
 
 ### 3. Step-by-Step Process
@@ -180,6 +176,22 @@ deploy-transformer-v1.bat          # Deploy to Firebase Functions (Python runtim
 - **CPU Only**: 12-24 hours (depending on data size)
 - **Mid-range GPU**: 2-6 hours (GTX 1660, RTX 3060)
 - **High-end GPU**: 1-3 hours (RTX 3080, RTX 4080, A100)
+
+## Cloud Training Options
+
+### Single Run (Inference Model)
+- **Purpose**: Get a working model quickly for immediate deployment
+- **Configuration**: d_model=384, 6 layers (4 encoder + 2 decoder), 12 attention heads
+- **Time**: ~1 hour on H100 GPU
+- **Cost**: ~$6-8
+- **Use case**: Production inference while optimizing hyperparameters
+
+### Hyperparameter Sweep (Optimization)
+- **Purpose**: Find optimal attention head configuration and training parameters
+- **Focus**: Attention heads [8,16,32] with fixed architecture (d_model=512, 8 layers)
+- **Time**: ~3-4 days on H100 GPU (30 trials)
+- **Cost**: ~$300-600
+- **Use case**: Research optimal configuration for maximum performance
 
 ## Model Performance
 
@@ -353,10 +365,11 @@ python test_model.py --input file.json  # Test with custom data
 ## Technical Details
 
 ### Architecture Management
-- **Single Source Model**: Model architecture (`model.py`) is centralized in inference directory
-- **Training References**: Training scripts automatically import from inference/model.py
-- **Deployment**: Model definition and checkpoint are co-located for Firebase deployment
+- **Single Source Model**: Model architecture (`model.py`) is now in tidal-analysis root directory
+- **Training References**: Training scripts import from ../../../../../model.py (tidal-analysis root)
+- **Deployment**: Model definition and checkpoint are in tidal-analysis root for Firebase deployment
 - **Consistency**: Ensures training and inference use identical model architecture
+- **Python 3.13 Runtime**: Uses latest Python runtime with firebase.json configuration
 
 ### Optimized Data Preparation Pipeline
 

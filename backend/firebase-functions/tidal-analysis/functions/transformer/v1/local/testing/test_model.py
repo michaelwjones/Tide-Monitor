@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 # Add paths for imports
-sys.path.append(str(Path(__file__).parent.parent.parent / 'cloud' / 'inference'))
+sys.path.append(str(Path(__file__).parent.parent.parent.parent.parent))
 
 from model import TidalTransformer, create_model
 from firebase_fetch import get_transformer_input_sequence, create_sample_data

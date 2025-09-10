@@ -24,26 +24,60 @@ def fetch_firebase_data():
             
         print(f"Successfully fetched {len(data)} readings from Firebase")
         
-        # Filter out readings with invalid water levels (< -200mm)
+        # Filter out readings with invalid water levels (< -200mm) and old dates (July 6, 2025 and earlier)
         filtered_data = {}
-        skipped_count = 0
+        water_level_skipped = 0
+        date_skipped = 0
+        
+        # Cutoff date: July 7, 2025 00:00:00 UTC (everything before this is filtered out)
+        cutoff_date = datetime(2025, 7, 7, 0, 0, 0)
         
         for key, reading in data.items():
-            if 'w' in reading:
+            skip_reading = False
+            
+            # Check date filter first
+            if 't' in reading:
+                try:
+                    # Parse timestamp as UTC 
+                    timestamp_str = reading['t'].replace('Z', '+00:00')
+                    timestamp = datetime.fromisoformat(timestamp_str)
+                    # Convert to naive UTC for comparison
+                    if timestamp.tzinfo:
+                        timestamp = timestamp.replace(tzinfo=None)
+                    
+                    if timestamp < cutoff_date:
+                        date_skipped += 1
+                        skip_reading = True
+                except (ValueError, TypeError):
+                    # Skip readings with invalid timestamps
+                    date_skipped += 1
+                    skip_reading = True
+            else:
+                # Skip readings without timestamp
+                date_skipped += 1
+                skip_reading = True
+            
+            if not skip_reading and 'w' in reading:
                 try:
                     water_level = float(reading['w'])
-                    if water_level >= -200:
-                        filtered_data[key] = reading
-                    else:
-                        skipped_count += 1
+                    if water_level < -200:
+                        water_level_skipped += 1
+                        skip_reading = True
                 except (ValueError, TypeError):
                     # Skip readings with invalid water level values
-                    skipped_count += 1
-            else:
-                # Keep readings without water level data
+                    water_level_skipped += 1
+                    skip_reading = True
+            elif not skip_reading:
+                # Keep readings without water level data if they pass date filter
+                pass
+            
+            if not skip_reading:
                 filtered_data[key] = reading
         
-        print(f"Filtered out {skipped_count} readings with invalid water levels (< -200mm)")
+        total_skipped = water_level_skipped + date_skipped
+        print(f"Filtered out {date_skipped} readings from July 6, 2025 and earlier")
+        print(f"Filtered out {water_level_skipped} readings with invalid water levels (< -200mm)")
+        print(f"Total filtered: {total_skipped} readings")
         print(f"Kept {len(filtered_data)} readings after filtering")
         
         # Create data directory if it doesn't exist

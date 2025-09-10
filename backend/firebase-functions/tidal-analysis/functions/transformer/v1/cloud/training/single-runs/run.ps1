@@ -45,9 +45,9 @@ if ($LASTEXITCODE -eq 0) {
         Write-Host "- seq2seq_single_run_summary.json (training summary)" -ForegroundColor White
         Write-Host ""
         Write-Host "Next steps:" -ForegroundColor Cyan
-        Write-Host "1. Copy best_seq2seq_single_run.pth to cloud/inference/best.pth" -ForegroundColor White
+        Write-Host "1. Copy best_seq2seq_single_run.pth to ../../../../../../best.pth (tidal-analysis root)" -ForegroundColor White
         Write-Host "2. Test the model using local/testing/start-server.bat" -ForegroundColor White
-        Write-Host "3. Deploy to Firebase using cloud/inference/deploy-transformer-v1.bat" -ForegroundColor White
+        Write-Host "3. Deploy to Firebase using ../../../../../../deploy-transformer-v1.bat" -ForegroundColor White
     }
 } else {
     Write-Host ""

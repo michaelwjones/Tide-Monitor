@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from firebase_fetch import get_transformer_input_sequence, create_sample_data
 
 # Add paths for imports
-sys.path.append(str(Path(__file__).parent.parent.parent / 'cloud' / 'inference'))
+sys.path.append(str(Path(__file__).parent.parent.parent.parent.parent))
 
 try:
     from model import TidalTransformer, create_model
@@ -38,7 +38,7 @@ class TransformerHandler(BaseHTTPRequestHandler):
         if cls.model is not None:
             return True
             
-        model_path = '../inference/best.pth'
+        model_path = '../../../../best.pth'
         
         try:
             # Load model

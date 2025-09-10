@@ -1,0 +1,84 @@
+{
+  "best_config": {
+    "batch_size": 16,
+    "learning_rate": 0.0001,
+    "d_model": 256,
+    "nhead": 8,
+    "num_layers": 4,
+    "dropout": 0.1,
+    "weight_decay": 1e-05,
+    "augment": true,
+    "missing_prob": 0.02,
+    "gap_prob": 0.05,
+    "noise_std": 0.1
+  },
+  "best_val_loss": 0.95074308460409,
+  "total_trials": 4,
+  "optimization_algorithm": "Grid/Random Search + ASHA",
+  "top_5_configs": [
+    {
+      "config": {
+        "batch_size": 16,
+        "learning_rate": 0.0001,
+        "d_model": 256,
+        "nhead": 8,
+        "num_layers": 4,
+        "dropout": 0.1,
+        "weight_decay": 1e-05,
+        "augment": true,
+        "missing_prob": 0.02,
+        "gap_prob": 0.05,
+        "noise_std": 0.1
+      },
+      "val_loss": 0.95074308460409
+    },
+    {
+      "config": {
+        "batch_size": 16,
+        "learning_rate": 0.0001,
+        "d_model": 256,
+        "nhead": 8,
+        "num_layers": 4,
+        "dropout": 0.1,
+        "weight_decay": 1e-05,
+        "augment": true,
+        "missing_prob": 0.02,
+        "gap_prob": 0.05,
+        "noise_std": 0.1
+      },
+      "val_loss": 0.9636639389124784
+    },
+    {
+      "config": {
+        "batch_size": 32,
+        "learning_rate": 5e-05,
+        "d_model": 256,
+        "nhead": 8,
+        "num_layers": 4,
+        "dropout": 0.1,
+        "weight_decay": 1e-05,
+        "augment": true,
+        "missing_prob": 0.02,
+        "gap_prob": 0.05,
+        "noise_std": 0.1
+      },
+      "val_loss": 1.062812892454011
+    },
+    {
+      "config": {
+        "batch_size": 32,
+        "learning_rate": 0.0001,
+        "d_model": 256,
+        "nhead": 8,
+        "num_layers": 4,
+        "dropout": 0.1,
+        "weight_decay": 1e-05,
+        "augment": true,
+        "missing_prob": 0.02,
+        "gap_prob": 0.05,
+        "noise_std": 0.1
+      },
+      "val_loss": 1.14949817103999
+    }
+  ]
+}

@@ -421,15 +421,15 @@ def train_model(config, data_dir="/data"):
     
     # Learning rate scheduler
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=10, eta_min=1e-6  # Match max epochs
+        optimizer, T_max=50, eta_min=1e-6  # Match max epochs
     )
     
     # Training loop
     best_val_loss = float('inf')
     patience_counter = 0
-    patience = 5  # Reduced for testing
+    patience = 15  # Production early stopping patience
     
-    for epoch in range(10):  # Max epochs (reduced for testing)
+    for epoch in range(50):  # Max epochs (production training)
         # Training
         model.train()
         train_loss = 0.0
@@ -533,46 +533,48 @@ def run_hyperparameter_sweep():
     print("✅ Training data found")
     print()
     
-    # Define hyperparameter search space (MINIMAL TEST - 4 trials total)
+    # Define hyperparameter search space (FOCUSED OPTIMIZATION)
     search_space = {
-        # Only 2 parameters with 2 values each = 2x2 = 4 total trials
-        "batch_size": tune.choice([16, 32]),        # Test 2 batch sizes
-        "learning_rate": tune.choice([1e-4, 5e-5]), # Test 2 learning rates
+        # Fixed model architecture (reasonable size for cost/performance balance)
+        "d_model": 512,        # Good balance of performance and cost
+        "num_layers": 8,       # Deep enough to be effective
         
-        # Fixed parameters (use proven defaults)
-        "d_model": 256,        # Small, fast model for testing
-        "nhead": 8,           # Divisible by d_model
-        "num_layers": 4,      # Minimal depth
-        "dropout": 0.1,       # Standard dropout
-        "weight_decay": 1e-5, # Standard weight decay
+        # OPTIMIZE THE UNKNOWN: Attention head configuration
+        "nhead": tune.choice([8, 16, 32]),  # Key question: optimal attention heads
         
-        # Fixed augmentation (use local training defaults)  
-        "augment": True,
-        "missing_prob": 0.02,
-        "gap_prob": 0.05,
-        "noise_std": 0.1,
+        # Training hyperparameters (genuinely need optimization)
+        "learning_rate": tune.loguniform(1e-5, 5e-4),    # Critical parameter
+        "batch_size": tune.choice([32, 48, 64, 96]),      # H100 batch optimization
+        "weight_decay": tune.loguniform(1e-6, 1e-3),     # Regularization balance
+        "dropout": tune.uniform(0.05, 0.3),              # Overfitting control
+        
+        # Data augmentation (affects real-world robustness)
+        "augment": tune.choice([True]),  # Always use augmentation
+        "missing_prob": tune.uniform(0.01, 0.08),        # Sensor dropout simulation
+        "gap_prob": tune.uniform(0.02, 0.12),            # Connectivity gap simulation
+        "noise_std": tune.uniform(0.05, 0.25),           # Measurement noise robustness
     }
     
-    # Configure scheduler for early stopping (reduced for testing)
+    # Configure scheduler for early stopping (production settings)
     scheduler = ASHAScheduler(
         metric="val_loss",
         mode="min",
-        max_t=10,  # Max epochs (reduced for testing)
-        grace_period=5,   # Min epochs before stopping (reduced)
-        reduction_factor=2,
+        max_t=50,  # Max epochs per trial (production training)
+        grace_period=15,   # Min epochs before stopping
+        reduction_factor=3,  # More aggressive pruning for efficiency
         brackets=1
     )
     
-    print("🎯 Hyperparameter Search Configuration (MINIMAL TEST):")
-    print(f"   Search algorithm: Grid Search")
-    print(f"   Early stopping: ASHA Scheduler")  
-    print(f"   Max trials: 4 (2 batch_size × 2 learning_rate)")
-    print(f"   Max epochs per trial: 10 (reduced for testing)")
-    print(f"   Early stopping patience: 5 epochs")
+    print("🎯 Hyperparameter Search Configuration (FOCUSED OPTIMIZATION):")
+    print(f"   Search algorithm: Random Search + ASHA Early Stopping")
+    print(f"   Max trials: 30 (focused on unknowns)")
+    print(f"   Max epochs per trial: 50")
+    print(f"   Early stopping grace period: 15 epochs")
     print(f"   GPU: NVIDIA H100 (80GB VRAM)")
-    print(f"   Model: d_model=256, nhead=8, layers=4 (small & fast)")
-    print(f"   Batch sizes: [16, 32]")
-    print(f"   Learning rates: [1e-4, 5e-5]")
+    print(f"   Fixed architecture: d_model=512, layers=8")
+    print(f"   KEY QUESTION: Optimal attention heads [8,16,32]")
+    print(f"   Tuning: LR, batch size, regularization, data augmentation")
+    print(f"   Focus: Answer 'what matters' not 'bigger is better'")
     print()
     
     # Configure Ray to use GPU properly
@@ -586,18 +588,19 @@ def run_hyperparameter_sweep():
         param_space=search_space,
         tune_config=tune.TuneConfig(
             scheduler=scheduler,
-            num_samples=4,   # Only 4 trials (2×2 grid)
+            num_samples=30,  # Focused search (30 trials)
             max_concurrent_trials=1,  # Run one trial at a time on single GPU
         ),
         run_config=tune.RunConfig(
             name="tide_transformer_v1_hp_sweep",
-            stop={"training_iteration": 10},  # Match max epochs
+            stop={"training_iteration": 50},  # Match max epochs
         )
     )
     
-    print("🔄 Starting minimal hyperparameter sweep...")
-    print("   Testing 4 trials × max 10 epochs = ~30-60 minutes total")
-    print("   This validates the entire pipeline before production runs")
+    print("🔄 Starting focused hyperparameter optimization...")
+    print("   30 trials × avg 25 epochs = ~3-4 days total")
+    print("   Cost estimate: ~$300-600 (vs $2000+ for unfocused search)")
+    print("   Answers the real question: optimal attention head configuration")
     print()
     
     results = tuner.fit()

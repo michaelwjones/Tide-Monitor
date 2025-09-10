@@ -414,30 +414,31 @@ def run_single_training():
     print(f"   Output sequence length: {y_train.shape[1]}")
     print()
     
-    # Optimal hyperparameters from sweep (adapted for seq2seq)
+    # Modest but reliable configuration for inference deployment
     config = {
-        "d_model": 512,
-        "nhead": 16,
-        "num_layers": 4,  # Split between encoder/decoder
-        "dropout": 0.17305796046740565,
-        "learning_rate": 5.845165970318201e-05,
-        "batch_size": 32,
-        "weight_decay": 2.0160787083950938e-06,
-        "num_epochs": 150,  # More epochs for single run
+        # Modest but effective model for inference
+        "d_model": 384,        # Smaller than sweep focus, but capable
+        "nhead": 12,           # Good attention coverage (d_model/nhead = 32)
+        "num_layers": 6,       # Reasonable depth for good performance
+        "dropout": 0.15,       # Moderate regularization
+        "learning_rate": 1e-4, # Conservative learning rate
+        "batch_size": 96,      # Increased H100 utilization
+        "weight_decay": 1e-5,  # Standard regularization
+        "num_epochs": 100,     # Sufficient training time
         
-        # Data augmentation parameters (match local training exactly)
+        # Data augmentation parameters (proven values)
         "augment": True,
-        "missing_prob": 0.02,  # 2% chance of individual missing values
-        "gap_prob": 0.05,      # 5% chance of creating gaps per sequence
-        "noise_std": 0.1,      # Noise standard deviation in normalized space
+        "missing_prob": 0.03,  # Moderate missing value simulation
+        "gap_prob": 0.06,      # Moderate gap simulation  
+        "noise_std": 0.12,     # Moderate noise for robustness
     }
     
     # Split layers for seq2seq (encoder gets more layers)
     num_encoder_layers = max(1, (config["num_layers"] * 2) // 3)  # ~67% to encoder
     num_decoder_layers = max(1, config["num_layers"] - num_encoder_layers)  # remainder to decoder
     
-    print("🎯 Optimal Configuration (Seq2Seq):")
-    print(f"   d_model: {config['d_model']}, nhead: {config['nhead']}")
+    print("🎯 Inference Model Configuration (Seq2Seq):")
+    print(f"   d_model: {config['d_model']}, nhead: {config['nhead']} (head_dim: {config['d_model']//config['nhead']})")
     print(f"   Encoder layers: {num_encoder_layers}, Decoder layers: {num_decoder_layers}")
     print(f"   Total layers: {config['num_layers']}")
     print(f"   Learning Rate: {config['learning_rate']:.2e}")
@@ -445,6 +446,7 @@ def run_single_training():
     print(f"   Weight Decay: {config['weight_decay']:.2e}")
     print(f"   Dropout: {config['dropout']:.3f}")
     print(f"   Epochs: {config['num_epochs']}")
+    print(f"   Purpose: Reliable model for production inference")
     print()
     
     # Create high-quality datasets with full augmentation
@@ -533,9 +535,9 @@ def run_single_training():
             
             optimizer.zero_grad()
             
-            # Use teacher forcing during training (80% chance)
+            # Use teacher forcing during training (100% for efficiency)
             # batch_x and batch_y already have shape (batch_size, seq_len, 1) from dataset
-            outputs = model(batch_x, batch_y, teacher_forcing_ratio=0.8)
+            outputs = model(batch_x, batch_y, teacher_forcing_ratio=1.0)
             loss = criterion(outputs, batch_y)
             loss.backward()
             

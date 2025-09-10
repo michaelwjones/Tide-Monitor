@@ -11,8 +11,8 @@ from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
 import numpy as np
 
-# Import model from inference directory
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'inference'))
+# Import model from tidal-analysis root directory
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
 from model import create_model
 
 

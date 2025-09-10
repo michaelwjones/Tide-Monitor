@@ -1,0 +1,23 @@
+{
+  "best_val_loss": 0.9070198178291321,
+  "total_epochs": 17,
+  "config": {
+    "d_model": 384,
+    "nhead": 12,
+    "num_layers": 6,
+    "dropout": 0.15,
+    "learning_rate": 0.0001,
+    "batch_size": 96,
+    "weight_decay": 1e-05,
+    "num_epochs": 100,
+    "augment": true,
+    "missing_prob": 0.03,
+    "gap_prob": 0.06,
+    "noise_std": 0.12
+  },
+  "architecture": "seq2seq_transformer",
+  "encoder_layers": 4,
+  "decoder_layers": 2,
+  "model_parameters": 11833729,
+  "final_lr": 9.310673033669524e-05
+}

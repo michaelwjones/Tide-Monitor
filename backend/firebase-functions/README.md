@@ -22,7 +22,9 @@ The `runTidalAnalysis` function runs every 5 minutes via Cloud Scheduler to perf
 The `runLSTMv1Prediction` function runs every 6 hours to generate 24-hour water level forecasts using iterative neural network prediction. Uses the last 72 hours of data to produce 1,440 future predictions, stored in `/tidal-analysis/lstm-v1-forecasts/` for debug dashboard visualization.
 
 #### Transformer v1 (`transformer/v1/`)
-The `run_transformer_v1_analysis` function runs every 5 minutes via Cloud Scheduler to generate 24-hour water level forecasts using sequence-to-sequence transformer architecture. Uses Python runtime with 1GB memory allocation for native PyTorch inference. Features direct prediction (single forward pass) with the last 433 readings (72 hours @ 10-minute intervals) to produce 144 future predictions (24 hours @ 10-minute intervals), stored in `/tidal-analysis/transformer-v1-forecast/`. 
+The `run_transformer_v1_analysis` function runs every 5 minutes via Cloud Scheduler to generate 24-hour water level forecasts using sequence-to-sequence transformer architecture. Uses Python 3.13 runtime with 1GB memory allocation for native PyTorch inference. Features direct prediction (single forward pass) with the last 433 readings (72 hours @ 10-minute intervals) to produce 144 future predictions (24 hours @ 10-minute intervals), stored in `/tidal-analysis/transformer-v1-forecast/`.
+
+**Deployment Structure**: Core deployment files (main.py, model.py, requirements.txt, best.pth) are located in `tidal-analysis/` root directory with Python 3.13 runtime configuration. Training and testing components remain in `transformer/v1/local/` subdirectories. 
 
 **Recent Optimizations (Data Pipeline):**
 - **Simplified pipeline**: Eliminated synthetic data generation and gap filling in favor of real sensor data only
