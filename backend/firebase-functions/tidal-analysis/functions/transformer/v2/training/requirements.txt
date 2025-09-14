@@ -1,0 +1,21 @@
+# Core dependencies for Transformer v2 training
+modal>=0.63.0
+torch>=2.1.0
+torchvision
+torchaudio
+numpy>=1.24.0
+scipy
+pandas
+scikit-learn
+
+# Training utilities
+tqdm
+tensorboard
+
+# Optional monitoring
+wandb
+
+# Development dependencies
+matplotlib
+seaborn
+jupyter

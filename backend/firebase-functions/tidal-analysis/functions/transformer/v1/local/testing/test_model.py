@@ -13,8 +13,9 @@ import argparse
 import time
 from pathlib import Path
 
-# Add paths for imports
-sys.path.append(str(Path(__file__).parent.parent.parent.parent.parent))
+# Add paths for imports (from local/testing -> v1/cloud/inference)
+model_path = Path(__file__).parent.parent.parent / 'cloud' / 'inference'
+sys.path.append(str(model_path.resolve()))
 
 from model import TidalTransformer, create_model
 from firebase_fetch import get_transformer_input_sequence, create_sample_data
@@ -22,7 +23,7 @@ from firebase_fetch import get_transformer_input_sequence, create_sample_data
 def load_trained_model(model_path=None):
     """Load the trained transformer model"""
     if model_path is None:
-        model_path = '../training/checkpoints/best.pth'
+        model_path = '../../cloud/training/single-runs/best_single_pass.pth'
     
     if not os.path.exists(model_path):
         print("❌ Error: Trained model not found at:", model_path)
@@ -32,8 +33,16 @@ def load_trained_model(model_path=None):
     try:
         checkpoint = torch.load(model_path, map_location='cpu')
         
-        # Create model with standard config
-        model = create_model()
+        # Create model with config from checkpoint
+        config = checkpoint['config']
+        model = TidalTransformer(
+            input_dim=1,
+            d_model=config['d_model'],
+            nhead=config['nhead'],
+            num_encoder_layers=config['num_layers'],
+            dim_feedforward=config['d_model'] * 4,
+            dropout=config['dropout']
+        )
         model.load_state_dict(checkpoint['model_state_dict'])
         model.eval()
         

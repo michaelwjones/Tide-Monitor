@@ -1,6 +1,6 @@
 # Transformer v1 Testing & Validation
 
-Comprehensive testing interface for validating the trained seq2seq transformer model with real Firebase data and 24-hour forecasting.
+Comprehensive testing interface for validating the trained single-pass encoder transformer model with real Firebase data and 24-hour forecasting.
 
 ## Files
 
@@ -56,8 +56,8 @@ python server.py
 - **Model Architecture**: Shows encoder/decoder layers and parameters
 
 ### Model Information
-- **Transformer Architecture**: 6 encoder + 3 decoder layers, 8 attention heads
-- **Seq2Seq Processing**: Direct 433→144 sequence transformation
+- **Transformer Architecture**: 8 encoder layers, 16 attention heads, single-pass processing
+- **Direct Prediction**: 433→144 sequence transformation in one forward pass
 - **Training Metrics**: Displays validation loss and model parameters
 - **Error Analysis**: Real-time prediction accuracy metrics
 
@@ -72,8 +72,8 @@ python server.py
 ### Model Architecture
 - **Input**: 433-step sequences (72 hours at 10-minute intervals)
 - **Output**: 144-step predictions (24 hours at 10-minute intervals)
-- **Direct Prediction**: Non-iterative seq2seq approach
-- **Attention Mechanism**: Multi-head attention for temporal dependencies
+- **Direct Prediction**: Single-pass encoder-only architecture
+- **Attention Mechanism**: 16-head attention for temporal dependencies
 
 ## Command Line Testing (`test_model.py`)
 

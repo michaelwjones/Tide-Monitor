@@ -26,14 +26,14 @@ if ($LASTEXITCODE -eq 0) {
     
     # Download results
     Write-Host "Downloading trained model and summary..." -ForegroundColor Yellow
-    py -3.11 -m modal volume get tide-training-data best_seq2seq_single_run.pth .\
-    py -3.11 -m modal volume get tide-training-data seq2seq_single_run_summary.json .\
+    py -3.11 -m modal volume get tide-training-data best_single_pass.pth .\ --force
+    py -3.11 -m modal volume get tide-training-data single_pass_summary.json .\ --force
     
-    if (Test-Path ".\seq2seq_single_run_summary.json") {
+    if (Test-Path ".\single_pass_summary.json") {
         Write-Host "Results downloaded successfully!" -ForegroundColor Green
         
         # Show summary
-        $summary = Get-Content ".\seq2seq_single_run_summary.json" | ConvertFrom-Json
+        $summary = Get-Content ".\single_pass_summary.json" | ConvertFrom-Json
         Write-Host ""
         Write-Host "Training Summary:" -ForegroundColor Cyan
         Write-Host "Best validation loss: $($summary.best_val_loss)" -ForegroundColor Green
@@ -41,18 +41,18 @@ if ($LASTEXITCODE -eq 0) {
         Write-Host "Model parameters: $($summary.model_parameters)" -ForegroundColor Gray
         Write-Host ""
         Write-Host "Files saved:" -ForegroundColor Cyan
-        Write-Host "- best_seq2seq_single_run.pth (trained seq2seq model)" -ForegroundColor White
-        Write-Host "- seq2seq_single_run_summary.json (training summary)" -ForegroundColor White
+        Write-Host "- best_single_pass.pth (trained single-pass transformer)" -ForegroundColor White
+        Write-Host "- single_pass_summary.json (training summary)" -ForegroundColor White
         Write-Host ""
         Write-Host "Next steps:" -ForegroundColor Cyan
-        Write-Host "1. Copy best_seq2seq_single_run.pth to ../../../../../../best.pth (tidal-analysis root)" -ForegroundColor White
+        Write-Host "1. Copy best_single_pass.pth to ../../../../../../best.pth (tidal-analysis root)" -ForegroundColor White
         Write-Host "2. Test the model using local/testing/start-server.bat" -ForegroundColor White
         Write-Host "3. Deploy to Firebase using ../../../../../../deploy-transformer-v1.bat" -ForegroundColor White
     }
 } else {
     Write-Host ""
     Write-Host "TRAINING FAILED" -ForegroundColor Red
-    Write-Host "Check logs: py -3.11 -m modal app logs tide-transformer-v1-seq2seq-single-run" -ForegroundColor Gray
+    Write-Host "Check logs: py -3.11 -m modal app logs tide-transformer-v1-single-pass-run" -ForegroundColor Gray
 }
 
 Write-Host ""

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Tide Transformer v1 - Modal Single Training Run (Seq2Seq Architecture)
-Single high-performance GPU training run using optimal hyperparameters with seq2seq transformer
+Tide Transformer v1 - Modal Single Training Run (Single-Pass Architecture)
+High-performance GPU training run using single-pass encoder-only transformer
 """
 
 import modal
@@ -15,7 +15,7 @@ import math
 from pathlib import Path
 
 # Modal app definition
-app = modal.App("tide-transformer-v1-seq2seq-single-run")
+app = modal.App("tide-transformer-v1-single-pass-run")
 
 # Define the container image with all dependencies
 image = (
@@ -37,8 +37,7 @@ volume = modal.Volume.from_name("tide-training-data", create_if_missing=True)
 
 class TidalDataset:
     """
-    High-quality PyTorch Dataset for tidal prediction with seq2seq transformer.
-    Matches local training implementation exactly for consistent hyperparameter optimization.
+    High-quality PyTorch Dataset for tidal prediction with single-pass transformer.
     """
     
     def __init__(self, X, y, norm_params, split='train', augment=True, 
@@ -206,22 +205,21 @@ class PositionalEncoding(nn.Module):
 
 class TidalTransformer(nn.Module):
     """
-    Sequence-to-sequence transformer for tidal prediction with 10-minute intervals.
+    Single-pass encoder-only transformer for tidal prediction.
     
     Architecture:
-    - Configurable encoder/decoder layers
-    - Configurable attention heads and dimensions  
+    - Transformer encoder with multi-head attention
     - Input: 433 time steps (72 hours at 10-minute intervals)
     - Output: 144 time steps (24 hours at 10-minute intervals)
+    - Single forward pass for both training and inference
     """
     
     def __init__(self, 
                  input_dim=1,
-                 d_model=512,
-                 nhead=16, 
-                 num_encoder_layers=3,
-                 num_decoder_layers=1,
-                 dim_feedforward=2048,
+                 d_model=256,
+                 nhead=8, 
+                 num_encoder_layers=6,
+                 dim_feedforward=1024,
                  dropout=0.1,
                  max_seq_length=5000):
         super(TidalTransformer, self).__init__()
@@ -230,32 +228,40 @@ class TidalTransformer(nn.Module):
         self.input_dim = input_dim
         self.nhead = nhead
         self.num_encoder_layers = num_encoder_layers
-        self.num_decoder_layers = num_decoder_layers
         self.dropout = dropout
+        self.input_seq_len = 433
+        self.output_seq_len = 144
         
         # Input projection: map from input_dim to d_model
         self.input_projection = nn.Linear(input_dim, d_model)
         
-        # Output projection: map from d_model back to input_dim
-        self.output_projection = nn.Linear(d_model, input_dim)
-        
         # Positional encoding
         self.pos_encoder = PositionalEncoding(d_model, max_seq_length)
         
-        # Transformer architecture
-        self.transformer = nn.Transformer(
+        # Transformer encoder
+        encoder_layer = nn.TransformerEncoderLayer(
             d_model=d_model,
             nhead=nhead,
-            num_encoder_layers=num_encoder_layers,
-            num_decoder_layers=num_decoder_layers,
             dim_feedforward=dim_feedforward,
             dropout=dropout,
-            batch_first=True  # (batch_size, seq_len, d_model) for better performance
+            batch_first=True
+        )
+        self.transformer_encoder = nn.TransformerEncoder(
+            encoder_layer, num_layers=num_encoder_layers
         )
         
-        # Enable gradient checkpointing to save memory
-        if hasattr(self.transformer, 'enable_nested_tensor'):
-            self.transformer.enable_nested_tensor = False
+        # Simple approach: use evenly spaced positions from the encoded sequence
+        # 433 input steps -> select every ~3rd position to get 144 outputs
+        output_positions = torch.linspace(0, 432, 144).long()
+        self.register_buffer('output_positions', output_positions)
+        
+        # Direct prediction head for each selected position
+        self.prediction_head = nn.Sequential(
+            nn.Linear(d_model, d_model * 2),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(d_model * 2, 1),
+        )
         
         # Initialize weights
         self.init_weights()
@@ -268,94 +274,38 @@ class TidalTransformer(nn.Module):
                 if module.bias is not None:
                     nn.init.constant_(module.bias, 0)
     
-    def generate_square_subsequent_mask(self, sz: int):
-        """Generate causal mask for decoder to prevent looking at future tokens"""
-        mask = torch.triu(torch.ones(sz, sz), diagonal=1)
-        return mask.masked_fill(mask == 1, float('-inf'))
-    
-    def forward(self, src, tgt=None, teacher_forcing_ratio=1.0):
+    def forward(self, src):
         """
-        Forward pass through the transformer.
+        Single-pass forward through the transformer.
         
         Args:
             src: Source sequence (batch_size, input_seq_len, input_dim)
-            tgt: Target sequence for teacher forcing (batch_size, output_seq_len, input_dim)
-            teacher_forcing_ratio: Probability of using teacher forcing vs autoregressive
             
         Returns:
             output: Predicted sequence (batch_size, output_seq_len, input_dim)
         """
         batch_size, src_seq_len, _ = src.shape
         
-        # Project input to model dimension (batch_first=True, no transpose needed)
+        # Ensure input is the expected length
+        if src_seq_len != self.input_seq_len:
+            raise ValueError(f"Expected input length {self.input_seq_len}, got {src_seq_len}")
+        
+        # Project input to model dimension
         src = self.input_projection(src)  # (batch_size, seq_len, d_model)
         
         # Add positional encoding (need to transpose for pos_encoder, then back)
         src = src.transpose(0, 1)         # (seq_len, batch_size, d_model) for pos_encoder
         src = self.pos_encoder(src)
         src = src.transpose(0, 1)         # (batch_size, seq_len, d_model) for transformer
-
-        if self.training and tgt is not None and torch.rand(1).item() < teacher_forcing_ratio:
-            # Training with teacher forcing
-            tgt = self.input_projection(tgt)  # (batch_size, seq_len, d_model)
-            
-            # Add positional encoding (transpose for pos_encoder, then back)
-            tgt = tgt.transpose(0, 1)         # (seq_len, batch_size, d_model) for pos_encoder
-            tgt = self.pos_encoder(tgt)
-            tgt = tgt.transpose(0, 1)         # (batch_size, seq_len, d_model) for transformer
-            
-            # Create causal mask for decoder
-            tgt_seq_len = tgt.size(1)  # seq_len dimension is now index 1
-            tgt_mask = self.generate_square_subsequent_mask(tgt_seq_len).to(src.device)
-            
-            # Transformer forward pass
-            output = self.transformer(src, tgt, tgt_mask=tgt_mask)
-            
-        else:
-            # Inference or training without teacher forcing (autoregressive)
-            output_seq_len = 144  # 24 hours at 10-minute intervals
-            
-            # Start with encoder output
-            memory = self.transformer.encoder(src)
-            
-            # Memory-efficient autoregressive generation with sliding window
-            max_context = 72  # Keep only last 72 tokens for context
-            decoder_input = torch.zeros(batch_size, 1, self.d_model).to(src.device)  # (batch_size, 1, d_model)
-            outputs = []
-            
-            # Autoregressive generation
-            for i in range(output_seq_len):
-                # Always slice to max_context to avoid conditional logic during tracing
-                # This is safe even when current_len <= max_context
-                decoder_input = decoder_input[:, -max_context:, :]
-                current_len = decoder_input.size(1)
-                
-                # Use fixed window size to avoid dynamic operations during tracing
-                # Use current_len directly since it's now bounded by max_context
-                tgt_mask = self.generate_square_subsequent_mask(current_len).to(src.device)
-                
-                # Decoder forward pass with full decoder input (already windowed above)
-                decoder_output = self.transformer.decoder(
-                    decoder_input, memory, tgt_mask=tgt_mask
-                )
-                
-                # Take the last output token
-                current_output = decoder_output[:, -1:, :]  # (batch_size, 1, d_model)
-                outputs.append(current_output.clone())  # Clone to avoid memory references
-                
-                # Append current output to decoder input
-                decoder_input = torch.cat([decoder_input, current_output], dim=1)  # Concat along seq_len
-                
-                # Clear cache periodically during inference
-                if i % 100 == 0 and not torch.jit.is_tracing():
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
-            
-            # Concatenate all outputs
-            output = torch.cat(outputs, dim=1)  # (batch_size, output_seq_len, d_model)
         
-        # Project back to input dimension (already in batch_first format)
-        output = self.output_projection(output)  # (batch_size, seq_len, input_dim)
+        # Process through transformer encoder
+        encoded = self.transformer_encoder(src)  # (batch_size, seq_len, d_model)
+        
+        # Select evenly spaced positions from the encoded sequence
+        selected_positions = encoded[:, self.output_positions, :]  # (batch_size, 144, d_model)
+        
+        # Apply prediction head to each selected position
+        output = self.prediction_head(selected_positions)  # (batch_size, 144, 1)
         
         return output
 
@@ -367,16 +317,16 @@ class TidalTransformer(nn.Module):
     memory=32768,  # 32GB RAM for H100
 )
 def run_single_training():
-    """Single training run with optimal hyperparameters and seq2seq architecture"""
+    """Single training run with single-pass encoder-only transformer"""
     
-    print("🚀 Starting Tide Transformer v1 Single Training Run (Seq2Seq)")
+    print("🚀 Starting Tide Transformer v1 Single Training Run (Single-Pass)")
     print("=" * 60)
     
     # Check GPU availability
     if torch.cuda.is_available():
         print(f"✅ GPU available: {torch.cuda.get_device_name(0)}")
         print(f"✅ GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
-        print(f"🚀 Using H100 GPU for high-performance seq2seq training!")
+        print(f"🚀 Using H100 GPU for high-performance single-pass training!")
     else:
         print("⚠️  No GPU available, using CPU")
     
@@ -414,42 +364,37 @@ def run_single_training():
     print(f"   Output sequence length: {y_train.shape[1]}")
     print()
     
-    # Modest but reliable configuration for inference deployment
+    # Configuration optimized for single-pass architecture
     config = {
-        # Modest but effective model for inference
-        "d_model": 384,        # Smaller than sweep focus, but capable
-        "nhead": 12,           # Good attention coverage (d_model/nhead = 32)
-        "num_layers": 6,       # Reasonable depth for good performance
+        # Model architecture
+        "d_model": 512,        # Larger model for better capacity
+        "nhead": 16,           # More attention heads for complex patterns
+        "num_layers": 8,       # Deeper model for better representation
         "dropout": 0.15,       # Moderate regularization
         "learning_rate": 1e-4, # Conservative learning rate
-        "batch_size": 96,      # Increased H100 utilization
+        "batch_size": 64,      # Good batch size for H100
         "weight_decay": 1e-5,  # Standard regularization
-        "num_epochs": 100,     # Sufficient training time
+        "num_epochs": 150,     # More epochs for single-pass learning
         
-        # Data augmentation parameters (proven values)
+        # Data augmentation parameters
         "augment": True,
         "missing_prob": 0.03,  # Moderate missing value simulation
         "gap_prob": 0.06,      # Moderate gap simulation  
         "noise_std": 0.12,     # Moderate noise for robustness
     }
     
-    # Split layers for seq2seq (encoder gets more layers)
-    num_encoder_layers = max(1, (config["num_layers"] * 2) // 3)  # ~67% to encoder
-    num_decoder_layers = max(1, config["num_layers"] - num_encoder_layers)  # remainder to decoder
-    
-    print("🎯 Inference Model Configuration (Seq2Seq):")
+    print("🎯 Single-Pass Model Configuration:")
     print(f"   d_model: {config['d_model']}, nhead: {config['nhead']} (head_dim: {config['d_model']//config['nhead']})")
-    print(f"   Encoder layers: {num_encoder_layers}, Decoder layers: {num_decoder_layers}")
-    print(f"   Total layers: {config['num_layers']}")
+    print(f"   Encoder layers: {config['num_layers']}")
     print(f"   Learning Rate: {config['learning_rate']:.2e}")
     print(f"   Batch Size: {config['batch_size']}")
     print(f"   Weight Decay: {config['weight_decay']:.2e}")
     print(f"   Dropout: {config['dropout']:.3f}")
     print(f"   Epochs: {config['num_epochs']}")
-    print(f"   Purpose: Reliable model for production inference")
+    print(f"   Architecture: Single-pass encoder-only transformer")
     print()
     
-    # Create high-quality datasets with full augmentation
+    # Create datasets with full augmentation
     train_dataset = TidalDataset(
         X_train, y_train, norm_params, 
         split='train', 
@@ -481,13 +426,12 @@ def run_single_training():
         pin_memory=True if torch.cuda.is_available() else False
     )
     
-    # Initialize seq2seq model
+    # Initialize single-pass model
     model = TidalTransformer(
         input_dim=1,
         d_model=config["d_model"],
         nhead=config["nhead"], 
-        num_encoder_layers=num_encoder_layers,
-        num_decoder_layers=num_decoder_layers,
+        num_encoder_layers=config["num_layers"],
         dim_feedforward=config["d_model"] * 4,
         dropout=config["dropout"]
     ).to(device)
@@ -497,7 +441,7 @@ def run_single_training():
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     
     print(f"🏗️  Model Architecture:")
-    print(f"   Architecture: Sequence-to-Sequence Transformer")
+    print(f"   Architecture: Single-Pass Encoder Transformer")
     print(f"   Total parameters: {total_params:,}")
     print(f"   Trainable parameters: {trainable_params:,}")
     print()
@@ -518,7 +462,7 @@ def run_single_training():
     # Training loop
     best_val_loss = float('inf')
     patience_counter = 0
-    patience = 15
+    patience = 20
     
     print("🔄 Starting Training...")
     print("=" * 60)
@@ -535,9 +479,8 @@ def run_single_training():
             
             optimizer.zero_grad()
             
-            # Use teacher forcing during training (100% for efficiency)
-            # batch_x and batch_y already have shape (batch_size, seq_len, 1) from dataset
-            outputs = model(batch_x, batch_y, teacher_forcing_ratio=1.0)
+            # Single-pass forward (no teacher forcing needed)
+            outputs = model(batch_x)
             loss = criterion(outputs, batch_y)
             loss.backward()
             
@@ -559,8 +502,7 @@ def run_single_training():
                 batch_x = batch_x.to(device)
                 batch_y = batch_y.to(device)
                 
-                # No teacher forcing during validation
-                # batch_x and batch_y already have shape (batch_size, seq_len, 1) from dataset
+                # Single-pass forward (same as training)
                 outputs = model(batch_x)
                 loss = criterion(outputs, batch_y)
                 
@@ -580,21 +522,20 @@ def run_single_training():
             best_val_loss = avg_val_loss
             patience_counter = 0
             
-            # Save best model to volume (seq2seq format)
+            # Save best model
             model_state = {
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
-                'loss': avg_val_loss,  # Use 'loss' for compatibility with inference
+                'loss': avg_val_loss,
                 'config': {
                     **config,
-                    'num_encoder_layers': num_encoder_layers,
-                    'num_decoder_layers': num_decoder_layers,
-                    'architecture': 'seq2seq_transformer'
+                    'num_encoder_layers': config['num_layers'],
+                    'architecture': 'single_pass_encoder_transformer'
                 },
                 'normalization_params': norm_params
             }
-            torch.save(model_state, '/data/best_seq2seq_single_run.pth')
+            torch.save(model_state, '/data/best_single_pass.pth')
         else:
             patience_counter += 1
         
@@ -615,7 +556,7 @@ def run_single_training():
     print("🏆 TRAINING COMPLETE!")
     print("=" * 60)
     print(f"🎯 Best Validation Loss: {best_val_loss:.6f}")
-    print(f"📁 Model saved to: /data/best_seq2seq_single_run.pth")
+    print(f"📁 Model saved to: /data/best_single_pass.pth")
     print()
     
     # Save training summary
@@ -623,30 +564,28 @@ def run_single_training():
         "best_val_loss": best_val_loss,
         "total_epochs": epoch + 1,
         "config": config,
-        "architecture": "seq2seq_transformer",
-        "encoder_layers": num_encoder_layers,
-        "decoder_layers": num_decoder_layers,
+        "architecture": "single_pass_encoder_transformer",
+        "encoder_layers": config['num_layers'],
         "model_parameters": total_params,
         "final_lr": optimizer.param_groups[0]['lr']
     }
     
-    with open("/data/seq2seq_single_run_summary.json", "w") as f:
+    with open("/data/single_pass_summary.json", "w") as f:
         json.dump(summary, f, indent=2, default=str)
     
-    print("💾 Training summary saved to /data/seq2seq_single_run_summary.json")
-    print("🚀 Ready for deployment!")
+    print("💾 Training summary saved")
+    print("🚀 Ready for deployment with single-pass inference!")
     
     return summary
 
 # Local entry point for uploading data  
 @app.local_entrypoint()
 def upload_training_data():
-    """Upload training data to Modal volume using batch_upload"""
+    """Upload training data to Modal volume"""
     
-    # Use absolute path to avoid any Windows path issues
     script_dir = Path(__file__).parent.absolute()
     data_dir = script_dir.parent.parent.parent / "local" / "data-preparation" / "data"
-    data_dir = data_dir.resolve()  # Resolve to absolute path
+    data_dir = data_dir.resolve()
     
     required_files = [
         "X_train.npy", "y_train.npy", "X_val.npy", "y_val.npy", 
@@ -663,7 +602,7 @@ def upload_training_data():
             return False
         print(f"✓ Found {filename}")
     
-    # Upload files using batch_upload
+    # Upload files
     try:
         with volume.batch_upload() as batch:
             for filename in required_files:
@@ -677,6 +616,3 @@ def upload_training_data():
     except Exception as e:
         print(f"❌ Upload failed: {e}")
         return False
-
-# Note: Functions can be called directly via modal run file.py::function_name
-# No main entrypoint needed - Modal will call functions directly

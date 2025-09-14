@@ -5,21 +5,21 @@ echo This function performs transformer-based tidal analysis every 5 minutes.
 echo.
 
 echo Checking trained PyTorch model...
-if not exist "tidal-analysis\functions\transformer\v1\cloud\training\single-runs\best_seq2seq_single_run.pth" (
+if not exist "tidal-analysis\functions\transformer\v1\cloud\training\single-runs\best_single_pass.pth" (
     echo ERROR: Trained PyTorch model not found!
     echo Please train the transformer model first using cloud training single-runs
-    echo Expected: tidal-analysis\functions\transformer\v1\cloud\training\single-runs\best_seq2seq_single_run.pth
+    echo Expected: tidal-analysis\functions\transformer\v1\cloud\training\single-runs\best_single_pass.pth
     echo.
     pause
     exit /b 1
 )
-echo [OK] Trained PyTorch model found
+echo [OK] Trained single-pass transformer model found
 
 echo.
-echo Copying model checkpoint to tidal-analysis root directory...
-copy "tidal-analysis\functions\transformer\v1\cloud\training\single-runs\best_seq2seq_single_run.pth" "tidal-analysis\best.pth" > nul
+echo Copying model checkpoint to inference directory...
+copy "tidal-analysis\functions\transformer\v1\cloud\training\single-runs\best_single_pass.pth" "tidal-analysis\functions\transformer\v1\cloud\inference\best.pth" > nul
 if %ERRORLEVEL% EQU 0 (
-    echo [OK] Model checkpoint copied to tidal-analysis root
+    echo [OK] Model checkpoint copied to inference directory
 ) else (
     echo [ERROR] Failed to copy model checkpoint
     pause
@@ -27,9 +27,11 @@ if %ERRORLEVEL% EQU 0 (
 )
 
 echo.
-echo Deploying all tidal-analysis functions (including transformer v1)...
+echo Deploying transformer v1 inference function...
+cd tidal-analysis\functions\transformer\v1\cloud\inference
 firebase deploy --only functions --project tide-monitor-boron
 set DEPLOY_RESULT=%ERRORLEVEL%
+cd /d "%ORIGINAL_DIR%"
 
 if %DEPLOY_RESULT% EQU 0 (
     echo.

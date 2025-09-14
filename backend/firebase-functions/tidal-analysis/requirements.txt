@@ -1,5 +1,4 @@
-# Firebase Functions Python requirements for Transformer v1
+# This directory contains multiple function subdirectories
+# Each function has its own requirements.txt
 firebase-functions>=0.1.0
 firebase-admin>=6.0.0
-torch>=2.0.0
-numpy>=1.21.0,<2.0.0

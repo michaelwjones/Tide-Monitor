@@ -169,39 +169,57 @@
         // Fetch Transformer 24-hour forecasts from Firebase
         async function fetchTransformerPredictions() {
             try {
-                const response = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/tidal-analysis/transformer-v1-forecast.json');
-                const data = await response.json();
+                // Try v2 first, then fallback to v1
+                const sources = [
+                    { url: 'https://tide-monitor-boron-default-rtdb.firebaseio.com/tidal-analysis/transformer-v2-forecast.json', version: 'v2' },
+                    { url: 'https://tide-monitor-boron-default-rtdb.firebaseio.com/tidal-analysis/transformer-v1-forecast.json', version: 'v1' }
+                ];
                 
-                if (!data || !data.forecast) {
-                    console.log('No Transformer forecasts found');
-                    return null;
+                for (const source of sources) {
+                    try {
+                        const response = await fetch(source.url);
+                        const data = await response.json();
+                        
+                        if (!data || !data.forecast) {
+                            console.log(`No Transformer ${source.version} forecasts found`);
+                            continue;
+                        }
+                        
+                        // Check if forecast was updated in the last 10 minutes
+                        const generatedAt = new Date(data.generated_at);
+                        const now = new Date();
+                        const timeDiff = (now - generatedAt) / (1000 * 60); // minutes
+                        
+                        if (timeDiff > 10) {
+                            console.log(`Transformer ${source.version} forecast is ${timeDiff.toFixed(1)} minutes old, not showing`);
+                            continue;
+                        }
+                        
+                        console.log(`Fetched Transformer ${source.version} forecast: ${data.forecast.length} predictions`);
+                        
+                        // Each prediction has: timestamp (ISO string), prediction (mm), step
+                        const predictions = data.forecast.map(pred => ({
+                            timestamp: new Date(pred.timestamp),
+                            prediction: pred.prediction, // Keep in mm
+                            step: pred.step
+                        }));
+                        
+                        return {
+                            predictions: predictions,
+                            generatedAt: generatedAt,
+                            modelVersion: data.model_version,
+                            inputDataCount: data.input_data_count,
+                            version: source.version
+                        };
+                        
+                    } catch (error) {
+                        console.log(`Error fetching Transformer ${source.version} predictions:`, error);
+                        continue;
+                    }
                 }
                 
-                // Check if forecast was updated in the last 10 minutes
-                const generatedAt = new Date(data.generated_at);
-                const now = new Date();
-                const timeDiff = (now - generatedAt) / (1000 * 60); // minutes
-                
-                if (timeDiff > 10) {
-                    console.log(`Transformer forecast is ${timeDiff.toFixed(1)} minutes old, not showing`);
-                    return null;
-                }
-                
-                console.log(`Fetched Transformer forecast: ${data.forecast.length} predictions`);
-                
-                // Each prediction has: timestamp (ISO string), prediction (mm), step
-                const predictions = data.forecast.map(pred => ({
-                    timestamp: new Date(pred.timestamp),
-                    prediction: pred.prediction, // Keep in mm
-                    step: pred.step
-                }));
-                
-                return {
-                    predictions: predictions,
-                    generatedAt: generatedAt,
-                    modelVersion: data.model_version,
-                    inputDataCount: data.input_data_count
-                };
+                console.log('No recent Transformer forecasts found');
+                return null;
                 
             } catch (error) {
                 console.error('Error fetching Transformer predictions:', error);
@@ -383,7 +401,7 @@
             
             // Add prediction dataset to chart (points only, no connecting lines)
             const predictionDataset = {
-                label: 'Transformer 24h Forecast',
+                label: `Transformer ${forecastData.version.toUpperCase()} 24h Forecast`,
                 data: predictionData,
                 borderColor: 'purple',
                 backgroundColor: 'purple',
@@ -407,7 +425,7 @@
             
             // Find and remove Transformer prediction dataset
             debugChartInstance.data.datasets = debugChartInstance.data.datasets.filter(
-                dataset => dataset.label !== 'Transformer 24h Forecast'
+                dataset => !dataset.label.includes('Transformer') || !dataset.label.includes('24h Forecast')
             );
             debugChartInstance.update('none');
             

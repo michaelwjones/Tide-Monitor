@@ -17,7 +17,9 @@ from datetime import datetime, timedelta
 from firebase_fetch import get_transformer_input_sequence, create_sample_data
 
 # Add paths for imports
-sys.path.append(str(Path(__file__).parent.parent.parent.parent.parent))
+model_path = Path(__file__).parent.parent.parent / 'cloud' / 'inference'  
+sys.path.append(str(model_path.resolve()))
+print(f"[INFO] Added model path: {model_path.resolve()}")
 
 try:
     from model import TidalTransformer, create_model
@@ -38,7 +40,7 @@ class TransformerHandler(BaseHTTPRequestHandler):
         if cls.model is not None:
             return True
             
-        model_path = '../../../../best.pth'
+        model_path = '../../cloud/training/single-runs/best_single_pass.pth'
         
         try:
             # Load model
@@ -56,8 +58,16 @@ class TransformerHandler(BaseHTTPRequestHandler):
                 
             checkpoint = torch.load(model_path, map_location='cpu')
             
-            # Create and load model
-            cls.model = create_model()
+            # Create model with config from checkpoint
+            config = checkpoint['config']
+            cls.model = TidalTransformer(
+                input_dim=1,
+                d_model=config['d_model'],
+                nhead=config['nhead'],
+                num_encoder_layers=config['num_layers'],
+                dim_feedforward=config['d_model'] * 4,
+                dropout=config['dropout']
+            )
             cls.model.load_state_dict(checkpoint['model_state_dict'])
             cls.model.eval()
             

@@ -1,6 +1,8 @@
-# Transformer v1 - Sequence-to-Sequence Tidal Prediction
+# Transformer v1 - Single-Pass Encoder Tidal Prediction
 
-Advanced sequence-to-sequence transformer model for 24-hour tidal prediction using multi-head attention mechanisms.
+Single-pass encoder-only transformer model for 24-hour tidal prediction using multi-head attention mechanisms.
+
+> **⚠️ Important Note**: This model architecture was recently corrected to fix a critical training flaw. The previous architecture used overly complex Conv1D layers that may have destroyed temporal information. The updated architecture now uses simple evenly-spaced position selection from all 433 encoded time steps for proper tidal pattern learning. **Existing checkpoints from before this fix will not be compatible** and require retraining with the corrected architecture.
 
 ## Overview
 
@@ -31,19 +33,21 @@ The Transformer v1 system is organized into clean local and cloud components:
 ## Architecture Details
 
 ### Model Specifications
-- **Architecture**: Sequence-to-sequence transformer
-- **Encoder**: 6 layers, 8 attention heads, 256 hidden dimensions
-- **Decoder**: 3 layers, 8 attention heads, 256 hidden dimensions
+- **Architecture**: Single-pass encoder-only transformer with position selection
+- **Encoder**: 8 layers, 16 attention heads, 512 hidden dimensions
+- **Temporal Processing**: Evenly-spaced position selection from encoded sequence
 - **Input Length**: 433 time steps (72 hours at 10-minute intervals)
 - **Output Length**: 144 time steps (24 hours at 10-minute intervals)
-- **Parameters**: ~2.5M trainable parameters
+- **Parameters**: ~28M trainable parameters
 
 ### Key Features
 - **Multi-Head Attention**: Captures multiple temporal patterns simultaneously
+- **Position Selection**: Evenly-spaced sampling from all 433 encoded time steps
+- **Direct Mapping**: Simple 433→144 temporal mapping without information loss
 - **Positional Encoding**: Sinusoidal encoding for temporal positioning
 - **Layer Normalization**: Stable training with residual connections
-- **Causal Masking**: Prevents decoder from accessing future information
-- **Mixed Precision**: Optional AMP training for efficiency
+- **Single Forward Pass**: Same behavior for training and inference (no autoregressive generation)
+- **Full Context Utilization**: Uses all 433 encoded time steps through position selection
 
 ## Directory Structure
 
@@ -181,10 +185,10 @@ deploy-transformer-v1.bat          # Deploy to Firebase Functions (Python runtim
 
 ### Single Run (Inference Model)
 - **Purpose**: Get a working model quickly for immediate deployment
-- **Configuration**: d_model=384, 6 layers (4 encoder + 2 decoder), 12 attention heads
-- **Time**: ~1 hour on H100 GPU
-- **Cost**: ~$6-8
-- **Use case**: Production inference while optimizing hyperparameters
+- **Configuration**: d_model=512, 8 encoder layers, 16 attention heads
+- **Time**: ~15 minutes on H100 GPU
+- **Cost**: ~$4-6
+- **Use case**: Production inference with single-pass architecture
 
 ### Hyperparameter Sweep (Optimization)
 - **Purpose**: Find optimal attention head configuration and training parameters
@@ -195,12 +199,13 @@ deploy-transformer-v1.bat          # Deploy to Firebase Functions (Python runtim
 
 ## Model Performance
 
-### Advantages over LSTM v1
-- **Training Speed**: 5-10x faster than iterative LSTM approach
-- **Inference Speed**: Single forward pass vs 1440 iterative steps
-- **Temporal Modeling**: Better capture of long-range dependencies
+### Advantages over LSTM v1 and Previous Autoregressive Transformer
+- **Training Speed**: 5-10x faster than iterative approaches
+- **Inference Speed**: Single forward pass vs 144 autoregressive steps
+- **Consistent Behavior**: Same forward pass for training and inference
+- **Temporal Modeling**: Better capture of long-range dependencies via attention
 - **Parallelization**: Full sequence processed simultaneously
-- **Robustness Training**: Built-in missing value and noise simulation during training
+- **Robustness**: No autoregressive error accumulation
 
 ### Expected Metrics
 - **Training Loss**: <0.1 (normalized MSE)
@@ -232,7 +237,7 @@ deploy-transformer-v1.bat          # Deploy to Firebase Functions (Python runtim
    - Pre-validated 433-point sequence fed directly to model
    - Preserves -999 synthetic values exactly as model expects
    - No additional padding or mean calculations that could distort data
-5. **Inference**: Native PyTorch transformer generates 144 predictions in single pass
+5. **Inference**: Single-pass encoder-only transformer generates 144 predictions directly
 6. **Timestamp Alignment**: Uses last real data timestamp (not synthetic) as prediction base
 7. **Quality Assurance**: Converts NaN/infinite predictions to -999 (error values)
 8. **Storage**: Complete forecast with metadata and error tracking
@@ -349,6 +354,17 @@ python test_model.py --input file.json  # Test with custom data
      - Displays boundary gap between last training and first validation
      - Clear distinction between discarded data span and sequence boundary gap
    - Result: Accurate reporting of temporal separation for data leakage prevention
+
+13. **Architectural Simplification** ✅ **FIXED**
+   - Issue: Previous architecture used complex Conv1D layers that may have destroyed temporal information
+   - Root Cause: Overly complex temporal projection with multiple Conv1D and linear layers
+   - Impact: Model unable to learn proper tidal patterns despite high-quality training data
+   - Solution: Simplified to evenly-spaced position selection from encoded sequence
+     - Direct selection: `selected_positions = encoded[:, self.output_positions, :]`
+     - Position buffer: `output_positions = torch.linspace(0, 432, 144).long()`
+     - Removes all Conv1D layers and complex temporal projections
+     - Single prediction head processes selected positions directly
+   - Result: Training and inference models now use identical simplified architecture
 
 ### Performance Optimization
 

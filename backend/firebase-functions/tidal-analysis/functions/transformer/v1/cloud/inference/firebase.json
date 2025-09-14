@@ -1,0 +1,14 @@
+{
+  "functions": [
+    {
+      "source": ".",
+      "codebase": "transformer-v1-inference",
+      "ignore": [
+        "venv",
+        "__pycache__",
+        "*.pyc",
+        ".git"
+      ]
+    }
+  ]
+}

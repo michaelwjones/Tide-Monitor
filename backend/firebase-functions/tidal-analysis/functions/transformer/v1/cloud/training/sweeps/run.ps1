@@ -25,7 +25,7 @@ if ($LASTEXITCODE -eq 0) {
     
     # Download results
     Write-Host "Downloading results..." -ForegroundColor Yellow
-    py -3.11 -m modal volume get tide-training-data hp_optimization_results.json .\
+    py -3.11 -m modal volume get tide-training-data hp_optimization_results.json .\ --force
     
     if (Test-Path ".\hp_optimization_results.json") {
         Write-Host "Results saved to hp_optimization_results.json" -ForegroundColor Green

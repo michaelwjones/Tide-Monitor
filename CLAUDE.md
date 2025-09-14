@@ -29,7 +29,7 @@ This is a **Tide Monitor** project that measures water levels and wave heights u
    - **Data Enrichment** (`tide-enrichment/`): Automatically triggers when new readings arrive
    - **Tidal Analysis Functions** (`tidal-analysis/functions/`): Multiple analysis methods for advanced signal processing
    - **LSTM Forecasting** (`tidal-analysis/functions/lstm/v1/`): Neural network-powered 24-hour water level predictions
-   - **Transformer Forecasting** (`tidal-analysis/functions/transformer/v1/`): Advanced sequence-to-sequence 24-hour predictions with real-time temporal alignment
+   - **Transformer Forecasting** (`tidal-analysis/functions/transformer/v1/`): Single-pass encoder-only transformer for direct 433→144 prediction (no autoregressive generation)
    - Fetch real-time wind and water level data from NOAA station 8656483 (Duke Marine Lab)
    - Enrich each reading with environmental conditions
    - Perform strict data validation requiring at least 1 data point (uses last element)
@@ -332,17 +332,35 @@ These improvements fix uniform prediction outputs and ensure natural tidal varia
 
 This removal simplified the system to focus on the two reliable wave analysis methods (percentile and envelope) that provide consistent, high-resolution measurements.
 
-## Coding Principles
+**Autoregressive Transformer Architecture (REMOVED)**: The transformer v1 system previously used an autoregressive seq2seq architecture that caused prediction quality issues:
 
-- **Do not mask a failure with a fallback**
+- **Problem**: Training used single-pass (433→144) but inference used 144-step autoregressive loops  
+- **Result**: Model learned one behavior but was forced to perform differently during production
+- **Symptoms**: Uniform outputs, no sinusoidal patterns, poor tidal prediction quality
+- **Root Cause**: Zero-initialization in decoder during autoregressive generation
+- **Resolution**: Replaced with single-pass encoder-only transformer architecture
 
-## Permissions
+**Current Transformer v1 Architecture (IMPLEMENTED)**: Single-pass encoder-only transformer for reliable tidal prediction:
 
-- You have permission to commit and push code.
+- **Architecture**: Encoder-only transformer with multi-head attention (16 heads, 8 layers, 512 dimensions)
+- **Input/Output**: Direct 433→144 mapping (72 hours input → 24 hours output at 10-minute intervals)
+- **Training**: Single forward pass: `model(src)` → predictions (no teacher forcing needed)
+- **Inference**: Identical single forward pass: `model(src)` → predictions (no autoregressive generation)
+- **Benefits**: Consistent training/inference behavior, natural sinusoidal outputs, reliable tidal patterns
+- **Implementation**: `model.py`, `main.py`, `modal_single_run_seq2seq.py` all use single-pass architecture
+
+**CRITICAL**: Never implement autoregressive generation for transformer v1. Always use single-pass encoder-only architecture.
+
+## Memory & Context
+
+Always keep these rules in your context:
+
+- Do not mask a failure with a fallback
 - Occasionally I will ask for options, ideas, or advice. In those cases, do not make any code changes.
-- Follow directions exactly, make suggestions separately, don't make unauthorized changes to critical components.
+- Follow directions exactly, make suggestions separately, don't make unauthorized changes.
 - When I ask you to make a change A, do not make changes A and B. Only change A. I am a very technical user, if I want B changed I will ask for it.
 - Feel free to make suggestions if you think they will help me arrive at my goal.
 - Don't run a firebase command unless specifically asked to.
 - README files should contain current state, not change history.
 - Do not put emojis or unicode in batch files or powershell scripts.
+- Do not ever try to pass off fake data as real data.
