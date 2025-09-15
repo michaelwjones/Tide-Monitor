@@ -393,7 +393,7 @@
                 }));
                 
                 forecastDataset = {
-                    label: `Transformer ${transformerData.version.toUpperCase()} 24h Forecast`,
+                    label: 'Water Level Forecast (ft)',
                     data: predictionData,
                     borderColor: 'orange',
                     backgroundColor: 'orange',
@@ -409,8 +409,8 @@
             // Set time range and horizontal line based on forecast availability
             const maxTime = hasForecast ? new Date(now.getTime() + (24 * 60 * 60 * 1000)) : now;
             const horizontalLineData = [
-                {x: twentyFourHoursAgo, y: 2.5},
-                {x: maxTime, y: 2.5}
+                {x: twentyFourHoursAgo, y: 3},
+                {x: maxTime, y: 3}
             ];
             
             // Build datasets array, including forecast if available
@@ -546,7 +546,7 @@
                 // Add forecast to legend if available
                 if (transformerData && transformerData.predictions) {
                     legendItems.push({ 
-                        label: `Transformer ${transformerData.version.toUpperCase()} 24h Forecast`, 
+                        label: 'Water Level Forecast (ft)', 
                         color: 'orange' 
                     });
                 }
