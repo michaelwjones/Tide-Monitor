@@ -27,28 +27,6 @@
             color: white;
             text-decoration: none;
         }
-        .toggle-prediction {
-            background: #17a2b8;
-            color: white;
-            padding: 10px 16px;
-            border: none;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-            transition: background-color 0.2s;
-            cursor: pointer;
-            margin-left: 10px;
-        }
-        .toggle-prediction:hover {
-            background: #138496;
-        }
-        .toggle-prediction.active {
-            background: #fd7e14;
-        }
-        .toggle-prediction.active:hover {
-            background: #e8650f;
-        }
         .toggle-trendlines {
             background: #007bff;
             color: white;
@@ -119,7 +97,6 @@
             <div id="chartLegend" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; font-size: 14px; flex: 1;"></div>
             <div style="display: flex; align-items: center;">
                 <a href="../index.html" class="main-link">← Main Dashboard</a>
-                <button id="togglePrediction" class="toggle-prediction hidden">Show Forecast</button>
                 <button id="show24Hours" class="toggle-trendlines" style="background: #007bff; margin-left: 10px;">24 Hours</button>
                 <button id="show72Hours" class="toggle-trendlines" style="background: #6c757d; margin-left: 5px;">72 Hours</button>
             </div>
@@ -135,8 +112,8 @@
         });
 
         let debugChartInstance = null;
-        let predictionVisible = false;
         let currentReadings = [];
+        let forecastData = null;
 
         // Round wind direction to nearest 22.5 degrees (16 compass directions)
         function roundWindDirection(degrees) {
@@ -188,9 +165,10 @@
             const pixelX = xScale.getPixelForValue(latestWindData.x);
             const pixelY = yScale.getPixelForValue(latestWindData.y);
             
-            // Position indicator at the end of the wind plot line
-            indicator.style.left = `${pixelX}px`;
-            indicator.style.top = `${pixelY}px`;
+            // Position indicator so the arrow BASE starts at the wind plot endpoint
+            // Arrow is 25px tall, so we need to offset the container so the bottom of the arrow is at the endpoint
+            indicator.style.left = `${pixelX - 1}px`; // Center the 2px wide arrow
+            indicator.style.top = `${pixelY - 25}px`; // Position so bottom of arrow is at the endpoint
             
             // Round to nearest 22.5 degrees
             const roundedDirection = roundWindDirection(parseFloat(windDirection));
@@ -247,12 +225,7 @@
                 currentReadings = allReadings;
                 
                 // Check for transformer forecast availability
-                const transformerData = await fetchTransformerPredictions();
-                if (transformerData) {
-                    document.getElementById('togglePrediction').classList.remove('hidden');
-                } else {
-                    document.getElementById('togglePrediction').classList.add('hidden');
-                }
+                forecastData = await fetchTransformerPredictions();
                 
                 // Create debug chart
                 createDebugChart(allReadings);
@@ -338,9 +311,10 @@
             
             const ctx = document.getElementById('debugChart').getContext('2d');
 
-            // Set initial time range to last 24 hours
+            // Set initial time range to last 24 hours, extend if forecast available
             const now = new Date();
             const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+            const maxTime = forecastData ? new Date(now.getTime() + (24 * 60 * 60 * 1000)) : now;
 
             debugChartInstance = new Chart(ctx, {
                 type: 'line',
@@ -389,7 +363,7 @@
                         order: 4
                     }, {
                         label: 'Reference Line',
-                        data: [{x: twentyFourHoursAgo, y: 3}, {x: now, y: 3}],
+                        data: [{x: twentyFourHoursAgo, y: 3}, {x: maxTime, y: 3}],
                         borderColor: 'green',
                         borderWidth: 2,
                         pointRadius: 0,
@@ -442,7 +416,7 @@
                         x: {
                             type: 'time',
                             min: twentyFourHoursAgo,
-                            max: now,
+                            max: maxTime,
                             time: {
                                 displayFormats: {
                                     hour: 'h:mm a'
@@ -464,6 +438,11 @@
                 }
             });
 
+            // Add forecast data if available
+            if (forecastData) {
+                addTransformerPredictionsToChart();
+            }
+            
             // Create custom legend
             createCustomLegend();
             
@@ -483,18 +462,28 @@
                 { label: 'Reference Line', color: 'green' }
             ];
 
+            // Add forecast legend item if forecast data is available
+            if (forecastData) {
+                legendItems.push({ 
+                    label: `Transformer ${forecastData.version.toUpperCase()} 24h Forecast`, 
+                    color: 'purple',
+                    isPoints: true
+                });
+            }
+
             legendContainer.innerHTML = legendItems.map(item => `
                 <span style="display: flex; align-items: center; gap: 5px;">
-                    <span style="width: 16px; height: 3px; background-color: ${item.color}; display: inline-block;"></span>
+                    ${item.isPoints ? 
+                        `<span style="width: 8px; height: 8px; background-color: ${item.color}; border-radius: 50%; display: inline-block;"></span>` :
+                        `<span style="width: 16px; height: 3px; background-color: ${item.color}; display: inline-block;"></span>`
+                    }
                     <span>${item.label}</span>
                 </span>
             `).join('');
         }
 
-        // Add Transformer predictions to the chart
-        async function addTransformerPredictions() {
-            const forecastData = await fetchTransformerPredictions();
-            
+        // Add Transformer predictions to the chart using existing forecast data
+        function addTransformerPredictionsToChart() {
             if (!forecastData || !debugChartInstance) {
                 return;
             }
@@ -525,6 +514,18 @@
             console.log(`Added Transformer predictions: ${predictionData.length} points`);
         }
 
+        // Add Transformer predictions to the chart (legacy function for compatibility)
+        async function addTransformerPredictions() {
+            const newForecastData = await fetchTransformerPredictions();
+            
+            if (!newForecastData || !debugChartInstance) {
+                return;
+            }
+            
+            forecastData = newForecastData;
+            addTransformerPredictionsToChart();
+        }
+
         // Remove Transformer predictions from the chart
         function removeTransformerPredictions() {
             if (!debugChartInstance) return;
@@ -538,58 +539,9 @@
             console.log('Removed Transformer predictions from chart');
         }
 
-        // Toggle 24-hour prediction visibility
-        async function togglePrediction() {
-            const button = document.getElementById('togglePrediction');
-            
-            // Check current button text to determine action
-            if (button.textContent === 'Show Forecast') {
-                // User wants to SHOW forecast - extend chart and add data
-                predictionVisible = true;
-                button.textContent = 'Hide Forecast';
-                button.classList.add('active');
-                
-                // Add Transformer predictions to the chart
-                await addTransformerPredictions();
-                
-                // Extend chart x-axis to show 24 hours into future for prediction
-                if (debugChartInstance) {
-                    const now = new Date();
-                    const extendedMax = new Date(now.getTime() + (24 * 60 * 60 * 1000)); // Add 24 hours from now
-                    debugChartInstance.options.scales.x.max = extendedMax;
-                    
-                    // Also update zoom limits to allow viewing the prediction (if zoom plugin exists)
-                    if (debugChartInstance.options.plugins.zoom && debugChartInstance.options.plugins.zoom.limits) {
-                        debugChartInstance.options.plugins.zoom.limits.x.max = extendedMax;
-                    }
-                    debugChartInstance.update('none'); // Update without animation for smooth transition
-                }
-            } else {
-                // User wants to HIDE forecast - contract chart and remove data
-                predictionVisible = false;
-                button.textContent = 'Show Forecast';
-                button.classList.remove('active');
-                
-                // Remove Transformer predictions from chart
-                removeTransformerPredictions();
-                
-                // Reset chart x-axis to current time (remove future prediction view)
-                if (debugChartInstance) {
-                    const now = new Date();
-                    debugChartInstance.options.scales.x.max = now;
-                    
-                    // Reset zoom limits to current time (if zoom plugin exists)
-                    if (debugChartInstance.options.plugins.zoom && debugChartInstance.options.plugins.zoom.limits) {
-                        debugChartInstance.options.plugins.zoom.limits.x.max = now;
-                    }
-                    debugChartInstance.update('none'); // Update without animation for smooth transition
-                }
-            }
-        }
 
         // Initialize event listeners
         window.addEventListener('load', function() {
-            document.getElementById('togglePrediction').addEventListener('click', togglePrediction);
             
             document.getElementById('show24Hours').addEventListener('click', function() {
                 if (debugChartInstance) {
@@ -597,10 +549,8 @@
                     const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
                     debugChartInstance.options.scales.x.min = twentyFourHoursAgo;
                     
-                    // Set max to current time (forecast button will extend if needed)
-                    const forecastButton = document.getElementById('togglePrediction');
-                    const isForecastVisible = forecastButton.textContent === 'Hide Forecast';
-                    const maxTime = isForecastVisible ? new Date(now.getTime() + (24 * 60 * 60 * 1000)) : now;
+                    // Set max to current time, extend if forecast data available
+                    const maxTime = forecastData ? new Date(now.getTime() + (24 * 60 * 60 * 1000)) : now;
                     debugChartInstance.options.scales.x.max = maxTime;
                     if (debugChartInstance.options.plugins.zoom && debugChartInstance.options.plugins.zoom.limits) {
                         debugChartInstance.options.plugins.zoom.limits.x.max = maxTime;
@@ -618,10 +568,8 @@
                     const seventyTwoHoursAgo = new Date(now.getTime() - (72 * 60 * 60 * 1000));
                     debugChartInstance.options.scales.x.min = seventyTwoHoursAgo;
                     
-                    // Set max to current time (forecast button will extend if needed)
-                    const forecastButton = document.getElementById('togglePrediction');
-                    const isForecastVisible = forecastButton.textContent === 'Hide Forecast';
-                    const maxTime = isForecastVisible ? new Date(now.getTime() + (24 * 60 * 60 * 1000)) : now;
+                    // Set max to current time, extend if forecast data available
+                    const maxTime = forecastData ? new Date(now.getTime() + (24 * 60 * 60 * 1000)) : now;
                     debugChartInstance.options.scales.x.max = maxTime;
                     if (debugChartInstance.options.plugins.zoom && debugChartInstance.options.plugins.zoom.limits) {
                         debugChartInstance.options.plugins.zoom.limits.x.max = maxTime;
