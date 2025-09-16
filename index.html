@@ -34,6 +34,34 @@
             color: white;
             text-decoration: none;
         }
+        .wind-direction-indicator {
+            position: absolute;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .wind-arrow {
+            width: 2px;
+            height: 25px;
+            background: black;
+            position: relative;
+            transform-origin: center bottom;
+        }
+        .wind-arrow::after {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            width: 0;
+            height: 0;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-bottom: 8px solid black;
+        }
+        .chart-container {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
@@ -45,7 +73,12 @@
     <div id="loading">Loading...</div>
     
     <div id="content" class="hidden">
-        <canvas id="waterLevelChart" width="800" height="500"></canvas>
+        <div class="chart-container">
+            <canvas id="waterLevelChart" width="800" height="500"></canvas>
+            <div id="windDirectionIndicator" class="wind-direction-indicator" style="display: none;">
+                <div class="wind-arrow" id="windArrow"></div>
+            </div>
+        </div>
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px;">
             <div id="chartLegend" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; font-size: 14px; flex: 1;"></div>
             <a href="debug/" class="debug-link">Debug Dashboard →</a>
@@ -61,6 +94,75 @@
         });
 
         let chartInstance = null;
+        let currentReadings = [];
+
+        // Round wind direction to nearest 22.5 degrees (16 compass directions)
+        function roundWindDirection(degrees) {
+            if (degrees === null || degrees === undefined || isNaN(degrees)) return null;
+            return Math.round(degrees / 22.5) * 22.5;
+        }
+
+        // Update wind direction indicator
+        function updateWindDirectionIndicator(readings) {
+            const indicator = document.getElementById('windDirectionIndicator');
+            const arrow = document.getElementById('windArrow');
+            
+            if (!readings || readings.length === 0 || !chartInstance) {
+                indicator.style.display = 'none';
+                return;
+            }
+            
+            // Get the most recent wind direction and speed readings
+            const latestReading = readings[readings.length - 1];
+            const windDirection = latestReading.windDirection;
+            const windSpeed = latestReading.windSpeedRaw;
+            
+            if (windDirection === '--' || windDirection === null || windDirection === undefined ||
+                windSpeed === null || windSpeed === undefined) {
+                indicator.style.display = 'none';
+                return;
+            }
+            
+            // Find the wind speed dataset
+            const windSpeedDataset = chartInstance.data.datasets.find(ds => ds.label === 'Wind Speed (knots)');
+            if (!windSpeedDataset || windSpeedDataset.data.length === 0) {
+                indicator.style.display = 'none';
+                return;
+            }
+            
+            // Get the latest wind speed data point
+            const latestWindData = windSpeedDataset.data[windSpeedDataset.data.length - 1];
+            if (!latestWindData) {
+                indicator.style.display = 'none';
+                return;
+            }
+            
+            // Get chart dimensions and scales
+            const chartArea = chartInstance.chartArea;
+            const xScale = chartInstance.scales.x;
+            const yScale = chartInstance.scales.windSpeed;
+            
+            // Calculate pixel position of the latest wind speed point
+            const pixelX = xScale.getPixelForValue(latestWindData.x);
+            const pixelY = yScale.getPixelForValue(latestWindData.y);
+            
+            // Position indicator so the arrow BASE starts at the wind plot endpoint
+            // Arrow is 25px tall, so we need to offset the container so the bottom of the arrow is at the endpoint
+            indicator.style.left = `${pixelX - 1}px`; // Center the 2px wide arrow
+            indicator.style.top = `${pixelY - 25}px`; // Position so bottom of arrow is at the endpoint
+            
+            // Round to nearest 22.5 degrees
+            const roundedDirection = roundWindDirection(parseFloat(windDirection));
+            
+            // Rotate arrow to point in wind direction (0° = North = up)
+            arrow.style.transform = `rotate(${roundedDirection}deg)`;
+            
+            // Show the indicator
+            indicator.style.display = 'block';
+            
+            // Update tooltip with direction info
+            indicator.title = `Wind Direction: ${roundedDirection}°`;
+        }
 
         // Prepare data for cubic spline interpolation with light smoothing (Wind/Wave category)
         function prepareWindWaveSplineData(data) {
@@ -320,10 +422,14 @@
                     wavesPercentile: (value.hp !== undefined && value.hp !== null) ? (value.hp / 304.8).toFixed(2) : '--',
                     waterLevel: (value.w / 304.8).toFixed(2),
                     windSpeed: (value.ws !== undefined && value.ws !== null && value.ws !== "-999") ? (parseFloat(value.ws) * 1.944).toFixed(1) : '--', // Convert m/s to knots
-                    windSpeedRaw: (value.ws !== undefined && value.ws !== null && value.ws !== "-999") ? (parseFloat(value.ws) * 1.944) : null
+                    windSpeedRaw: (value.ws !== undefined && value.ws !== null && value.ws !== "-999") ? (parseFloat(value.ws) * 1.944) : null,
+                    windDirection: (value.wd !== undefined && value.wd !== null && value.wd !== "-999") ? parseFloat(value.wd).toFixed(0) : '--'
                 }));
             }
 
+            // Store readings for wind direction indicator
+            currentReadings = readings;
+            
             // Get forecast data if available
             let transformerData = null;
             if (forecastData.status === 'fulfilled') {
@@ -558,6 +664,9 @@
                     </span>
                 `).join('');
             }
+            
+            // Update wind direction indicator after chart is fully rendered
+            setTimeout(() => updateWindDirectionIndicator(currentReadings), 100);
         }
     </script>
 </body>
