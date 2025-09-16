@@ -12,7 +12,7 @@ Advanced monitoring interface with detailed visualizations and wind analysis fea
 - **Reference Line**: 3-foot reference marker for context
 
 ### Wind Direction Indicator
-- **Visual Arrow**: White arrow with purple stroke extending from wind speed plot endpoint
+- **Visual Arrow**: Black arrow extending from wind speed plot endpoint
 - **Precision**: Rounds to nearest 22.5° (16 compass directions: N, NNE, NE, etc.)
 - **Real-time Updates**: Updates every 2 minutes with chart refresh
 - **Smart Positioning**: Arrow base starts exactly at latest wind speed data point

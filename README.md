@@ -13,7 +13,7 @@ Ultrasonic sensor (HRXL-MaxSonar MB7360) → Particle Boron 404X → Firebase �
 
 **Measurements**: Water level, wave heights, wind speed/direction (from NOAA), data quality metrics
 
-**Features**: Real-time visualization, auto-refresh every 2 minutes, 24-hour ML forecasting, wind direction indicators
+**Features**: Real-time visualization, auto-refresh every 2 minutes, 24-hour ML forecasting, wind direction indicators (both dashboards)
 
 ## Quick Start
 
