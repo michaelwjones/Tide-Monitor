@@ -69,6 +69,45 @@
             max-height: 600px;
             width: 100%;
         }
+        .wind-direction-indicator {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            border: 2px solid #666;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #333;
+        }
+        .wind-arrow {
+            width: 2px;
+            height: 20px;
+            background: purple;
+            position: relative;
+            transform-origin: center bottom;
+        }
+        .wind-arrow::after {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            width: 0;
+            height: 0;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-bottom: 8px solid purple;
+        }
+        .chart-container {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
@@ -81,7 +120,12 @@
     <div id="loading">Loading...</div>
     
     <div id="content" class="hidden">
-        <canvas id="debugChart" width="800" height="500"></canvas>
+        <div class="chart-container">
+            <canvas id="debugChart" width="800" height="500"></canvas>
+            <div id="windDirectionIndicator" class="wind-direction-indicator" style="display: none;">
+                <div class="wind-arrow" id="windArrow"></div>
+            </div>
+        </div>
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-top: 10px;">
             <div id="chartLegend" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; font-size: 14px; flex: 1;"></div>
             <div style="display: flex; align-items: center;">
@@ -104,6 +148,44 @@
         let debugChartInstance = null;
         let predictionVisible = false;
         let currentReadings = [];
+
+        // Round wind direction to nearest 22.5 degrees (16 compass directions)
+        function roundWindDirection(degrees) {
+            if (degrees === null || degrees === undefined || isNaN(degrees)) return null;
+            return Math.round(degrees / 22.5) * 22.5;
+        }
+
+        // Update wind direction indicator
+        function updateWindDirectionIndicator(readings) {
+            const indicator = document.getElementById('windDirectionIndicator');
+            const arrow = document.getElementById('windArrow');
+            
+            if (!readings || readings.length === 0) {
+                indicator.style.display = 'none';
+                return;
+            }
+            
+            // Get the most recent wind direction reading
+            const latestReading = readings[readings.length - 1];
+            const windDirection = latestReading.windDirection;
+            
+            if (windDirection === '--' || windDirection === null || windDirection === undefined) {
+                indicator.style.display = 'none';
+                return;
+            }
+            
+            // Round to nearest 22.5 degrees
+            const roundedDirection = roundWindDirection(parseFloat(windDirection));
+            
+            // Rotate arrow to point in wind direction (0° = North = up)
+            arrow.style.transform = `rotate(${roundedDirection}deg)`;
+            
+            // Show the indicator
+            indicator.style.display = 'flex';
+            
+            // Update tooltip with direction info
+            indicator.title = `Wind Direction: ${roundedDirection}°`;
+        }
 
         async function fetchDebugData() {
             try {
@@ -156,6 +238,9 @@
                 
                 // Create debug chart
                 createDebugChart(allReadings);
+                
+                // Update wind direction indicator
+                updateWindDirectionIndicator(allReadings);
                 
                 // Hide loading and show content
                 document.getElementById('loading').classList.add('hidden');
