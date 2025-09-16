@@ -71,23 +71,12 @@
         }
         .wind-direction-indicator {
             position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 40px;
-            height: 40px;
-            border: 2px solid #666;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.9);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 10px;
-            color: #333;
+            pointer-events: none;
+            z-index: 10;
         }
         .wind-arrow {
             width: 2px;
-            height: 20px;
+            height: 25px;
             background: purple;
             position: relative;
             transform-origin: center bottom;
@@ -160,19 +149,48 @@
             const indicator = document.getElementById('windDirectionIndicator');
             const arrow = document.getElementById('windArrow');
             
-            if (!readings || readings.length === 0) {
+            if (!readings || readings.length === 0 || !debugChartInstance) {
                 indicator.style.display = 'none';
                 return;
             }
             
-            // Get the most recent wind direction reading
+            // Get the most recent wind direction and speed readings
             const latestReading = readings[readings.length - 1];
             const windDirection = latestReading.windDirection;
+            const windSpeed = latestReading.windSpeedRaw;
             
-            if (windDirection === '--' || windDirection === null || windDirection === undefined) {
+            if (windDirection === '--' || windDirection === null || windDirection === undefined ||
+                windSpeed === null || windSpeed === undefined) {
                 indicator.style.display = 'none';
                 return;
             }
+            
+            // Find the wind speed dataset
+            const windSpeedDataset = debugChartInstance.data.datasets.find(ds => ds.label === 'Wind Speed (knots)');
+            if (!windSpeedDataset || windSpeedDataset.data.length === 0) {
+                indicator.style.display = 'none';
+                return;
+            }
+            
+            // Get the latest wind speed data point
+            const latestWindData = windSpeedDataset.data[windSpeedDataset.data.length - 1];
+            if (!latestWindData) {
+                indicator.style.display = 'none';
+                return;
+            }
+            
+            // Get chart dimensions and scales
+            const chartArea = debugChartInstance.chartArea;
+            const xScale = debugChartInstance.scales.x;
+            const yScale = debugChartInstance.scales.windSpeed;
+            
+            // Calculate pixel position of the latest wind speed point
+            const pixelX = xScale.getPixelForValue(latestWindData.x);
+            const pixelY = yScale.getPixelForValue(latestWindData.y);
+            
+            // Position indicator at the end of the wind plot line
+            indicator.style.left = `${pixelX}px`;
+            indicator.style.top = `${pixelY}px`;
             
             // Round to nearest 22.5 degrees
             const roundedDirection = roundWindDirection(parseFloat(windDirection));
@@ -181,7 +199,7 @@
             arrow.style.transform = `rotate(${roundedDirection}deg)`;
             
             // Show the indicator
-            indicator.style.display = 'flex';
+            indicator.style.display = 'block';
             
             // Update tooltip with direction info
             indicator.title = `Wind Direction: ${roundedDirection}°`;
@@ -448,6 +466,9 @@
 
             // Create custom legend
             createCustomLegend();
+            
+            // Update wind direction indicator after chart is fully rendered
+            setTimeout(() => updateWindDirectionIndicator(currentReadings), 100);
         }
 
         function createCustomLegend() {
@@ -585,6 +606,9 @@
                         debugChartInstance.options.plugins.zoom.limits.x.max = maxTime;
                     }
                     debugChartInstance.update();
+                    
+                    // Update wind direction indicator after chart update
+                    setTimeout(() => updateWindDirectionIndicator(currentReadings), 100);
                 }
             });
             
@@ -603,6 +627,9 @@
                         debugChartInstance.options.plugins.zoom.limits.x.max = maxTime;
                     }
                     debugChartInstance.update();
+                    
+                    // Update wind direction indicator after chart update
+                    setTimeout(() => updateWindDirectionIndicator(currentReadings), 100);
                 }
             });
         });
