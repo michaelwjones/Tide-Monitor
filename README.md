@@ -11,9 +11,9 @@ Real-time water level and wave height monitoring system using ultrasonic sensors
 
 Ultrasonic sensor (HRXL-MaxSonar MB7360) → Particle Boron 404X → Firebase → Web dashboards
 
-**Measurements**: Water level, wave heights, wind speed (from NOAA), data quality metrics
+**Measurements**: Water level, wave heights, wind speed/direction (from NOAA), data quality metrics
 
-**Features**: Real-time visualization, auto-refresh every 2 minutes, 24-hour forecasting with ML models
+**Features**: Real-time visualization, auto-refresh every 2 minutes, 24-hour ML forecasting, wind direction indicators
 
 ## Quick Start
 
@@ -38,5 +38,5 @@ Data updates every minute, dashboards refresh every 2 minutes.
 
 For detailed technical information, see:
 - `/backend/README.md` - Hardware, firmware, cloud functions
-- `/debug/README.md` - Advanced dashboard features  
+- `/debug/README.md` - Advanced dashboard features (wind direction, auto-forecasting)
 - Method-specific README files for ML models and analysis functions
