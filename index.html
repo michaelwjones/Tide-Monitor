@@ -155,7 +155,8 @@
             const roundedDirection = roundWindDirection(parseFloat(windDirection));
             
             // Rotate arrow to point in wind direction (0° = North = up)
-            arrow.style.transform = `rotate(${roundedDirection}deg)`;
+            // Wind direction indicates where wind comes FROM, so add 180° to show where it's blowing TO
+            arrow.style.transform = `rotate(${roundedDirection + 180}deg)`;
             
             // Show the indicator
             indicator.style.display = 'block';
