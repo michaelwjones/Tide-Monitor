@@ -24,6 +24,17 @@ Advanced signal processing and machine learning forecasting for tidal data.
 - **Input**: Last 72 hours at 10-minute intervals (433 readings)
 - **Output**: 144 future predictions (24 hours), stored in `/tidal-analysis/transformer-v1-forecast/`
 
+### Transformer v2 (`functions/transformer/v2/`)
+- **Purpose**: Enhanced transformer with improved training methodology
+- **Architecture**: Same as v1 but with refined data preparation and validation
+- **Features**: Two-dataset structure (training/validation), incremental sequence naming
+
+### Transformer v3 (`functions/transformer/v3/`)
+- **Purpose**: Latest transformer with discontinuity analysis capabilities
+- **Architecture**: Same core transformer with enhanced data structure
+- **Features**: Three-dataset structure (training/validation/discontinuity), timestamp-based naming
+- **Key Innovation**: Dedicated discontinuity test dataset with 1440 input-only sequences
+
 ## Function Tracking
 
 See `analysis-functions.csv` for complete deployment history and function management.
@@ -40,3 +51,5 @@ For implementation details, training procedures, and troubleshooting:
 - `/functions/matrix-pencil/v1/README.md`
 - `/functions/lstm/v1/README.md`
 - `/functions/transformer/v1/README.md`
+- `/functions/transformer/v2/README.md`
+- `/functions/transformer/v3/README.md`

@@ -1,0 +1,1308 @@
+{
+  "timestamp": "2025-09-22T00:03:52.785678",
+  "total_tests": 100,
+  "total_discontinuities": 100,
+  "discontinuity_rate": "100.0%",
+  "discontinuities": [
+    {
+      "time": "2025-09-15T00:00:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7160053658272,
+        "threshold": 50.0,
+        "last_actual": -0.4063129830146577,
+        "first_predicted": 783.3096923828125,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:01:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7133198189522,
+        "threshold": 50.0,
+        "last_actual": -0.4063129830146577,
+        "first_predicted": 783.3070068359375,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:02:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7197905291243,
+        "threshold": 50.0,
+        "last_actual": -0.41595752131184094,
+        "first_predicted": 783.3038330078125,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:03:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7209301799109,
+        "threshold": 50.0,
+        "last_actual": -0.419172367410902,
+        "first_predicted": 783.3017578125,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:04:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7220698306975,
+        "threshold": 50.0,
+        "last_actual": -0.4223872135099631,
+        "first_predicted": 783.2996826171875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:05:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7284795057134,
+        "threshold": 50.0,
+        "last_actual": -0.43203175180714637,
+        "first_predicted": 783.2964477539062,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:06:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7263432752446,
+        "threshold": 50.0,
+        "last_actual": -0.43203175180714637,
+        "first_predicted": 783.2943115234375,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:07:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7303315611928,
+        "threshold": 50.0,
+        "last_actual": -0.43846144400526854,
+        "first_predicted": 783.2918701171875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:08:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.740505398714,
+        "threshold": 50.0,
+        "last_actual": -0.4513208284015129,
+        "first_predicted": 783.2891845703125,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:09:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7446157549747,
+        "threshold": 50.0,
+        "last_actual": -0.45775052059963506,
+        "first_predicted": 783.286865234375,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:10:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7530395901468,
+        "threshold": 50.0,
+        "last_actual": -0.4673950588968183,
+        "first_predicted": 783.28564453125,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:11:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7570889112512,
+        "threshold": 50.0,
+        "last_actual": -0.4738247510949405,
+        "first_predicted": 783.2832641601562,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:12:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.757801315944,
+        "threshold": 50.0,
+        "last_actual": -0.4770395971940016,
+        "first_predicted": 783.28076171875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:13:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7591851073555,
+        "threshold": 50.0,
+        "last_actual": -0.48025444329306266,
+        "first_predicted": 783.2789306640625,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:14:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7637837448661,
+        "threshold": 50.0,
+        "last_actual": -0.48668413549118483,
+        "first_predicted": 783.277099609375,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:15:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7706817011322,
+        "threshold": 50.0,
+        "last_actual": -0.4963286737883681,
+        "first_predicted": 783.2743530273438,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:16:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7785562198981,
+        "threshold": 50.0,
+        "last_actual": -0.5059732120855513,
+        "first_predicted": 783.2725830078125,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:17:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7764199894293,
+        "threshold": 50.0,
+        "last_actual": -0.5059732120855513,
+        "first_predicted": 783.2704467773438,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:18:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7839282972577,
+        "threshold": 50.0,
+        "last_actual": -0.5156177503827346,
+        "first_predicted": 783.268310546875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:19:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7917417808674,
+        "threshold": 50.0,
+        "last_actual": -0.5252622886799179,
+        "first_predicted": 783.2664794921875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:20:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.794102134779,
+        "threshold": 50.0,
+        "last_actual": -0.528477134778979,
+        "first_predicted": 783.265625,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:21:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7984566316646,
+        "threshold": 50.0,
+        "last_actual": -0.5349068269771011,
+        "first_predicted": 783.2635498046875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:22:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.7932276254093,
+        "threshold": 50.0,
+        "last_actual": -0.53169198087804,
+        "first_predicted": 783.2615356445312,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:23:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.8013462848003,
+        "threshold": 50.0,
+        "last_actual": -0.5413365191752233,
+        "first_predicted": 783.260009765625,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:24:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.8093428738787,
+        "threshold": 50.0,
+        "last_actual": -0.5509810574724066,
+        "first_predicted": 783.2583618164062,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:25:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.8073287137224,
+        "threshold": 50.0,
+        "last_actual": -0.5509810574724066,
+        "first_predicted": 783.25634765625,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:26:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.8156915137383,
+        "threshold": 50.0,
+        "last_actual": -0.5606255957695898,
+        "first_predicted": 783.2550659179688,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:27:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.8235660325042,
+        "threshold": 50.0,
+        "last_actual": -0.5702701340667731,
+        "first_predicted": 783.2532958984375,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:28:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.8219791184417,
+        "threshold": 50.0,
+        "last_actual": -0.5702701340667731,
+        "first_predicted": 783.251708984375,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:29:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.8334957294005,
+        "threshold": 50.0,
+        "last_actual": -0.5831295184630174,
+        "first_predicted": 783.2503662109375,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:30:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.8391929997237,
+        "threshold": 50.0,
+        "last_actual": -0.5895592106611396,
+        "first_predicted": 783.2496337890625,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:31:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.8376060856612,
+        "threshold": 50.0,
+        "last_actual": -0.5895592106611396,
+        "first_predicted": 783.248046875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:32:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.8487564856824,
+        "threshold": 50.0,
+        "last_actual": -0.6024185950573839,
+        "first_predicted": 783.246337890625,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:33:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.8479019934949,
+        "threshold": 50.0,
+        "last_actual": -0.6024185950573839,
+        "first_predicted": 783.2454833984375,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:34:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.8594186044536,
+        "threshold": 50.0,
+        "last_actual": -0.6152779794536283,
+        "first_predicted": 783.244140625,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:35:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.8578316903911,
+        "threshold": 50.0,
+        "last_actual": -0.6152779794536283,
+        "first_predicted": 783.2425537109375,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:36:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.8666217365009,
+        "threshold": 50.0,
+        "last_actual": -0.6249225177508115,
+        "first_predicted": 783.24169921875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:37:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.878016277147,
+        "threshold": 50.0,
+        "last_actual": -0.6377819021470559,
+        "first_predicted": 783.240234375,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:38:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.8834083716889,
+        "threshold": 50.0,
+        "last_actual": -0.644211594345178,
+        "first_predicted": 783.2391967773438,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:39:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.8921373826423,
+        "threshold": 50.0,
+        "last_actual": -0.6538561326423613,
+        "first_predicted": 783.23828125,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:40:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.8917101365486,
+        "threshold": 50.0,
+        "last_actual": -0.6538561326423613,
+        "first_predicted": 783.2378540039062,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:41:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.8969191256217,
+        "threshold": 50.0,
+        "last_actual": -0.6602858248404835,
+        "first_predicted": 783.2366333007812,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:42:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9020060443823,
+        "threshold": 50.0,
+        "last_actual": -0.6667155170386057,
+        "first_predicted": 783.2352905273438,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:43:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9114674772107,
+        "threshold": 50.0,
+        "last_actual": -0.6763600553357889,
+        "first_predicted": 783.235107421875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:44:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9138278311224,
+        "threshold": 50.0,
+        "last_actual": -0.67957490143485,
+        "first_predicted": 783.2342529296875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:45:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9157609389401,
+        "threshold": 50.0,
+        "last_actual": -0.6827897475339111,
+        "first_predicted": 783.2329711914062,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:46:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9215802795758,
+        "threshold": 50.0,
+        "last_actual": -0.6892194397320333,
+        "first_predicted": 783.2323608398438,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:47:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9269723741177,
+        "threshold": 50.0,
+        "last_actual": -0.6956491319301554,
+        "first_predicted": 783.2313232421875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:48:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9299430795917,
+        "threshold": 50.0,
+        "last_actual": -0.6988639780292165,
+        "first_predicted": 783.2310791015625,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:49:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9386720905452,
+        "threshold": 50.0,
+        "last_actual": -0.7085085163263998,
+        "first_predicted": 783.2301635742188,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:50:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.945040747587,
+        "threshold": 50.0,
+        "last_actual": -0.714938208524522,
+        "first_predicted": 783.2301025390625,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:51:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9475231718111,
+        "threshold": 50.0,
+        "last_actual": -0.718153054623583,
+        "first_predicted": 783.2293701171875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:52:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9498835257226,
+        "threshold": 50.0,
+        "last_actual": -0.7213679007226441,
+        "first_predicted": 783.228515625,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:53:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9564963233895,
+        "threshold": 50.0,
+        "last_actual": -0.7277975929207663,
+        "first_predicted": 783.2286987304688,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:54:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9624987694939,
+        "threshold": 50.0,
+        "last_actual": -0.7342272851188885,
+        "first_predicted": 783.228271484375,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:55:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9584904663636,
+        "threshold": 50.0,
+        "last_actual": -0.7310124390198274,
+        "first_predicted": 783.2274780273438,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:56:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9738933101402,
+        "threshold": 50.0,
+        "last_actual": -0.7470866695151328,
+        "first_predicted": 783.226806640625,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:57:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.970434323416,
+        "threshold": 50.0,
+        "last_actual": -0.7438718234160717,
+        "first_predicted": 783.2265625,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:58:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9803230023383,
+        "threshold": 50.0,
+        "last_actual": -0.753516361713255,
+        "first_predicted": 783.226806640625,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T00:59:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9924499648595,
+        "threshold": 50.0,
+        "last_actual": -0.7663757461094993,
+        "first_predicted": 783.22607421875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:00:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9863254484426,
+        "threshold": 50.0,
+        "last_actual": -0.7599460539113772,
+        "first_predicted": 783.2263793945312,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:01:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9926330703282,
+        "threshold": 50.0,
+        "last_actual": -0.7663757461094993,
+        "first_predicted": 783.2262573242188,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:02:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 783.9985744812764,
+        "threshold": 50.0,
+        "last_actual": -0.7728054383076215,
+        "first_predicted": 783.2257690429688,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:03:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0023386437816,
+        "threshold": 50.0,
+        "last_actual": -0.7760202844066826,
+        "first_predicted": 783.226318359375,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:04:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0088904062923,
+        "threshold": 50.0,
+        "last_actual": -0.7824499766048048,
+        "first_predicted": 783.2264404296875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:05:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0114949008289,
+        "threshold": 50.0,
+        "last_actual": -0.7856648227038658,
+        "first_predicted": 783.225830078125,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:06:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0114338656726,
+        "threshold": 50.0,
+        "last_actual": -0.7856648227038658,
+        "first_predicted": 783.2257690429688,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:07:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0147097469279,
+        "threshold": 50.0,
+        "last_actual": -0.7888796688029269,
+        "first_predicted": 783.225830078125,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:08:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0249646367876,
+        "threshold": 50.0,
+        "last_actual": -0.7985242071001102,
+        "first_predicted": 783.2264404296875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:09:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0245373906938,
+        "threshold": 50.0,
+        "last_actual": -0.7985242071001102,
+        "first_predicted": 783.2260131835938,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:10:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0313943289857,
+        "threshold": 50.0,
+        "last_actual": -0.8049538992982324,
+        "first_predicted": 783.2264404296875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:11:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0320046805482,
+        "threshold": 50.0,
+        "last_actual": -0.8049538992982324,
+        "first_predicted": 783.22705078125,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:12:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0354026321161,
+        "threshold": 50.0,
+        "last_actual": -0.8081687453972934,
+        "first_predicted": 783.2272338867188,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:13:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0360129836786,
+        "threshold": 50.0,
+        "last_actual": -0.8081687453972934,
+        "first_predicted": 783.2278442382812,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:14:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0396550758713,
+        "threshold": 50.0,
+        "last_actual": -0.8113835914963545,
+        "first_predicted": 783.228271484375,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:15:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.042991992283,
+        "threshold": 50.0,
+        "last_actual": -0.8145984375954156,
+        "first_predicted": 783.2283935546875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:16:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0433582032205,
+        "threshold": 50.0,
+        "last_actual": -0.8145984375954156,
+        "first_predicted": 783.228759765625,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:17:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0435413086892,
+        "threshold": 50.0,
+        "last_actual": -0.8145984375954156,
+        "first_predicted": 783.2289428710938,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:18:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0477327172882,
+        "threshold": 50.0,
+        "last_actual": -0.8178132836944767,
+        "first_predicted": 783.2299194335938,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:19:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0510696336997,
+        "threshold": 50.0,
+        "last_actual": -0.8210281297935378,
+        "first_predicted": 783.2300415039062,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:20:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0547117258926,
+        "threshold": 50.0,
+        "last_actual": -0.8242429758925989,
+        "first_predicted": 783.23046875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:21:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.062179015747,
+        "threshold": 50.0,
+        "last_actual": -0.830672668090721,
+        "first_predicted": 783.2315063476562,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:22:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0661873188773,
+        "threshold": 50.0,
+        "last_actual": -0.8338875141897821,
+        "first_predicted": 783.2322998046875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:23:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0669197407523,
+        "threshold": 50.0,
+        "last_actual": -0.8338875141897821,
+        "first_predicted": 783.2330322265625,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:24:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0774187712369,
+        "threshold": 50.0,
+        "last_actual": -0.8435320524869654,
+        "first_predicted": 783.23388671875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:25:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0780291227994,
+        "threshold": 50.0,
+        "last_actual": -0.8435320524869654,
+        "first_predicted": 783.2344970703125,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:26:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.081854320461,
+        "threshold": 50.0,
+        "last_actual": -0.8467468985860265,
+        "first_predicted": 783.235107421875,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:27:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0854353774976,
+        "threshold": 50.0,
+        "last_actual": -0.8499617446850876,
+        "first_predicted": 783.2354736328125,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:28:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0869002212476,
+        "threshold": 50.0,
+        "last_actual": -0.8499617446850876,
+        "first_predicted": 783.2369384765625,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:29:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0841736563985,
+        "threshold": 50.0,
+        "last_actual": -0.8467468985860265,
+        "first_predicted": 783.2374267578125,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:30:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0879988540601,
+        "threshold": 50.0,
+        "last_actual": -0.8499617446850876,
+        "first_predicted": 783.238037109375,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:31:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0957713196957,
+        "threshold": 50.0,
+        "last_actual": -0.8563914368832097,
+        "first_predicted": 783.2393798828125,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:32:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0969920228207,
+        "threshold": 50.0,
+        "last_actual": -0.8563914368832097,
+        "first_predicted": 783.2406005859375,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:33:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.1011834314198,
+        "threshold": 50.0,
+        "last_actual": -0.8596062829822709,
+        "first_predicted": 783.2415771484375,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:34:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.1021599939198,
+        "threshold": 50.0,
+        "last_actual": -0.8596062829822709,
+        "first_predicted": 783.2425537109375,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:35:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.0969510048467,
+        "threshold": 50.0,
+        "last_actual": -0.8531765907841486,
+        "first_predicted": 783.2437744140625,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:36:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.1010203431332,
+        "threshold": 50.0,
+        "last_actual": -0.8563914368832097,
+        "first_predicted": 783.24462890625,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:37:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.1017527650082,
+        "threshold": 50.0,
+        "last_actual": -0.8563914368832097,
+        "first_predicted": 783.245361328125,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:38:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.1002469032842,
+        "threshold": 50.0,
+        "last_actual": -0.8531765907841486,
+        "first_predicted": 783.2470703125,
+        "severity": "high"
+      }
+    },
+    {
+      "time": "2025-09-15T01:39:00+00:00",
+      "type": "level_jump",
+      "details": {
+        "detected": true,
+        "type": "level_jump",
+        "jump_size": 784.104377276727,
+        "threshold": 50.0,
+        "last_actual": -0.8563914368832097,
+        "first_predicted": 783.2479858398438,
+        "severity": "high"
+      }
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+# Firebase Functions Python requirements for Transformer v2
+firebase-functions>=0.1.0
+firebase-admin>=6.0.0
+torch>=2.0.0,<3.0.0 --index-url https://download.pytorch.org/whl/cpu
+numpy>=1.21.0,<2.0.0
+google-cloud-storage>=2.0.0
