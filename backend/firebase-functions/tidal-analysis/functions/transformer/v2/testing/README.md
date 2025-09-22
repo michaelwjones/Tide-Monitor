@@ -16,7 +16,7 @@ The testing interface provides a comprehensive web-based environment for validat
 ## Features
 
 ### 📊 **Data Visualization**
-- **Complete Dataset**: Browse all 11,638+ training sequences
+- **Complete Dataset**: Browse all 12,126 training sequences
 - **Interactive Charts**: Zoom, pan, and inspect individual data points  
 - **Multi-dataset View**: Input (72h) and target (24h) data clearly separated
 - **Sequence Statistics**: Min/max/mean values displayed for each sequence
@@ -199,7 +199,7 @@ Runs inference on training sequence N:
 Returns training input data in JSON format:
 ```json
 {
-    "shape": [11638, 432],
+    "shape": [12126, 432],
     "data": [...],
     "stats": {
         "min": -2.5,

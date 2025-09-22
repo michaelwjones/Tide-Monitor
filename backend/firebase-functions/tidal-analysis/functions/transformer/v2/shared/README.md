@@ -25,6 +25,16 @@ This directory contains shared code and trained models for transformer v2 that a
 - **Source**: Generated during data preparation phase
 - **Usage**: Required for properly normalizing input data and denormalizing outputs
 
+### `data_packaging.py`
+- **Description**: Shared data packaging tool for creating inference sequences
+- **Source**: Extracted from data preparation logic for reusability
+- **Usage**: Creates 432-point normalized sequences using Firebase-identical logic
+- **Key Features**: 
+  - Automatic Firebase data fetching with freshness checking
+  - Binary search-based temporal alignment (±5 minute tolerance)
+  - Proper normalization/denormalization handling
+  - Missing data management (-999 markers)
+
 ## Model Format
 
 The model files are PyTorch checkpoint dictionaries containing:
@@ -55,6 +65,38 @@ model.load_state_dict(checkpoint['model_state_dict'])
 # Set to evaluation mode
 model.eval()
 ```
+
+## Data Packaging Tool Usage
+
+```python
+from data_packaging import DataPackager
+from datetime import datetime
+
+# Initialize with normalization parameters
+packager = DataPackager('path/to/normalization_params.json')
+
+# Load fresh Firebase data (automatically fetches if stale)
+firebase_data = packager.load_fresh_firebase_data()
+
+# Create inference sequence for specific time
+reference_time = datetime.now()
+sequence, metadata = packager.create_inference_sequence(firebase_data, reference_time)
+
+# sequence: 432-point normalized numpy array ready for model input
+# metadata: dict with timing info, quality metrics, missing data count
+
+# Denormalize predictions back to mm
+predictions_mm = packager.denormalize_sequence(model_output)
+```
+
+### DataPackager Class Methods
+
+- `__init__(normalization_params_path)`: Initialize with optional normalization parameters
+- `load_normalization_params(path)`: Load normalization parameters from JSON
+- `parse_firebase_readings(raw_data)`: Parse raw Firebase data into chronological readings
+- `create_inference_sequence(data, time)`: Create 432-point sequence for inference
+- `denormalize_sequence(normalized)`: Convert normalized values back to mm
+- `load_fresh_firebase_data(path)`: Load Firebase data, fetching fresh if needed
 
 ## Model Specifications
 

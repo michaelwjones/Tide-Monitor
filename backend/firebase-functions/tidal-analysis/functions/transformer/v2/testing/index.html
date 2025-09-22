@@ -132,6 +132,8 @@
                 <select id="sequence-selector">
                     <option value="0">Sequence 1</option>
                 </select>
+                <input type="number" id="sequence-input" placeholder="Type sequence #" min="1" style="width: 120px; margin-left: 10px;">
+                <button id="go-to-sequence">Go</button>
                 <button id="random-sequence">Random Sequence</button>
                 <button id="show-distribution">Show Data Distribution</button>
                 <span style="color: #666; font-size: 12px; margin-left: 20px;" id="sequence-count">
@@ -339,16 +341,37 @@
             document.getElementById('random-sequence').addEventListener('click', () => {
                 const randomIndex = Math.floor(Math.random() * availableSequences);
                 selector.value = randomIndex;
+                document.getElementById('sequence-input').value = randomIndex + 1;
                 selector.dispatchEvent(new Event('change'));
             });
 
+            document.getElementById('go-to-sequence').addEventListener('click', () => {
+                const inputValue = parseInt(document.getElementById('sequence-input').value);
+                if (inputValue && inputValue >= 1 && inputValue <= availableSequences) {
+                    const sequenceIndex = inputValue - 1;
+                    selector.value = sequenceIndex;
+                    selector.dispatchEvent(new Event('change'));
+                } else {
+                    alert(`Please enter a sequence number between 1 and ${availableSequences}`);
+                }
+            });
+
+            document.getElementById('sequence-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    document.getElementById('go-to-sequence').click();
+                }
+            });
+
             selector.addEventListener('change', (e) => {
-                showSequence(parseInt(e.target.value));
+                const sequenceIndex = parseInt(e.target.value);
+                document.getElementById('sequence-input').value = sequenceIndex + 1;
+                showSequence(sequenceIndex);
             });
 
             document.getElementById('show-distribution').addEventListener('click', showDistribution);
 
             // Show first sequence by default
+            document.getElementById('sequence-input').value = 1;
             showSequence(0);
         }
 

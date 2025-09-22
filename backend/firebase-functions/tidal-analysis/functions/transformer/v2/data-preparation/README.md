@@ -20,7 +20,7 @@ Downloads and filters sensor data from Firebase Realtime Database.
 
 **Output Files:**
 - `data/firebase_raw_data.json` - Complete unfiltered data (for reference)
-- `data/firebase_filtered_data.json` - Clean data with invalid readings removed
+- `data/firebase_filtered_data.json` - Clean data with invalid readings removed (used by training and shared tools)
 - `data/firebase_enriched_data.json` - **Note: Created but not used by any current processes**
 
 **Usage:**
@@ -77,7 +77,7 @@ python create_training_data.py
 
 ### File Usage Overview
 - **`firebase_raw_data.json`**: Complete Firebase download (39 MB) - used for reference/debugging only
-- **`firebase_filtered_data.json`**: Quality-filtered data (38 MB) - **actively used by `create_training_data.py`**
+- **`firebase_filtered_data.json`**: Quality-filtered data (38 MB) - **actively used by `create_training_data.py` and shared data packaging tool**
 - **`firebase_enriched_data.json`**: Includes NOAA weather data (37.5 MB) - **currently unused, orphaned file**
 
 ### Why Enriched Data Isn't Used
@@ -94,7 +94,7 @@ The enriched data file contains sensor readings plus NOAA environmental data (wi
 ## Data Format
 
 ### Sequence Structure
-- **Input Length**: 433 points (72 hours at 10-minute intervals)
+- **Input Length**: 432 points (72 hours at 10-minute intervals)
 - **Output Length**: 144 points (24 hours at 10-minute intervals)
 - **Total Timespan**: 96 hours per sequence
 
@@ -170,3 +170,23 @@ The enriched data file contains sensor readings plus NOAA environmental data (wi
 - `random` - Sequence offset generation
 
 All dependencies are standard Python libraries or commonly available packages.
+
+## Shared Tools Integration
+
+The data packaging logic from `create_training_data.py` has been extracted into a reusable shared tool:
+
+**Location**: `../shared/data_packaging.py`
+
+**Purpose**: Provides consistent sequence creation logic for:
+- Training data preparation
+- Inference preprocessing 
+- Discontinuity analysis
+- Testing utilities
+
+**Key Benefits**:
+- **Code Reuse**: Eliminates duplication of complex temporal alignment logic
+- **Consistency**: Ensures identical processing across all components
+- **Maintainability**: Single source of truth for data packaging algorithms
+- **Testing**: Shared tool enables systematic validation of model inputs
+
+**Integration**: The shared tool uses the same binary search algorithms and timestamp matching logic as the data preparation pipeline, ensuring 100% consistency between training and inference data processing.

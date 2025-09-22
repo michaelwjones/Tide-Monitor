@@ -141,7 +141,7 @@ python -m modal volume get transformer-v2-storage training_log.json ./logs/
 - **Training Time**: 30-60 minutes on H100
 - **Target RMSE**: < 50mm (normalized units < 0.15)
 - **Memory Usage**: ~24GB GPU memory
-- **Dataset**: 12,164 training sequences, 1,967 validation sequences
+- **Dataset**: 12,126 training sequences, 1,959 validation sequences
 
 ### Training Progress
 ```
