@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Transformer v3 Discontinuity Analysis Tool
-Single entry point for all discontinuity analysis tasks
+Transformer v3 Sanity Analysis Tool
+Single entry point for all sanity analysis tasks
 """
 
 import argparse
@@ -70,9 +70,9 @@ class DiscontinuityAnalyzer:
             self._find_suspect_sequences(X_train_denorm, y_train_denorm)
             
     def analyze_inference_data(self, analysis_types: List[str], num_tests: int = 50):
-        """Analyze inference discontinuities using pre-generated discontinuity test sequences"""
-        print("Analyzing Inference Discontinuities (v3)")
-        print("=" * 42)
+        """Analyze inference using pre-generated sanity test sequences"""
+        print("Analyzing Inference Sanity (v3)")
+        print("=" * 32)
         
         # Load model
         model_path = Path(__file__).parent.parent / 'shared' / 'model.pth'
@@ -93,28 +93,28 @@ class DiscontinuityAnalyzer:
             print(f"Error loading model: {e}")
             return
             
-        # Load pre-generated discontinuity test sequences
+        # Load pre-generated sanity test sequences
         data_dir = Path(__file__).parent.parent / 'data-preparation' / 'data'
         try:
-            X_discontinuity = np.load(data_dir / 'X_discontinuity.npy')
-            with open(data_dir / 'sequence_names_discontinuity.json', 'r') as f:
-                discontinuity_names = json.load(f)
-            print(f"Loaded {len(X_discontinuity)} discontinuity test sequences")
-            print(f"Date range: {discontinuity_names[0]} to {discontinuity_names[-1]}")
+            X_sanity = np.load(data_dir / 'X_sanity.npy')
+            with open(data_dir / 'sequence_names_sanity.json', 'r') as f:
+                sanity_names = json.load(f)
+            print(f"Loaded {len(X_sanity)} sanity test sequences")
+            print(f"Date range: {sanity_names[0]} to {sanity_names[-1]}")
         except FileNotFoundError as e:
-            print(f"Error: Could not load discontinuity test data: {e}")
-            print("Make sure you have run the v3 data preparation to generate X_discontinuity.npy")
+            print(f"Error: Could not load sanity test data: {e}")
+            print("Make sure you have run the v3 data preparation to generate X_sanity.npy")
             return
             
         # Limit test count to available sequences
-        sequences_to_test = min(num_tests, len(X_discontinuity))
-        print(f"Testing {sequences_to_test} sequences from discontinuity dataset")
+        sequences_to_test = min(num_tests, len(X_sanity))
+        print(f"Testing {sequences_to_test} sequences from sanity dataset")
         
         discontinuities_found = []
         
         for sequence_index in range(sequences_to_test):
-            sequence_name = discontinuity_names[sequence_index]
-            input_sequence = X_discontinuity[sequence_index]  # Already normalized
+            sequence_name = sanity_names[sequence_index]
+            input_sequence = X_sanity[sequence_index]  # Already normalized
             
             try:
                 # Run inference directly (input is already normalized)
@@ -171,7 +171,7 @@ class DiscontinuityAnalyzer:
         
         if discontinuities_found:
             try:
-                self._save_discontinuity_results(discontinuities_found)
+                self._save_sanity_results(discontinuities_found)
             except Exception as e:
                 print(f"Warning: Could not save results to JSON: {e}")
                 print("Discontinuities found but results not saved to file")
@@ -266,9 +266,9 @@ class DiscontinuityAnalyzer:
         validation_end = datetime(2025, 9, 12, tzinfo=timezone.utc)
         return validation_end
         
-    def _save_discontinuity_results(self, results):
-        """Save discontinuity analysis results"""
-        output_file = Path(__file__).parent / 'discontinuity_results.json'
+    def _save_sanity_results(self, results):
+        """Save sanity analysis results"""
+        output_file = Path(__file__).parent / 'sanity_results.json'
         
         # Convert numpy types to native Python types for JSON serialization
         def convert_for_json(obj):
@@ -301,11 +301,11 @@ class DiscontinuityAnalyzer:
         print(f"Results saved to {output_file}")
 
 def main():
-    parser = argparse.ArgumentParser(description='Transformer v2 Discontinuity Analysis')
+    parser = argparse.ArgumentParser(description='Transformer v3 Sanity Analysis')
     
     # Data source
     parser.add_argument('--data', choices=['training', 'inference'], required=True,
-                       help='Analyze training data quality or inference discontinuities')
+                       help='Analyze training data quality or inference sanity')
     
     # Analysis types for training data
     parser.add_argument('--training-analysis', nargs='+', 

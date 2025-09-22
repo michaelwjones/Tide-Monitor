@@ -30,10 +30,10 @@ Advanced signal processing and machine learning forecasting for tidal data.
 - **Features**: Two-dataset structure (training/validation), incremental sequence naming
 
 ### Transformer v3 (`functions/transformer/v3/`)
-- **Purpose**: Latest transformer with discontinuity analysis capabilities
+- **Purpose**: Latest transformer with sanity analysis capabilities
 - **Architecture**: Same core transformer with enhanced data structure
-- **Features**: Three-dataset structure (training/validation/discontinuity), timestamp-based naming
-- **Key Innovation**: Dedicated discontinuity test dataset with 1440 input-only sequences
+- **Features**: Three-dataset structure (training/validation/sanity), timestamp-based naming
+- **Key Innovation**: Dedicated sanity test dataset with 1440 input-only sequences
 
 ## Function Tracking
 

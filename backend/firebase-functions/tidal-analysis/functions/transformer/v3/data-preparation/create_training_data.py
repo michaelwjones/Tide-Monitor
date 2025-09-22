@@ -337,14 +337,14 @@ def create_train_val_split(X, y, sequence_metadata, val_split=0.2, random_seed=4
     
     return X_train, X_val, y_train, y_val
 
-def create_discontinuity_sequences(readings):
+def create_sanity_sequences(readings):
     """
-    Create 1440 input-only sequences from the last 4 days of data for discontinuity testing.
+    Create 1440 input-only sequences from the last 4 days of data for sanity testing.
     Each sequence starts 1 minute after the previous one.
     """
     from datetime import timedelta
     
-    print("Creating discontinuity test sequences...")
+    print("Creating sanity test sequences...")
     
     # Find the last 4 days of data
     last_timestamp = readings[-1]['timestamp']
@@ -360,8 +360,8 @@ def create_discontinuity_sequences(readings):
     print(f"Using last 4 days of data: {len(last_4_days)} readings")
     print(f"Date range: {four_days_ago} to {last_timestamp}")
     
-    discontinuity_sequences = []
-    discontinuity_names = []
+    sanity_sequences = []
+    sanity_names = []
     
     # Start from the first minute where we can create a valid 72-hour sequence
     start_time = last_4_days[0]['timestamp']
@@ -436,17 +436,17 @@ def create_discontinuity_sequences(readings):
         # Create timestamp name (local time, start of input sequence)
         sequence_name = current_start.strftime("%Y%m%d_%H%M")
         
-        discontinuity_sequences.append(input_downsampled)
-        discontinuity_names.append(sequence_name)
+        sanity_sequences.append(input_downsampled)
+        sanity_names.append(sequence_name)
         
         # Move to next minute
         current_start += timedelta(minutes=1)
         
         if (i + 1) % 100 == 0:
-            print(f"  Created {i + 1} discontinuity sequences...")
+            print(f"  Created {i + 1} sanity sequences...")
     
-    print(f"Created {len(discontinuity_sequences)} discontinuity test sequences")
-    return np.array(discontinuity_sequences), discontinuity_names
+    print(f"Created {len(sanity_sequences)} sanity test sequences")
+    return np.array(sanity_sequences), sanity_names
 
 def generate_sequences_with_timestamp_names(readings, total_hours=96, random_seed=42):
     """
@@ -612,7 +612,7 @@ def process_sequences_with_names(raw_sequences):
 
 def create_three_way_split(X, y, sequence_names, val_split=0.2, random_seed=42):
     """
-    Create train/validation split with timestamp-based names, excluding discontinuity data.
+    Create train/validation split with timestamp-based names, excluding sanity data.
     """
     np.random.seed(random_seed)
     
@@ -658,21 +658,21 @@ def main():
     print(f"Water level range: {min([r['water_level'] for r in readings]):.1f} - {max([r['water_level'] for r in readings]):.1f} mm")
     print(f"Date range: {readings[0]['timestamp']} to {readings[-1]['timestamp']}")
     
-    # Separate last 4 days for discontinuity testing
-    print("\nSeparating last 4 days for discontinuity testing...")
+    # Separate last 4 days for sanity testing
+    print("\nSeparating last 4 days for sanity testing...")
     from datetime import timedelta
     last_timestamp = readings[-1]['timestamp']
     four_days_ago = last_timestamp - timedelta(days=4)
     
-    # Split data: training/validation data vs discontinuity data
+    # Split data: training/validation data vs sanity data
     main_data = [r for r in readings if r['timestamp'] < four_days_ago]
-    discontinuity_data = [r for r in readings if r['timestamp'] >= four_days_ago]
+    sanity_data = [r for r in readings if r['timestamp'] >= four_days_ago]
     
     print(f"Main data (training/validation): {len(main_data)} readings")
-    print(f"Discontinuity data (last 4 days): {len(discontinuity_data)} readings")
+    print(f"Sanity data (last 4 days): {len(sanity_data)} readings")
     
     if len(main_data) < min_required:
-        print(f"Error: Insufficient main data for training after separating discontinuity data")
+        print(f"Error: Insufficient main data for training after separating sanity data")
         return
     
     # Generate sequences with timestamp names from main data
@@ -691,20 +691,20 @@ def main():
     print(f"Output shape: {y.shape} (24-hour sequences at 10-min intervals)")
     print(f"Sample sequence names: {sequence_names[:5]}")
     
-    # Create discontinuity test sequences
-    print("\nCreating discontinuity test sequences...")
-    X_discontinuity, discontinuity_names = create_discontinuity_sequences(discontinuity_data)
+    # Create sanity test sequences
+    print("\nCreating sanity test sequences...")
+    X_sanity, sanity_names = create_sanity_sequences(sanity_data)
     
-    if X_discontinuity is not None:
-        print(f"Discontinuity sequences: {X_discontinuity.shape}")
-        print(f"Sample discontinuity names: {discontinuity_names[:5]}")
+    if X_sanity is not None:
+        print(f"Sanity sequences: {X_sanity.shape}")
+        print(f"Sample sanity names: {sanity_names[:5]}")
     else:
-        print("Warning: Could not create discontinuity sequences")
+        print("Warning: Could not create sanity sequences")
     
     # Calculate normalization parameters
     print("\nCalculating normalization parameters...")
-    if X_discontinuity is not None:
-        all_values = np.concatenate([X.flatten(), y.flatten(), X_discontinuity.flatten()])
+    if X_sanity is not None:
+        all_values = np.concatenate([X.flatten(), y.flatten(), X_sanity.flatten()])
     else:
         all_values = np.concatenate([X.flatten(), y.flatten()])
     norm_params = calculate_normalization_params(all_values)
@@ -714,8 +714,8 @@ def main():
     X_normalized = apply_normalization(X, norm_params['mean'], norm_params['std'])
     y_normalized = apply_normalization(y, norm_params['mean'], norm_params['std'])
     
-    if X_discontinuity is not None:
-        X_discontinuity_normalized = apply_normalization(X_discontinuity, norm_params['mean'], norm_params['std'])
+    if X_sanity is not None:
+        X_sanity_normalized = apply_normalization(X_sanity, norm_params['mean'], norm_params['std'])
     
     # Create train/validation split
     print("Creating train/validation split...")
@@ -727,8 +727,8 @@ def main():
     print(f"  X_val: {X_val.shape}")
     print(f"  y_train: {y_train.shape}")
     print(f"  y_val: {y_val.shape}")
-    if X_discontinuity is not None:
-        print(f"  X_discontinuity: {X_discontinuity_normalized.shape}")
+    if X_sanity is not None:
+        print(f"  X_sanity: {X_sanity_normalized.shape}")
     
     # Save all data files
     print("\nSaving data files...")
@@ -741,8 +741,8 @@ def main():
     np.save('data/y_val.npy', y_val.astype(np.float32))
     
     # Discontinuity data
-    if X_discontinuity is not None:
-        np.save('data/X_discontinuity.npy', X_discontinuity_normalized.astype(np.float32))
+    if X_sanity is not None:
+        np.save('data/X_sanity.npy', X_sanity_normalized.astype(np.float32))
     
     # Sequence names
     with open('data/sequence_names_train.json', 'w') as f:
@@ -751,15 +751,15 @@ def main():
     with open('data/sequence_names_val.json', 'w') as f:
         json.dump(names_val, f, indent=2)
     
-    if X_discontinuity is not None:
-        with open('data/sequence_names_discontinuity.json', 'w') as f:
-            json.dump(discontinuity_names, f, indent=2)
+    if X_sanity is not None:
+        with open('data/sequence_names_sanity.json', 'w') as f:
+            json.dump(sanity_names, f, indent=2)
     
     # Save metadata
     metadata = {
         'total_raw_readings': len(readings),
         'main_data_readings': len(main_data),
-        'discontinuity_data_readings': len(discontinuity_data),
+        'sanity_data_readings': len(sanity_data),
         'total_generated_sequences': len(raw_sequences),
         'valid_sequences': len(X),
         'input_length': X.shape[1] if len(X) > 0 else 0,
@@ -767,8 +767,8 @@ def main():
         'interval_minutes': 10,
         'train_sequences': len(X_train),
         'val_sequences': len(X_val),
-        'discontinuity_sequences': len(X_discontinuity) if X_discontinuity is not None else 0,
-        'discontinuity_separation_date': four_days_ago.isoformat(),
+        'sanity_sequences': len(X_sanity) if X_sanity is not None else 0,
+        'sanity_separation_date': four_days_ago.isoformat(),
         'naming_scheme': 'timestamp_based',
         'success_rate': len(X) / len(raw_sequences) * 100 if len(raw_sequences) > 0 else 0
     }
@@ -781,12 +781,12 @@ def main():
     print(f"  X_val.npy: {X_val.nbytes / 1024 / 1024:.1f} MB")
     print(f"  y_train.npy: {y_train.nbytes / 1024 / 1024:.1f} MB")
     print(f"  y_val.npy: {y_val.nbytes / 1024 / 1024:.1f} MB")
-    if X_discontinuity is not None:
-        print(f"  X_discontinuity.npy: {X_discontinuity_normalized.nbytes / 1024 / 1024:.1f} MB")
+    if X_sanity is not None:
+        print(f"  X_sanity.npy: {X_sanity_normalized.nbytes / 1024 / 1024:.1f} MB")
     print(f"  sequence_names_train.json")
     print(f"  sequence_names_val.json")
-    if X_discontinuity is not None:
-        print(f"  sequence_names_discontinuity.json")
+    if X_sanity is not None:
+        print(f"  sequence_names_sanity.json")
     print(f"  normalization_params.json")
     print(f"  metadata.json")
     

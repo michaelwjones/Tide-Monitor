@@ -5,9 +5,9 @@ Transformer-based neural network for predicting water levels 24 hours into the f
 ## Architecture Changes in v3
 
 **Key improvements over v2:**
-- **Three-dataset structure**: Training, validation, and discontinuity testing datasets
+- **Three-dataset structure**: Training, validation, and sanity testing datasets
 - **Timestamp-based naming**: Sequences named by timestamp (YYYYMMDD_HHMM) instead of incremental IDs
-- **Discontinuity analysis**: Dedicated test dataset with 1440 input-only sequences for robust discontinuity detection
+- **Sanity analysis**: Dedicated test dataset with 1440 input-only sequences for robust model evaluation
 - **Improved data handling**: Uses -999 sentinel values for missing data instead of skipping sequences
 
 ## Data Preparation
@@ -18,7 +18,7 @@ Transformer-based neural network for predicting water levels 24 hours into the f
 ### Dataset Structure
 - **Training**: 13,388 sequences (main historical data)
 - **Validation**: 3,346 sequences (recent data for validation)
-- **Discontinuity**: 1,440 sequences (last 4 days, input-only for testing)
+- **Sanity**: 1,440 sequences (last 4 days, input-only for testing)
 
 ### Key Features
 - Timestamp-based sequence naming (YYYYMMDD_HHMM format)
@@ -37,7 +37,7 @@ python create_training_data.py
 Generates:
 - `X_train.npy`, `y_train.npy` - Training data
 - `X_val.npy`, `y_val.npy` - Validation data  
-- `X_discontinuity.npy` - Discontinuity test sequences (input-only)
+- `X_sanity.npy` - Sanity test sequences (input-only)
 - `sequence_names_*.json` - Timestamp-based naming files
 - `normalization_params.json` - Normalization parameters
 - `metadata.json` - Dataset statistics
@@ -55,9 +55,9 @@ python server.py
 ```
 Access at http://localhost:8080
 
-### Discontinuity Analysis
+### Sanity Analysis
 ```bash
-cd discontinuity-analysis
+cd sanity-analysis
 python analyze.py --data inference --num-tests 50
 ```
 
@@ -80,7 +80,7 @@ v3/
 ├── tester/                    # Web testing interface
 │   ├── server.py
 │   └── index.html
-├── discontinuity-analysis/    # Discontinuity detection
+├── sanity-analysis/           # Sanity analysis
 │   └── analyze.py
 └── shared/                    # Shared model and utilities
     ├── model.pth
@@ -89,7 +89,7 @@ v3/
 
 ## Key Improvements
 
-1. **Robust discontinuity testing**: Pre-generated dataset ensures consistent testing conditions
+1. **Robust sanity testing**: Pre-generated dataset ensures consistent testing conditions
 2. **Better sequence tracking**: Timestamp-based naming enables precise sequence identification  
 3. **Improved data integrity**: -999 handling prevents sequence gaps while maintaining data quality
-4. **Enhanced analysis**: Dedicated discontinuity dataset for comprehensive model evaluation
+4. **Enhanced analysis**: Dedicated sanity dataset for comprehensive model evaluation
