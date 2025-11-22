@@ -337,115 +337,41 @@
             return evaluateWindWaveCubicSpline(spline, evalPoints);
         }
 
-        // Fetch Transformer 24-hour forecasts from Firebase
-        async function fetchTransformerPredictions() {
-            try {
-                // Try v2 first, then fallback to v1
-                const sources = [
-                    { url: 'https://tide-monitor-boron-default-rtdb.firebaseio.com/tidal-analysis/transformer-v2-forecast.json', version: 'v2' },
-                    { url: 'https://tide-monitor-boron-default-rtdb.firebaseio.com/tidal-analysis/transformer-v1-forecast.json', version: 'v1' }
-                ];
-                
-                for (const source of sources) {
-                    try {
-                        const response = await fetch(source.url);
-                        const data = await response.json();
-                        
-                        if (!data || !data.forecast) {
-                            console.log(`No Transformer ${source.version} forecasts found`);
-                            continue;
-                        }
-                        
-                        // Check if forecast was updated in the last 10 minutes
-                        const generatedAt = new Date(data.generated_at);
-                        const now = new Date();
-                        const timeDiff = (now - generatedAt) / (1000 * 60); // minutes
-                        
-                        if (timeDiff > 10) {
-                            console.log(`Transformer ${source.version} forecast is ${timeDiff.toFixed(1)} minutes old, not showing`);
-                            continue;
-                        }
-                        
-                        console.log(`Fetched Transformer ${source.version} forecast: ${data.forecast.length} predictions`);
-                        
-                        // Each prediction has: timestamp (ISO string), prediction (mm), step
-                        const predictions = data.forecast.map(pred => ({
-                            timestamp: new Date(pred.timestamp),
-                            prediction: pred.prediction, // Keep in mm
-                            step: pred.step
-                        }));
-                        
-                        return {
-                            predictions: predictions,
-                            generatedAt: generatedAt,
-                            modelVersion: data.model_version,
-                            inputDataCount: data.input_data_count,
-                            version: source.version
-                        };
-                        
-                    } catch (error) {
-                        console.log(`Error fetching Transformer ${source.version} predictions:`, error);
-                        continue;
-                    }
-                }
-                
-                console.log('No recent Transformer forecasts found');
-                return null;
-                
-            } catch (error) {
-                console.error('Error fetching Transformer predictions:', error);
-                return null;
-            }
-        }
-
         async function fetchTideData() {
-            // Make two asynchronous calls
-            const [historyResponse, forecastData] = await Promise.allSettled([
-                fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/.json?orderBy="$key"&limitToLast=1440'),
-                fetchTransformerPredictions()
-            ]);
+            const historyResponse = await fetch('https://tide-monitor-boron-default-rtdb.firebaseio.com/readings/.json?orderBy="$key"&limitToLast=1440');
 
-            let readings = [];
-            if (historyResponse.status === 'fulfilled') {
-                const data = await historyResponse.value.json();
-                readings = Object.entries(data).map(([key, value]) => ({
-                    id: key,
-                    timestamp: new Date(value.t).toLocaleString('en-US', { 
-                        timeZone: 'America/New_York',
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit'
-                    }),
-                    rawTimestamp: new Date(value.t),
-                    wavesPercentile: (value.hp !== undefined && value.hp !== null) ? (value.hp / 304.8).toFixed(2) : '--',
-                    waterLevel: (value.w / 304.8).toFixed(2),
-                    windSpeed: (value.ws !== undefined && value.ws !== null && value.ws !== "-999") ? (parseFloat(value.ws) * 1.944).toFixed(1) : '--', // Convert m/s to knots
-                    windSpeedRaw: (value.ws !== undefined && value.ws !== null && value.ws !== "-999") ? (parseFloat(value.ws) * 1.944) : null,
-                    windDirection: (value.wd !== undefined && value.wd !== null && value.wd !== "-999") ? parseFloat(value.wd).toFixed(0) : '--'
-                }));
-            }
+            const data = await historyResponse.json();
+            const readings = Object.entries(data).map(([key, value]) => ({
+                id: key,
+                timestamp: new Date(value.t).toLocaleString('en-US', {
+                    timeZone: 'America/New_York',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                }),
+                rawTimestamp: new Date(value.t),
+                wavesPercentile: (value.hp !== undefined && value.hp !== null) ? (value.hp / 304.8).toFixed(2) : '--',
+                waterLevel: (value.w / 304.8).toFixed(2),
+                windSpeed: (value.ws !== undefined && value.ws !== null && value.ws !== "-999") ? (parseFloat(value.ws) * 1.944).toFixed(1) : '--', // Convert m/s to knots
+                windSpeedRaw: (value.ws !== undefined && value.ws !== null && value.ws !== "-999") ? (parseFloat(value.ws) * 1.944) : null,
+                windDirection: (value.wd !== undefined && value.wd !== null && value.wd !== "-999") ? parseFloat(value.wd).toFixed(0) : '--'
+            }));
 
             // Store readings for wind direction indicator
             currentReadings = readings;
-            
-            // Get forecast data if available
-            let transformerData = null;
-            if (forecastData.status === 'fulfilled') {
-                transformerData = forecastData.value;
-            }
-            
-            // Create chart with history data and optionally forecast data
-            createChart(readings, transformerData);
+
+            // Create chart with history data
+            createChart(readings);
             
             // Hide loading and show content
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('content').classList.remove('hidden');
         }
 
-        function createChart(readings, transformerData = null) {
+        function createChart(readings) {
             // Destroy existing chart if it exists
             if (chartInstance) {
                 chartInstance.destroy();
@@ -484,43 +410,17 @@
                 }
             }
             
-            // Determine time range based on forecast availability
+            // Determine time range
             const now = new Date();
             const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-            
-            // Prepare forecast dataset if available
-            let forecastDataset = null;
-            let hasForecast = false;
-            if (transformerData && transformerData.predictions) {
-                hasForecast = true;
-                // Convert predictions to chart data (water level in feet, points only)
-                const predictionData = transformerData.predictions.map(pred => ({
-                    x: pred.timestamp,
-                    y: pred.prediction / 304.8 // Convert mm to feet
-                }));
-                
-                forecastDataset = {
-                    label: 'Water Level Forecast (ft)',
-                    data: predictionData,
-                    borderColor: 'orange',
-                    backgroundColor: 'orange',
-                    fill: false,
-                    showLine: false, // Don't connect points with lines
-                    pointRadius: 3,
-                    pointHoverRadius: 5,
-                    yAxisID: 'y',
-                    order: 5
-                };
-            }
 
-            // Set time range and horizontal line based on forecast availability
-            const maxTime = hasForecast ? new Date(now.getTime() + (24 * 60 * 60 * 1000)) : now;
+            // Set horizontal line data
             const horizontalLineData = [
                 {x: twentyFourHoursAgo, y: 3},
-                {x: maxTime, y: 3}
+                {x: now, y: 3}
             ];
             
-            // Build datasets array, including forecast if available
+            // Build datasets array
             const datasets = [{
                 label: 'Water Level (ft)',
                 data: validReadings.map(r => ({x: r.rawTimestamp, y: parseFloat(r.waterLevel)})),
@@ -564,11 +464,6 @@
                 tension: 0,
                 order: 0
             }];
-
-            // Add forecast dataset if available
-            if (forecastDataset) {
-                datasets.push(forecastDataset);
-            }
 
             chartInstance = new Chart(ctx, {
                 type: 'line',
@@ -618,7 +513,7 @@
                         x: {
                             type: 'time',
                             min: twentyFourHoursAgo,
-                            max: maxTime,
+                            max: now,
                             time: {
                                 displayFormats: {
                                     hour: 'h:mm a'
@@ -650,14 +545,6 @@
                     { label: 'Reference Line', color: 'green' }
                 ];
 
-                // Add forecast to legend if available
-                if (transformerData && transformerData.predictions) {
-                    legendItems.push({ 
-                        label: 'Water Level Forecast (ft)', 
-                        color: 'orange' 
-                    });
-                }
-                
                 legendContainer.innerHTML = legendItems.map(item => `
                     <span style="display: flex; align-items: center; gap: 5px;">
                         <span style="width: 16px; height: 3px; background-color: ${item.color}; display: inline-block;"></span>
